@@ -234,6 +234,15 @@ tr.tot td{background:#F4F8FF;font-weight:700;border-top:2px solid var(--orange-m
 .splash-cta{margin-top:8px;padding:15px 38px;background:linear-gradient(135deg,var(--orange),var(--accent3));color:#fff;font-size:15px;font-weight:700;border:none;border-radius:11px;cursor:pointer;letter-spacing:.3px;box-shadow:0 10px 32px rgba(37,99,235,0.5);transition:all .2s;animation:ctaPulse 2.6s ease-in-out infinite 1.2s}
 .splash-cta:hover{transform:translateY(-2px)}
 @keyframes ctaPulse{0%,100%{box-shadow:0 8px 26px rgba(37,99,235,.45),0 0 0 0 rgba(37,99,235,.34)}50%{box-shadow:0 8px 26px rgba(37,99,235,.45),0 0 0 12px rgba(37,99,235,0)}}
+/* ---- Logo & con trỏ chuột CTA ---- */
+.tb-logo{height:30px;width:auto;display:block;object-fit:contain}
+.sc-logo{height:54px;width:auto;display:block;object-fit:contain;border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,0.35)}
+.splash-cta{display:inline-flex;align-items:center;gap:6px}
+.splash-cta-arrow{display:inline-flex;align-items:center;justify-content:center;margin-left:4px;animation:ctaClick 1.8s ease-in-out infinite}
+.splash-cta:hover .splash-cta-arrow{transform:none}
+@keyframes ctaClick{0%,100%{transform:scale(1)}45%{transform:scale(.82)}60%{transform:scale(.82)}}
+.cta-ripple{transform-origin:13px 13px;animation:ctaRipple 1.8s ease-out infinite}
+@keyframes ctaRipple{0%{transform:scale(.5);opacity:.7}70%{transform:scale(1.25);opacity:0}100%{opacity:0}}
 /* ---- Scrollbar ---- */
 *::-webkit-scrollbar{width:11px;height:11px}
 *::-webkit-scrollbar-track{background:transparent}
@@ -250,22 +259,24 @@ tr.tot td{background:#F4F8FF;font-weight:700;border-top:2px solid var(--orange-m
  <div class="splash-particles" id="splashParticles"></div>
  <div class="splash-cover">
   <div class="sc-top">
-   <div class="sc-mark">GHN</div>
+   <img class="sc-logo" src="ghn-logo.png" alt="GiaoHangNhanh">
    <div class="sc-badge">VÙNG TNT</div>
   </div>
   <div class="sc-kicker">Báo cáo Vận hành · Operations Report</div>
   <h1 class="sc-title">Trung tâm Dữ liệu Vận hành<br><span>GHN — Vùng TNT</span></h1>
-  <p class="sc-desc">Tổng hợp GTC, Tỉ lệ trả hàng, Ontime SLA và Aging — đồng bộ trực tiếp từ nguồn dữ liệu, kèm phân tích AI theo thời gian thực.</p>
+  <p class="sc-desc">Operations Analytics · <b>Phan Văn Quân</b></p>
   <div class="sc-regions">
    <span>Phú Thọ</span><span>Vĩnh Phúc</span><span>Hòa Bình</span><span>Hà Nam</span><span>Nam Định</span><span>Ninh Bình</span>
   </div>
-  <button class="splash-cta" onclick="dismissSplash()">Vào Dashboard <span class="splash-cta-arrow">→</span></button>
+  <button class="splash-cta" onclick="dismissSplash()">Vào Dashboard
+   <span class="splash-cta-arrow"><svg viewBox="0 0 28 28" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="13" cy="13" r="6.5" stroke="#fff" stroke-opacity=".55" stroke-width="1.4"/><circle class="cta-ripple" cx="13" cy="13" r="10.5" stroke="#fff" stroke-opacity=".35" stroke-width="1.2"/><circle cx="13" cy="13" r="2" fill="#fff"/><path d="M13.4 13.2 L22.5 16.1 L18.3 17.7 L16.7 22 Z" fill="#fff" stroke="#fff" stroke-width="1.1" stroke-linejoin="round"/></svg></span>
+  </button>
  </div>
 </div>
 
 <header class="topbar">
  <div class="tb-brand">
-  <div class="tb-mark">GHN</div>
+  <img class="tb-logo" src="ghn-logo.png" alt="GiaoHangNhanh">
   <div class="tb-titles">
    <div class="tb-name">Báo cáo Vận hành — Vùng TNT</div>
    <div class="tb-sub">Operations Analytics · Phan Văn Quân</div>
