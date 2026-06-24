@@ -737,7 +737,8 @@ function buildGTCDetailPage(){
   const rows=(raw||[]).slice(1).filter(r=>r.length>10&&(r[0]||'').trim()).map(r=>({
    am:(r[0]||'').trim(),bc:(r[1]||'').trim(),loai:gtcdLoaiKey(r[2]),kl:(r[3]||'').trim(),
    date:isoD(r[4]),vol:Math.round(parseFloat(r[5])||0),gan:(parseFloat(r[6])||0)*100,
-   gtc:(parseFloat(r[7])||0)*100,ctra:(parseFloat(r[8])||0)*100,lead:parseFloat(r[9])||0,ngtc:Math.round(parseFloat(r[10])||0)
+   gtc:(parseFloat(r[7])||0)*100,ctra:(parseFloat(r[8])||0)*100,lead:parseFloat(r[9])||0,
+   ngtc:Math.round(parseFloat(r[10])||0),ntra:Math.round(parseFloat(r[11])||0)
   })).filter(r=>r.date&&r.loai);
   window._GTCD.rows=rows;
   el.innerHTML=gtcDetailSkeleton(rows);
@@ -788,9 +789,9 @@ function gtcdFiltered(){
 function renderGTCDetail(){
  const G=window._GTCD;if(!G.rows.length)return;
  const data=gtcdFiltered();
- let vol=0,ngtc=0,ganW=0,heavyVol=0,tonVol=0;
- data.forEach(r=>{vol+=r.vol;ngtc+=r.ngtc;ganW+=r.vol*r.gan;if(r.kl!=='1. <5Kg')heavyVol+=r.vol;if(r.loai==='Hàng Tồn')tonVol+=r.vol;});
- const pctGTC=vol?ngtc/vol*100:0,pctGan=vol?ganW/vol:0,pctHeavy=vol?heavyVol/vol*100:0,ton=vol-ngtc;
+ let vol=0,ngtc=0,ntra=0,ganW=0,heavyVol=0;
+ data.forEach(r=>{vol+=r.vol;ngtc+=r.ngtc;ntra+=r.ntra;ganW+=r.vol*r.gan;if(r.kl!=='1. <5Kg')heavyVol+=r.vol;});
+ const pctGTC=vol?ngtc/vol*100:0,pctGan=vol?ganW/vol:0,pctHeavy=vol?heavyVol/vol*100:0,ton=vol-ngtc-ntra;
  const kpis=[
   {ic:'📦',bg:'#FFF0EB',c:'var(--orange)',label:'Tổng Volume',val:fmt(vol)},
   {ic:'✅',bg:'#DCFCE7',c:'var(--green)',label:'Số đơn GTC',val:fmt(ngtc)},
