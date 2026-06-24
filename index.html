@@ -729,11 +729,12 @@ const GTCD_GID='1337577508';
 const GTCD_LOAI=['Hàng Mới Ca 1','Hàng Mới Ca 2','Hàng Tồn'];
 const GTCD_KL=[{id:'1. <5Kg',label:'<5kg'},{id:'2. 5-10Kg',label:'5-10kg'},{id:'3. 10-15Kg',label:'10-15kg'},{id:'4. >=15Kg',label:'>=15kg'}];
 const GTCD_COLORS={'Hàng Mới Ca 1':'#F15D29','Hàng Mới Ca 2':'#38BDF8','Hàng Tồn':'#DC2626','Tổng':'#1C1C1E'};
-window._GTCD={rows:[],charts:{}};
+const GTCD_KLC={'1. <5Kg':'#FDBA74','2. 5-10Kg':'#FBBF24','3. 10-15Kg':'#A78BFA','4. >=15Kg':'#F87171'};
+window._GTCD={rows:[],charts:{},unstable:new Set()};
 function gtcdLoaiKey(v){const s=(v||'').trim();if(s.includes('Ca 1'))return'Hàng Mới Ca 1';if(s.includes('Ca 2'))return'Hàng Mới Ca 2';if(s.includes('Tồn'))return'Hàng Tồn';return'';}
 function buildGTCDetailPage(){
  const el=document.getElementById('p8');
- fetchSheetByGid(GTCD_GID).then(raw=>{
+ Promise.all([fetchSheetByGid(GTCD_GID),fetchSheetById(AGING_SID,'Baton').catch(()=>null)]).then(([raw,baton])=>{
   const rows=(raw||[]).slice(1).filter(r=>r.length>10&&(r[0]||'').trim()).map(r=>({
    am:(r[0]||'').trim(),bc:(r[1]||'').trim(),loai:gtcdLoaiKey(r[2]),kl:(r[3]||'').trim(),
    date:isoD(r[4]),vol:Math.round(parseFloat(r[5])||0),gan:(parseFloat(r[6])||0)*100,
@@ -741,6 +742,7 @@ function buildGTCDetailPage(){
    ngtc:Math.round(parseFloat(r[10])||0),ntra:Math.round(parseFloat(r[11])||0)
   })).filter(r=>r.date&&r.loai);
   window._GTCD.rows=rows;
+  window._GTCD.unstable=new Set((baton||[]).slice(1).map(r=>(r[3]||'').trim()).filter(Boolean));
   el.innerHTML=gtcDetailSkeleton(rows);
   window._GTCD.selLoai=new Set(GTCD_LOAI);
   window._GTCD.selKL=new Set(GTCD_KL.map(k=>k.id));
@@ -769,8 +771,10 @@ function gtcDetailSkeleton(rows){
   <div class="chip-row"><span class="chip-label">Khối lượng</span>${GTCD_KL.map(k=>`<span class="chip active" data-kl="${k.id}" onclick="gtcdToggle(this,'kl')">${k.label}</span>`).join('')}</div>
  </div>
  <div class="kpi-grid" id="gtcd_kpi"></div>
- <div class="chart-box"><h3>Xu hướng Volume theo Loại hàng</h3><div class="csub">3 đường loại hàng + đường tổng (đậm). Phát hiện tăng/đột biến ở hàng tồn.</div><div class="chart-canvas-wrap"><canvas id="gtcd_chartVol"></canvas></div></div>
- <div class="chart-box"><h3>Xu hướng %GTC theo Loại hàng</h3><div class="csub">So sánh hiệu suất giao của từng loại hàng theo ngày.</div><div class="chart-canvas-wrap"><canvas id="gtcd_chartGTC"></canvas></div></div>`;
+ <div class="chart-box"><h3>Xu hướng Volume theo Loại hàng</h3><div class="csub">Đường = loại hàng (+ Tổng đậm) · Cột = Volume theo 4 nhóm khối lượng/ngày.</div><div class="chart-canvas-wrap"><canvas id="gtcd_chartVol"></canvas></div></div>
+ <div class="chart-box"><h3>Xu hướng %GTC theo Loại hàng</h3><div class="csub">Đường = %GTC loại hàng (+ Tổng nét đứt) · Cột = %GTC theo 4 nhóm khối lượng/ngày.</div><div class="chart-canvas-wrap"><canvas id="gtcd_chartGTC"></canvas></div></div>
+ <div class="card"><div class="card-header"><div class="card-title"><div class="card-icon">👤</div>Theo AM</div><div class="card-info">Sắp xếp Volume cao → thấp · theo bộ lọc hiện tại</div></div><div id="gtcd_amTable"></div></div>
+ <div class="card"><div class="card-header"><div class="card-title"><div class="card-icon">🏪</div>Theo Bưu Cục</div><div class="card-info">Đánh dấu ⚠ bưu cục bất ổn (nguồn: Baton)</div></div><div id="gtcd_bcTable"></div></div>`;
 }
 function gtcdToggle(elm,type){
  elm.classList.toggle('active');
@@ -805,27 +809,80 @@ function renderGTCDetail(){
  const lo=from<=to?from:to,hi=from<=to?to:from;
  const dates=[...new Set(data.map(r=>r.date))].filter(d=>d>=lo&&d<=hi).sort();
  const selLoai=[...G.selLoai];
- const volByLoai={},gtcByLoai={};
+ const selKL=GTCD_KL.filter(k=>G.selKL.has(k.id)).map(k=>k.id);
+ const volByLoai={},gtcByLoai={},volByKL={},gtcByKL={};
  selLoai.forEach(l=>{volByLoai[l]=dates.map(()=>0);gtcByLoai[l]=dates.map(()=>({n:0,v:0}));});
+ selKL.forEach(k=>{volByKL[k]=dates.map(()=>0);gtcByKL[k]=dates.map(()=>({n:0,v:0}));});
  const totVol=dates.map(()=>0),totG=dates.map(()=>({n:0,v:0}));
  const dIdx=Object.fromEntries(dates.map((d,i)=>[d,i]));
- data.forEach(r=>{const i=dIdx[r.date];if(i===undefined)return;if(volByLoai[r.loai]){volByLoai[r.loai][i]+=r.vol;gtcByLoai[r.loai][i].n+=r.ngtc;gtcByLoai[r.loai][i].v+=r.vol;}totVol[i]+=r.vol;totG[i].n+=r.ngtc;totG[i].v+=r.vol;});
+ data.forEach(r=>{const i=dIdx[r.date];if(i===undefined)return;
+  if(volByLoai[r.loai]){volByLoai[r.loai][i]+=r.vol;gtcByLoai[r.loai][i].n+=r.ngtc;gtcByLoai[r.loai][i].v+=r.vol;}
+  if(volByKL[r.kl]){volByKL[r.kl][i]+=r.vol;gtcByKL[r.kl][i].n+=r.ngtc;gtcByKL[r.kl][i].v+=r.vol;}
+  totVol[i]+=r.vol;totG[i].n+=r.ngtc;totG[i].v+=r.vol;});
+ const klLabel=id=>(GTCD_KL.find(k=>k.id===id)||{}).label||id;
  const labels=dates.map(d=>shortD(d));
- const volDatasets=selLoai.map(l=>({label:l,data:volByLoai[l],borderColor:GTCD_COLORS[l],backgroundColor:GTCD_COLORS[l]+'22',tension:.35,borderWidth:2,pointRadius:2,fill:false}));
- volDatasets.push({label:'Tổng',data:totVol,borderColor:GTCD_COLORS['Tổng'],backgroundColor:'transparent',tension:.35,borderWidth:3,pointRadius:2,fill:false});
- const gtcDatasets=selLoai.map(l=>({label:l,data:gtcByLoai[l].map(o=>o.v?+(o.n/o.v*100).toFixed(2):null),borderColor:GTCD_COLORS[l],backgroundColor:'transparent',tension:.35,borderWidth:2,pointRadius:2,fill:false,spanGaps:true}));
- gtcDatasets.push({label:'Tổng',data:totG.map(o=>o.v?+(o.n/o.v*100).toFixed(2):null),borderColor:GTCD_COLORS['Tổng'],borderDash:[6,4],backgroundColor:'transparent',tension:.35,borderWidth:2.5,pointRadius:2,fill:false,spanGaps:true});
+ // Volume chart: cột = khối lượng, đường = loại hàng + Tổng
+ const volDatasets=selKL.map(k=>({type:'bar',label:'KL '+klLabel(k),data:volByKL[k],backgroundColor:GTCD_KLC[k]+'CC',borderColor:GTCD_KLC[k],borderWidth:1,order:2,categoryPercentage:.7,barPercentage:.9}));
+ selLoai.forEach(l=>volDatasets.push({type:'line',label:l,data:volByLoai[l],borderColor:GTCD_COLORS[l],backgroundColor:'transparent',tension:.35,borderWidth:2,pointRadius:2,fill:false,order:1}));
+ volDatasets.push({type:'line',label:'Tổng',data:totVol,borderColor:GTCD_COLORS['Tổng'],backgroundColor:'transparent',tension:.35,borderWidth:3,pointRadius:2,fill:false,order:0});
+ // %GTC chart: cột = %GTC khối lượng, đường = %GTC loại hàng + Tổng
+ const gtcDatasets=selKL.map(k=>({type:'bar',label:'KL '+klLabel(k),data:gtcByKL[k].map(o=>o.v?+(o.n/o.v*100).toFixed(2):null),backgroundColor:GTCD_KLC[k]+'CC',borderColor:GTCD_KLC[k],borderWidth:1,order:2,categoryPercentage:.7,barPercentage:.9}));
+ selLoai.forEach(l=>gtcDatasets.push({type:'line',label:l,data:gtcByLoai[l].map(o=>o.v?+(o.n/o.v*100).toFixed(2):null),borderColor:GTCD_COLORS[l],backgroundColor:'transparent',tension:.35,borderWidth:2,pointRadius:2,fill:false,spanGaps:true,order:1}));
+ gtcDatasets.push({type:'line',label:'Tổng',data:totG.map(o=>o.v?+(o.n/o.v*100).toFixed(2):null),borderColor:GTCD_COLORS['Tổng'],borderDash:[6,4],backgroundColor:'transparent',tension:.35,borderWidth:2.5,pointRadius:2,fill:false,spanGaps:true,order:0});
  gtcdDrawChart('gtcd_chartVol','vol',labels,volDatasets,false);
  gtcdDrawChart('gtcd_chartGTC','gtc',labels,gtcDatasets,true);
+ // Bảng theo AM & theo Bưu Cục
+ const amAgg={},bcAgg={};
+ data.forEach(r=>{
+  if(!amAgg[r.am])amAgg[r.am]={name:r.am,vol:0,ngtc:0,ntra:0,ganW:0,heavy:0};
+  const a=amAgg[r.am];a.vol+=r.vol;a.ngtc+=r.ngtc;a.ntra+=r.ntra;a.ganW+=r.vol*r.gan;if(r.kl!=='1. <5Kg')a.heavy+=r.vol;
+  if(!bcAgg[r.bc])bcAgg[r.bc]={name:r.bc,am:r.am,vol:0,ngtc:0,ntra:0,ganW:0,heavy:0};
+  const b=bcAgg[r.bc];b.vol+=r.vol;b.ngtc+=r.ngtc;b.ntra+=r.ntra;b.ganW+=r.vol*r.gan;if(r.kl!=='1. <5Kg')b.heavy+=r.vol;
+ });
+ document.getElementById('gtcd_amTable').innerHTML=gtcdAggTable(Object.values(amAgg).sort((a,b)=>b.vol-a.vol),false);
+ document.getElementById('gtcd_bcTable').innerHTML=gtcdAggTable(Object.values(bcAgg).sort((a,b)=>b.vol-a.vol),true);
+}
+function gtcdAggTable(rows,isBC){
+ if(!rows.length)return'<p style="padding:16px;color:var(--text-sub)">Không có dữ liệu</p>';
+ const cs='padding:6px 10px;';
+ const gc=p=>p>=65?'g':p>=50?'m':'b';
+ let h=`<div class="table-wrap" style="overflow-x:auto${isBC?';max-height:620px':''}"><table style="font-size:12px"><thead${isBC?' style="position:sticky;top:0;z-index:3;background:#FEEDE4"':''}><tr>
+  <th style="${cs}text-align:center;width:34px">STT</th>
+  <th style="${cs}min-width:150px">${isBC?'Bưu Cục':'AM'}</th>
+  ${isBC?`<th style="${cs}min-width:110px">AM</th>`:''}
+  <th style="${cs}text-align:right">Volume</th>
+  <th style="${cs}text-align:right">GTC</th>
+  <th style="${cs}text-align:right">Tồn</th>
+  <th style="${cs}text-align:center">%GTC</th>
+  <th style="${cs}text-align:center">%Gán</th>
+  <th style="${cs}text-align:center">%Cồng kềnh</th>
+ </tr></thead><tbody>`;
+ rows.forEach((r,i)=>{
+  const pGTC=r.vol?r.ngtc/r.vol*100:0,pGan=r.vol?r.ganW/r.vol:0,pHeavy=r.vol?r.heavy/r.vol*100:0,ton=r.vol-r.ngtc-r.ntra;
+  const unst=isBC&&window._GTCD.unstable.has(r.name);
+  const badge=unst?'<span style="display:inline-block;background:#FEE2E2;color:var(--red);border:1px solid #FECACA;border-radius:4px;font-size:9px;font-weight:700;padding:1px 5px;margin-left:5px">⚠ bất ổn</span>':'';
+  h+=`<tr><td style="${cs}text-align:center;color:var(--text-sub);font-size:11px">${i+1}</td>
+   <td style="${cs}font-weight:700;white-space:nowrap">${r.name}${badge}</td>
+   ${isBC?`<td style="${cs}color:var(--text-sub);font-size:11px;white-space:nowrap">${r.am||''}</td>`:''}
+   <td style="${cs}text-align:right">${fmt(r.vol)}</td>
+   <td style="${cs}text-align:right;color:var(--green);font-weight:600">${fmt(r.ngtc)}</td>
+   <td style="${cs}text-align:right;color:var(--yellow);font-weight:600">${fmt(ton)}</td>
+   <td style="${cs}text-align:center"><span class="pct ${gc(pGTC)}">${pGTC.toFixed(1)}%</span></td>
+   <td style="${cs}text-align:center">${pGan.toFixed(1)}%</td>
+   <td style="${cs}text-align:center">${pHeavy.toFixed(1)}%</td></tr>`;
+ });
+ h+='</tbody></table></div>';
+ if(isBC){const n=rows.filter(r=>window._GTCD.unstable.has(r.name)).length;if(n>0)h+=`<div class="analysis-box">⚠️ Có <strong>${n}</strong> bưu cục bất ổn trong danh sách (theo sheet Baton).</div>`;}
+ return h;
 }
 function gtcdDrawChart(canvasId,key,labels,datasets,isPct){
  const ctx=document.getElementById(canvasId);if(!ctx||!window.Chart)return;
  if(window._GTCD.charts[key])window._GTCD.charts[key].destroy();
- window._GTCD.charts[key]=new Chart(ctx,{type:'line',data:{labels,datasets},options:{
+ window._GTCD.charts[key]=new Chart(ctx,{type:'bar',data:{labels,datasets},options:{
   responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
   plugins:{legend:{position:'bottom',labels:{usePointStyle:true,boxWidth:8,font:{size:11}}},
    tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.y==null?'—':isPct?c.parsed.y.toFixed(1)+'%':c.parsed.y.toLocaleString('vi-VN')}`}}},
-  scales:{y:{beginAtZero:!isPct,ticks:{font:{size:10},callback:v=>isPct?v+'%':v.toLocaleString('vi-VN')},grid:{color:'#F0F0F0'}},x:{ticks:{font:{size:10}},grid:{display:false}}}
+  scales:{y:{beginAtZero:true,ticks:{font:{size:10},callback:v=>isPct?v+'%':v.toLocaleString('vi-VN')},grid:{color:'#F0F0F0'}},x:{ticks:{font:{size:10}},grid:{display:false}}}
  }});
 }
 
