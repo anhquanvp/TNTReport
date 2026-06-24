@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Báo Cáo Vận Hành TNT</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--orange:#F15D29;--orange-dark:#C8461A;--orange-light:#FFF0EB;--orange-mid:#FFD5C2;--sidebar-w:204px;--text-main:#1C1C1E;--text-sub:#6B7280;--border:#E5E7EB;--bg:#F4F6F9;--card:#FFFFFF;--shadow-sm:0 1px 3px rgba(0,0,0,0.08);--radius:10px;--green:#16A34A;--yellow:#D97706;--red:#DC2626;--green-bg:#DCFCE7;--yellow-bg:#FEF9C3;--red-bg:#FEE2E2}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text-main);display:flex;min-height:100vh;font-size:13px}
+.splash-overlay{position:fixed;inset:0;z-index:9999;background:url('bg.jpg') center/cover no-repeat;display:flex;align-items:center;justify-content:center;transition:opacity 0.7s ease;overflow:hidden}
+.splash-overlay::before{content:'';position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,0.55) 0%,rgba(0,0,0,0.35) 50%,rgba(0,0,0,0.65) 100%);z-index:0}
+.splash-overlay.fade-out{opacity:0;pointer-events:none}
+.splash-particles{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+.spark{position:absolute;border-radius:50%;animation:sparkle var(--d,4s) ease-in-out infinite var(--delay,0s)}
+@keyframes sparkle{0%,100%{opacity:0;transform:scale(0.5)}50%{opacity:var(--op,.7);transform:scale(1)}}
+.splash-glow{position:absolute;width:600px;height:600px;border-radius:50%;background:radial-gradient(circle,rgba(241,93,41,0.08) 0%,transparent 70%);left:50%;top:50%;transform:translate(-50%,-50%);animation:glowPulse 4s ease-in-out infinite}
+@keyframes glowPulse{0%,100%{transform:translate(-50%,-50%) scale(1);opacity:.5}50%{transform:translate(-50%,-50%) scale(1.15);opacity:1}}
+.splash-inner{display:flex;flex-direction:column;align-items:center;gap:14px;max-width:960px;width:100%;padding:24px 28px;position:relative;z-index:2}
+.splash-logo-wrap{display:flex;align-items:center;gap:12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:40px;padding:8px 20px;backdrop-filter:blur(8px)}
+.splash-logo-txt{font-size:38px;font-weight:900;background:linear-gradient(135deg,#F15D29 0%,#FF9A6C 60%,#FFD0A8 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:-1px}
+.splash-divider{width:1px;height:22px;background:rgba(255,255,255,0.18)}
+.splash-vung{color:rgba(255,255,255,0.75);font-size:14px;font-weight:600;letter-spacing:2.5px;text-transform:uppercase}
+.splash-title{font-size:52px;font-weight:900;color:#fff;text-align:center;line-height:1.2;text-shadow:0 4px 24px rgba(0,0,0,0.7),0 0 60px rgba(241,93,41,0.4);animation:titleGlow 3s ease-in-out infinite}
+@keyframes titleGlow{0%,100%{text-shadow:0 0 40px rgba(241,93,41,0.3),0 2px 12px rgba(0,0,0,0.5)}50%{text-shadow:0 0 60px rgba(241,93,41,0.55),0 2px 12px rgba(0,0,0,0.5)}}
+.splash-title span{background:linear-gradient(135deg,#F15D29,#FF9A6C);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.map-row{display:flex;align-items:flex-start;gap:18px;width:100%}
+.prov-grid{flex:1;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.prov-card{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:9px 11px;transition:all .25s;cursor:default}
+.prov-card:hover{transform:translateY(-2px);border-color:rgba(255,255,255,0.22)}
+.prov-name{font-size:14px;font-weight:700;margin-bottom:4px;white-space:nowrap}
+.prov-spec{font-size:11px;color:rgba(255,255,255,0.65);line-height:1.6}
+.c-bg{color:#FF8A56}.c-ls{color:#FBBF24}.c-qn{color:#38BDF8}.c-bn{color:#A78BFA}.c-hd{color:#34D399}.c-hp{color:#60A5FA}
+.splash-cta{margin-top:6px;padding:18px 56px;background:linear-gradient(135deg,#F15D29 0%,#E04010 100%);color:#fff;font-size:19px;font-weight:700;border:none;border-radius:50px;cursor:pointer;letter-spacing:.4px;box-shadow:0 8px 32px rgba(241,93,41,0.55);transition:all .2s;animation:ctaPulse 2.5s ease-in-out infinite 1.2s}
+.splash-cta:hover{transform:translateY(-2px) scale(1.03)}
+@keyframes ctaPulse{0%,100%{box-shadow:0 6px 24px rgba(241,93,41,.45),0 0 0 0 rgba(241,93,41,.3)}50%{box-shadow:0 6px 24px rgba(241,93,41,.45),0 0 0 10px rgba(241,93,41,0)}}
+.splash-cta-arrow{display:inline-block;margin-left:8px;transition:transform .2s}
+.splash-cta:hover .splash-cta-arrow{transform:translateX(4px)}
+@keyframes fadeInUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+.splash-inner>*{animation:fadeInUp 0.55s cubic-bezier(.22,.68,0,1.2) both}
+.splash-inner>*:nth-child(1){animation-delay:.08s}.splash-inner>*:nth-child(2){animation-delay:.18s}.splash-inner>*:nth-child(3){animation-delay:.3s}.splash-inner>*:nth-child(4){animation-delay:.44s}.splash-inner>*:nth-child(5){animation-delay:.56s}
+@keyframes provPulse{0%,100%{filter:drop-shadow(0 0 3px rgba(255,255,255,0.1))}50%{filter:drop-shadow(0 0 8px rgba(255,255,255,0.25))}}
+.prov-shape{animation:provPulse 4s ease-in-out infinite}
+.sidebar{width:var(--sidebar-w);background:linear-gradient(180deg,#1A1A1A 0%,#252525 100%);display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:100;overflow-y:auto}
+.logo-area{padding:18px 14px 14px;border-bottom:1px solid rgba(255,255,255,0.08)}
+.logo-area img{height:38px;filter:brightness(0) saturate(100%) invert(42%) sepia(96%) saturate(1220%) hue-rotate(342deg) brightness(101%) contrast(97%)}
+.logo-sub{color:rgba(255,255,255,0.6);font-size:12px;font-weight:700;letter-spacing:.4px;margin-top:7px;text-transform:uppercase}
+.logo-author{color:rgba(255,255,255,0.35);font-size:10px;font-weight:400;margin-top:5px;letter-spacing:.2px}
+.nav-section{padding:12px 14px 4px;color:rgba(255,255,255,0.3);font-size:9px;font-weight:600;letter-spacing:.9px;text-transform:uppercase}
+.nav-item{display:flex;align-items:center;gap:8px;padding:9px 12px;margin:2px 6px;border-radius:7px;cursor:pointer;color:rgba(255,255,255,0.6);font-size:12px;font-weight:500;transition:all .15s;border:none;background:none;width:calc(100% - 12px);text-align:left}
+.nav-item:hover{background:rgba(255,255,255,0.08);color:#fff}
+.nav-item.active{background:var(--orange);color:#fff;font-weight:600}
+.nav-item .icon{font-size:14px;flex-shrink:0;width:18px;text-align:center}
+.refresh-btn{display:flex;align-items:center;gap:6px;margin:10px 8px 4px;padding:8px 12px;border-radius:7px;background:rgba(241,93,41,0.15);border:1px solid rgba(241,93,41,0.3);color:var(--orange);font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;width:calc(100% - 16px)}
+.refresh-btn:hover{background:rgba(241,93,41,0.25)}
+.refresh-btn.spinning .spin{animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spin{display:inline-block}
+.last-update{color:rgba(255,255,255,0.3);font-size:9px;text-align:center;padding:4px 8px 10px}
+.main{margin-left:var(--sidebar-w);flex:1;padding:22px 26px;max-width:calc(100vw - var(--sidebar-w));overflow-x:hidden}
+.page{display:none}.page.active{display:block;animation:slideIn .5s ease both}
+@keyframes slideIn{from{opacity:0;transform:translateX(-20px)}to{opacity:1;transform:translateX(0)}}
+.loading{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;gap:12px}
+.spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--orange);border-radius:50%;animation:spin .8s linear infinite}
+.loading-text{color:var(--text-sub);font-size:13px}
+.error-box{background:#FEF2F2;border:1px solid #FECACA;border-radius:var(--radius);padding:16px;color:var(--red);font-size:13px;margin:20px 0}
+.page-header{margin-bottom:18px}
+.page-title{font-size:22px;font-weight:800;color:var(--text-main)}
+.page-meta{color:var(--text-sub);font-size:12px;margin-top:4px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.tag{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:500}
+.tag-orange{background:var(--orange-light);color:var(--orange-dark)}
+.card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow-sm);border:1px solid var(--border);overflow:hidden;margin-bottom:18px}
+.card-header{padding:13px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:linear-gradient(135deg,#fff 0%,var(--orange-light) 100%)}
+.card-title{font-size:13px;font-weight:600;color:var(--text-main);display:flex;align-items:center;gap:9px}
+.card-icon{width:28px;height:28px;background:var(--orange);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+.card-info{font-size:11px;color:var(--text-sub)}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:400px}
+th{background:#FEEDE4;padding:8px 10px;text-align:left;font-size:12px;font-weight:700;color:#9A3412;border-bottom:2px solid var(--orange-mid);white-space:nowrap}
+td{padding:7px 10px;border-bottom:1px solid #F3F4F6;font-size:12px;color:var(--text-main);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#FAFAFA}
+tr.tot td{background:#F8F9FA;font-weight:700;border-top:2px solid var(--orange-mid)}
+.pct{display:inline-block;padding:2px 7px;border-radius:5px;font-size:11px;font-weight:600;white-space:nowrap}
+.g{background:var(--green-bg);color:var(--green)}.m{background:var(--yellow-bg);color:var(--yellow)}.b{background:var(--red-bg);color:var(--red)}
+.red-cell{background:#FEE2E2!important;color:#DC2626!important;font-weight:700}
+.analysis-box{margin:10px 16px 4px;padding:11px 15px;background:#FFF7ED;border-radius:8px;font-size:12.5px;line-height:1.65;border-left:3px solid var(--orange)}
+.date-filter-bar{display:flex;align-items:center;gap:10px;padding:10px 16px;background:#F9FAFB;border-bottom:1px solid var(--border)}
+.date-filter-bar label{font-size:12px;font-weight:600;color:var(--text-sub)}
+.date-filter-bar select{padding:5px 10px;border-radius:6px;border:1px solid var(--border);font-size:12px;font-family:inherit;background:#fff;color:var(--text-main);cursor:pointer}
+.date-filter-bar select:focus{outline:none;border-color:var(--orange)}
+/* AI */
+.ai-preset-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.ai-preset-btn{padding:6px 14px;border-radius:20px;border:1px solid var(--border);background:#fff;color:var(--text-sub);font-size:12px;cursor:pointer;transition:all .15s}
+.ai-preset-btn:hover{border-color:var(--orange);color:var(--orange)}
+.ai-textarea{width:100%;min-height:100px;padding:12px 14px;border-radius:8px;border:1px solid var(--border);background:#fff;color:var(--text-main);font-size:13px;font-family:inherit;resize:vertical;box-sizing:border-box}
+.ai-textarea:focus{outline:none;border-color:var(--orange)}
+.ai-run-btn{margin-top:12px;padding:11px 32px;background:linear-gradient(135deg,#7C3AED,#5B21B6);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:8px}
+.ai-run-btn:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(124,58,237,0.4)}
+.ai-run-btn:disabled{opacity:.6;cursor:not-allowed;transform:none}
+.ai-result{padding:20px;background:#F9FAFB;border-radius:10px;border:1px solid var(--border);min-height:80px;line-height:1.75;color:var(--text-main)}
+.ai-result h1,.ai-result h2{color:var(--orange);margin:16px 0 8px;font-size:16px}
+.ai-result h3{color:var(--text-main);margin:12px 0 6px;font-size:14px}
+.ai-result ul,.ai-result ol{padding-left:22px;margin:6px 0}
+.ai-result li{margin:4px 0}
+.ai-result strong{color:var(--text-main)}
+.ai-result hr{border:none;border-top:1px solid var(--border);margin:16px 0}
+.ai-thinking{color:var(--text-sub);font-size:13px;display:flex;align-items:center;gap:8px}
+.ai-thinking-dot{width:8px;height:8px;border-radius:50%;background:var(--orange);animation:aiDot 1.2s ease-in-out infinite}
+.ai-thinking-dot:nth-child(2){animation-delay:.2s}.ai-thinking-dot:nth-child(3){animation-delay:.4s}
+@keyframes aiDot{0%,80%,100%{transform:scale(0.6);opacity:.5}40%{transform:scale(1);opacity:1}}
+.ai-tag-hl{display:inline-block;background:rgba(52,211,153,0.15);color:#34D399;border-radius:4px;padding:1px 6px;font-size:11px;font-weight:700;margin-right:4px}
+.ai-tag-ll{display:inline-block;background:rgba(248,113,113,0.15);color:#f87171;border-radius:4px;padding:1px 6px;font-size:11px;font-weight:700;margin-right:4px}
+</style>
+</head>
+<body>
+
+<!-- SPLASH -->
+<div id="splash" class="splash-overlay">
+ <div class="splash-particles" id="splashParticles"></div>
+ <div class="splash-glow"></div>
+ <div class="splash-inner">
+  <div class="splash-logo-wrap">
+   <div class="splash-logo-txt">GHN</div>
+   <div class="splash-divider"></div>
+   <div class="splash-vung">Vùng TNT</div>
+  </div>
+  <div class="splash-title">GHN – Vùng TNT<br><span>XIN CHÀO BẠN! 👋</span></div>
+  <div class="map-row">
+   <svg viewBox="0 0 480 340" width="330" height="234" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+     <filter id="glowA"><feGaussianBlur stdDeviation="3.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    </defs>
+    <rect width="480" height="340" fill="rgba(255,255,255,0.015)" rx="12"/>
+    <path class="prov-shape" d="M 58,34 L 150,22 L 200,42 L 210,84 L 176,116 L 116,120 L 70,98 L 54,58 Z" fill="#FF8A56" fill-opacity=".82" stroke="#FFD9C2" stroke-width="2" filter="url(#glowA)"/>
+    <text x="132" y="68" text-anchor="middle" fill="white" font-size="12" font-weight="800" font-family="Inter,sans-serif">Phú Thọ</text>
+    <text x="132" y="84" text-anchor="middle" fill="rgba(255,255,255,.82)" font-size="9" font-family="Inter,sans-serif">🍊 Bưởi Đoan Hùng</text>
+    <path class="prov-shape" d="M 216,46 L 286,28 L 338,52 L 332,98 L 278,120 L 224,100 L 210,66 Z" fill="#FBBF24" fill-opacity=".8" stroke="#fff" stroke-width="1.8" filter="url(#glowA)"/>
+    <text x="272" y="72" text-anchor="middle" fill="white" font-size="12" font-weight="800" font-family="Inter,sans-serif">Vĩnh Phúc</text>
+    <text x="272" y="88" text-anchor="middle" fill="rgba(255,255,255,.8)" font-size="9" font-family="Inter,sans-serif">🥬 Su su Tam Đảo</text>
+    <path class="prov-shape" d="M 50,128 L 140,122 L 182,150 L 176,212 L 132,252 L 80,244 L 48,202 L 40,160 Z" fill="#34D399" fill-opacity=".74" stroke="#fff" stroke-width="1.8"/>
+    <text x="108" y="186" text-anchor="middle" fill="white" font-size="12" font-weight="800" font-family="Inter,sans-serif">Hòa Bình</text>
+    <text x="108" y="202" text-anchor="middle" fill="rgba(255,255,255,.78)" font-size="9" font-family="Inter,sans-serif">🌾 Cam · Cơm lam</text>
+    <path class="prov-shape" d="M 188,154 L 262,142 L 302,170 L 292,210 L 244,230 L 196,212 L 182,178 Z" fill="#A78BFA" fill-opacity=".8" stroke="#fff" stroke-width="1.8"/>
+    <text x="240" y="184" text-anchor="middle" fill="white" font-size="11" font-weight="800" font-family="Inter,sans-serif">Hà Nam</text>
+    <text x="240" y="199" text-anchor="middle" fill="rgba(255,255,255,.8)" font-size="9" font-family="Inter,sans-serif">🐟 Cá kho Nhân Hậu</text>
+    <path class="prov-shape" d="M 308,172 L 388,150 L 446,196 L 450,254 L 418,300 L 358,304 L 312,262 L 300,212 Z" fill="#60A5FA" fill-opacity=".78" stroke="#fff" stroke-width="1.8"/>
+    <text x="376" y="228" text-anchor="middle" fill="white" font-size="12" font-weight="800" font-family="Inter,sans-serif">Nam Định</text>
+    <text x="376" y="244" text-anchor="middle" fill="rgba(255,255,255,.78)" font-size="9" font-family="Inter,sans-serif">🍜 Phở bò</text>
+    <path class="prov-shape" d="M 138,260 L 222,240 L 288,250 L 296,298 L 256,332 L 190,336 L 138,310 L 124,282 Z" fill="#38BDF8" fill-opacity=".74" stroke="#fff" stroke-width="1.8"/>
+    <text x="208" y="290" text-anchor="middle" fill="white" font-size="12" font-weight="800" font-family="Inter,sans-serif">Ninh Bình</text>
+    <text x="208" y="306" text-anchor="middle" fill="rgba(255,255,255,.78)" font-size="9" font-family="Inter,sans-serif">🐐 Dê núi · Cơm cháy</text>
+   </svg>
+   <div class="prov-grid">
+    <div class="prov-card"><div class="prov-name c-ls">🥬 Vĩnh Phúc</div><div class="prov-spec">Su su Tam Đảo<br>Cá thính Lập Thạch<br>Bánh trùng mật mía</div></div>
+    <div class="prov-card"><div class="prov-name c-bg">🍊 Phú Thọ</div><div class="prov-spec">Bưởi Đoan Hùng<br>Thịt chua Thanh Sơn<br>Cọ ỏm, Bánh tai</div></div>
+    <div class="prov-card"><div class="prov-name c-hd">🌾 Hòa Bình</div><div class="prov-spec">Cam Cao Phong<br>Lợn cắp nách<br>Cơm lam, Rượu cần</div></div>
+    <div class="prov-card"><div class="prov-name c-hp">🍜 Nam Định</div><div class="prov-spec">Phở bò Nam Định<br>Bánh gai Bà Thi<br>Nem nắm Giao Thủy</div></div>
+    <div class="prov-card"><div class="prov-name c-bn">🐟 Hà Nam</div><div class="prov-spec">Cá kho Nhân Hậu<br>Chuối ngự Đại Hoàng<br>Bánh cuốn Phủ Lý</div></div>
+    <div class="prov-card"><div class="prov-name c-qn">🐐 Ninh Bình</div><div class="prov-spec">Thịt dê núi<br>Cơm cháy Ninh Bình<br>Mắm tép Gia Viễn</div></div>
+   </div>
+  </div>
+  <button class="splash-cta" onclick="dismissSplash()">Click vào đây để xem Dashboard <span class="splash-cta-arrow">→</span></button>
+ </div>
+</div>
+
+<nav class="sidebar">
+ <div class="logo-area">
+  <img src="https://cdn.hstatic.net/themes/200000472237/1001423864/14/logo.png?v=2874" alt="GHN">
+  <div class="logo-sub">Báo Cáo Vận Hành TNT</div>
+  <div class="logo-author">Người làm: Phan Văn Quân</div>
+ </div>
+ <div class="nav-section">GTC</div>
+ <button class="nav-item active" onclick="show('p1',this)"><span class="icon">📦</span>Tổng quan GTC Total</button>
+ <button class="nav-item" onclick="show('p2',this)"><span class="icon">🎯</span>Tổng quan GTC TTS</button>
+ <div class="nav-section">Tỉ Lệ Trả</div>
+ <button class="nav-item" onclick="show('p3',this)"><span class="icon">📅</span>TLT theo Ngày</button>
+ <button class="nav-item" onclick="show('p4',this)"><span class="icon">📆</span>TLT theo Tuần</button>
+ <div class="nav-section">Ontime SLA TTS</div>
+ <button class="nav-item" onclick="show('p5',this)"><span class="icon">⏱️</span>Tổng quan ODR TTS</button>
+ <button class="nav-item" onclick="show('p6',this)"><span class="icon">🚀</span>Tổng quan OPR TTS</button>
+ <div class="nav-section">AI</div>
+ <button class="nav-item" onclick="show('p12',this)" style="background:linear-gradient(135deg,rgba(124,58,237,0.18),rgba(91,33,182,0.1));border:1px solid rgba(124,58,237,0.3);color:#A78BFA;font-weight:700"><span class="icon">✨</span>AI - Phân tích tổng quan</button>
+ <button class="refresh-btn" id="refreshBtn" onclick="loadAll()">
+  <span class="spin" id="spinIcon">🔄</span> Cập nhật dữ liệu
+ </button>
+ <div class="last-update" id="lastUpdate"></div>
+</nav>
+
+<main class="main">
+ <div class="page active" id="p1"><div class="loading"><div class="spinner"></div><div class="loading-text">Đang tải dữ liệu...</div></div></div>
+ <div class="page" id="p2"><div class="loading"><div class="spinner"></div><div class="loading-text">Đang tải dữ liệu...</div></div></div>
+ <div class="page" id="p3"><div class="loading"><div class="spinner"></div><div class="loading-text">Đang tải dữ liệu...</div></div></div>
+ <div class="page" id="p4"><div class="loading"><div class="spinner"></div><div class="loading-text">Đang tải dữ liệu...</div></div></div>
+ <div class="page" id="p5"><div class="loading"><div class="spinner"></div><div class="loading-text">Đang tải dữ liệu...</div></div></div>
+ <div class="page" id="p6"><div class="loading"><div class="spinner"></div><div class="loading-text">Đang tải dữ liệu...</div></div></div>
+ <div class="page" id="p7"><div class="loading"><div class="spinner"></div><div class="loading-text">Đang tải dữ liệu...</div></div></div>
+ <div class="page" id="p12"></div>
+</main>
+
+<script>
+/* ===== HELPERS ===== */
+function show(id,btn){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('active'));const el=document.getElementById(id);el.classList.add('active');el.style.animation='none';el.offsetHeight;el.style.animation='';btn.classList.add('active');}
+function fmt(n){return(+n||0).toLocaleString('vi-VN');}
+function isoD(d){return(d||'').match(/\d{4}-\d{2}-\d{2}/)?.[0]||'';}
+function shortD(iso){const p=(iso||'').split('-');return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:iso;}
+function parsePct(v){const s=(v||'').toString().trim();if(s.endsWith('%'))return parseFloat(s);return(parseFloat(s)||0)*100;}
+function parseCSV(text){return text.trim().split('\n').filter(l=>l.trim()).map(line=>{const cols=[];let cur='',inQ=false;for(const c of line){if(c==='"')inQ=!inQ;else if(c===','&&!inQ){cols.push(cur.trim());cur='';}else cur+=c;}cols.push(cur.trim());return cols;});}
+function errPage(msg){return`<div class="error-box">⚠️ Không thể tải dữ liệu: ${msg}<br><small>Kiểm tra kết nối hoặc quyền truy cập Google Sheet.</small></div>`;}
+
+/* ===== FETCH ===== */
+const SID='1CGUY5pxLZG5zoljPoVWv3Xnyn2XaLJdjEnOeYbCCJ0s';
+async function fetchSheet(name,retry=2){
+ for(let i=0;i<=retry;i++){
+  try{
+   const r=await fetch(`https://docs.google.com/spreadsheets/d/${SID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(name)}`);
+   if(!r.ok)throw new Error(`HTTP ${r.status}`);
+   return parseCSV(await r.text());
+  }catch(e){
+   if(i===retry)throw e;
+   await new Promise(res=>setTimeout(res,1500*(i+1)));
+  }
+ }
+}
+
+/* ===== DASHBOARD 1 & 2: GTC ===== */
+// rowsAM cols: name(0), Ngày(1), Volume(2), Tỉ lệ gán(3), Tỉ lệ GTC(4), Số đơn GTC(5)
+// rowsBC cols: AM(0), Bưu Cục(1), Ngày(2), Volume(3), Tỉ lệ gán(4), Tỉ lệ GTC(5), Số đơn GTC(6)
+window._GTC={};
+function getDOW(iso){if(!iso)return'';const d=new Date(iso+'T00:00:00');return['CN','Thứ 2','Thứ 3','Thứ 4','Thứ 5','Thứ 6','Thứ 7'][d.getDay()]||'';}
+function shortDDow(iso){return iso?`${shortD(iso)} (${getDOW(iso)})`:'—';}
+function renderGTCAmTable(rows,dates){
+ if(!rows||rows.length<2)return'<p style="padding:16px;color:var(--text-sub)">Không có dữ liệu</p>';
+ const data=rows.slice(1).filter(r=>r.length>4&&(r[0]||'').trim());
+ const isGrand=r=>(r[0]||'').toLowerCase().includes('grand total');
+ const amRows=data.filter(r=>!isGrand(r));
+ const gRows=data.filter(r=>isGrand(r));
+ const pivot={};
+ amRows.forEach(r=>{const name=(r[0]||'').trim(),d=isoD(r[1]);if(!name||!dates.includes(d))return;if(!pivot[name])pivot[name]={};pivot[name][d]={vol:Math.round(parseFloat(r[2])||0),gan:(parseFloat(r[3])||0)*100,gtc:(parseFloat(r[4])||0)*100,nGTC:Math.round(parseFloat(r[5])||0)};});
+ const gPivot={};
+ gRows.forEach(r=>{const d=isoD(r[1]);if(!dates.includes(d))return;gPivot[d]={vol:Math.round(parseFloat(r[2])||0),gan:(parseFloat(r[3])||0)*100,gtc:(parseFloat(r[4])||0)*100,nGTC:Math.round(parseFloat(r[5])||0)};});
+ const latest=dates[0];
+ const names=Object.keys(pivot).sort((a,b)=>(pivot[b][latest]?.gtc??-1)-(pivot[a][latest]?.gtc??-1));
+ const cs='padding:6px 9px;';
+ const sH='position:sticky;left:0;z-index:3;background:#FEEDE4;';
+ const sH2='position:sticky;left:32px;z-index:3;background:#FEEDE4;';
+ let h=`<div class="table-wrap" style="overflow-x:auto"><table style="font-size:12px"><thead>
+  <tr>
+   <th rowspan="2" style="${cs}${sH}width:32px;text-align:center">STT</th>
+   <th rowspan="2" style="${cs}${sH2}min-width:130px">AM</th>
+   ${dates.map(d=>`<th colspan="4" style="${cs}text-align:center;border-left:2px solid #E5E7EB"><strong>${shortDDow(d)}</strong></th>`).join('')}
+  </tr>
+  <tr>
+   ${dates.map(()=>`<th style="${cs}text-align:right;border-left:2px solid #E5E7EB">Vol</th><th style="${cs}text-align:center">%Gán</th><th style="${cs}text-align:center">%GTC</th><th style="${cs}text-align:right">GTC</th>`).join('')}
+  </tr>
+ </thead><tbody>`;
+ names.forEach((name,i)=>{
+  h+=`<tr><td style="${cs}text-align:center;color:var(--text-sub);font-size:11px;position:sticky;left:0;background:#fff;z-index:2">${i+1}</td><td style="${cs}white-space:nowrap;font-weight:700;position:sticky;left:32px;background:#fff;z-index:2">${name}</td>`;
+  dates.forEach(d=>{const c=pivot[name]?.[d];if(c){const gc=c.gtc>=65?'g':c.gtc>=50?'m':'b';h+=`<td style="${cs}text-align:right;border-left:2px solid #F3F4F6">${fmt(c.vol)}</td><td style="${cs}text-align:center">${c.gan.toFixed(1)}%</td><td style="${cs}text-align:center"><span class="pct ${gc}">${c.gtc.toFixed(1)}%</span></td><td style="${cs}text-align:right;color:var(--green);font-weight:600">${fmt(c.nGTC)}</td>`;}else{h+=`<td colspan="4" style="${cs}text-align:center;border-left:2px solid #F3F4F6;color:var(--text-sub)">—</td>`;}});
+  h+='</tr>';
+ });
+ if(Object.keys(gPivot).length){
+  h+=`<tr class="tot"><td style="${cs}position:sticky;left:0;background:#F8F9FA;z-index:2"></td><td style="${cs}position:sticky;left:32px;background:#F8F9FA;z-index:2">Grand Total</td>`;
+  dates.forEach(d=>{const c=gPivot[d];if(c){const gc=c.gtc>=65?'g':c.gtc>=50?'m':'b';h+=`<td style="${cs}text-align:right;border-left:2px solid #F3F4F6">${fmt(c.vol)}</td><td style="${cs}text-align:center">${c.gan.toFixed(1)}%</td><td style="${cs}text-align:center"><span class="pct ${gc}">${c.gtc.toFixed(1)}%</span></td><td style="${cs}text-align:right;color:var(--green);font-weight:600">${fmt(c.nGTC)}</td>`;}else{h+=`<td colspan="4" style="${cs}text-align:center;border-left:2px solid #F3F4F6">—</td>`;}});
+  h+='</tr>';
+ }
+ h+='</tbody></table></div>';
+ const lg=gPivot[latest];const prev=dates[1];const lg2=prev?gPivot[prev]:null;
+ let ana='';
+ if(names.length>0){
+  const best=names[0],worst=names[names.length-1];
+  ana+=`📊 Ngày ${shortD(latest)}: AM tốt nhất <strong>${best}</strong> (${(pivot[best]?.[latest]?.gtc??0).toFixed(1)}%) · AM tệ nhất <strong>${worst}</strong> (${(pivot[worst]?.[latest]?.gtc??0).toFixed(1)}%).`;
+ }
+ if(lg&&lg2){
+  const dVol=lg.vol-lg2.vol,dGTC=lg.nGTC-lg2.nGTC;
+  const vS=dVol>=0?'+':'',gS=dGTC>=0?'+':'';
+  const vC=dVol>=0?'var(--red)':'var(--green)',gC=dGTC>=0?'var(--green)':'var(--red)';
+  ana+=` So với ${shortD(prev)}: Vol <span style="color:${vC};font-weight:700">${vS}${fmt(dVol)}</span> · GTC <span style="color:${gC};font-weight:700">${gS}${fmt(dGTC)}</span>.`;
+  let maxDrop=null,maxAM='';
+  names.forEach(name=>{const c1=pivot[name]?.[latest]?.vol??null,c2=pivot[name]?.[prev]?.vol??null;if(c1!==null&&c2!==null){const drop=c2-c1;if(maxDrop===null||drop>maxDrop){maxDrop=drop;maxAM=name;}}});
+  if(maxAM&&maxDrop>0)ana+=` AM giảm Vol nhiều nhất: <strong>${maxAM}</strong> (▼ ${fmt(maxDrop)}).`;
+ }
+ if(ana)h+=`<div class="analysis-box">${ana}</div>`;
+ return h;
+}
+function renderGTCBcTable(rows,dates,last5D){
+ if(!rows||rows.length<2)return'<p style="padding:16px;color:var(--text-sub)">Không có dữ liệu</p>';
+ const data=rows.slice(1).filter(r=>r.length>5&&(r[1]||'').trim());
+ const isGrand=r=>(r[1]||'').toLowerCase().includes('grand total')||(r[0]||'').toLowerCase().includes('grand total');
+ const bcRows=data.filter(r=>!isGrand(r));
+ const gRows=data.filter(r=>isGrand(r));
+ const pivot={};
+ bcRows.forEach(r=>{const am=(r[0]||'').trim(),bc=(r[1]||'').trim(),d=isoD(r[2]);if(!bc)return;if(!pivot[bc])pivot[bc]={am,allD:{}};const nGTC=Math.round(parseFloat(r[6])||0);pivot[bc].allD[d]=nGTC;if(dates.includes(d))pivot[bc][d]={vol:Math.round(parseFloat(r[3])||0),gan:(parseFloat(r[4])||0)*100,gtc:(parseFloat(r[5])||0)*100,nGTC};});
+ const gPivot={};
+ gRows.forEach(r=>{const d=isoD(r[2]);if(!dates.includes(d))return;gPivot[d]={vol:Math.round(parseFloat(r[3])||0),gan:(parseFloat(r[4])||0)*100,gtc:(parseFloat(r[5])||0)*100,nGTC:Math.round(parseFloat(r[6])||0)};});
+ const activeNames=Object.keys(pivot).filter(bc=>[...last5D].some(d=>(pivot[bc].allD[d]??0)>0));
+ const latest=dates[0];
+ const sortedNames=activeNames.sort((a,b)=>(pivot[b][latest]?.gtc??-1)-(pivot[a][latest]?.gtc??-1));
+ const displayNames=sortedNames.slice(0,30);
+ const cs='padding:5px 8px;';
+ let h=`<div class="table-wrap" style="overflow-x:auto;max-height:1100px"><table style="font-size:12px"><thead style="position:sticky;top:0;z-index:4;background:#FEEDE4">
+  <tr>
+   <th rowspan="2" style="${cs}text-align:center;width:30px;position:sticky;left:0;z-index:5;background:#FEEDE4">STT</th>
+   <th rowspan="2" style="${cs}min-width:140px;position:sticky;left:30px;z-index:5;background:#FEEDE4">Bưu Cục</th>
+   <th rowspan="2" style="${cs}min-width:90px;position:sticky;left:170px;z-index:5;background:#FEEDE4">AM</th>
+   ${dates.map(d=>`<th colspan="4" style="${cs}text-align:center;border-left:2px solid #E5E7EB"><strong>${shortDDow(d)}</strong></th>`).join('')}
+  </tr>
+  <tr>
+   ${dates.map(()=>`<th style="${cs}text-align:right;border-left:2px solid #E5E7EB">Vol</th><th style="${cs}text-align:center">%Gán</th><th style="${cs}text-align:center">%GTC</th><th style="${cs}text-align:right">GTC</th>`).join('')}
+  </tr>
+ </thead><tbody>`;
+ displayNames.forEach((name,i)=>{
+  const row=pivot[name];
+  h+=`<tr><td style="${cs}text-align:center;color:var(--text-sub);font-size:11px;position:sticky;left:0;background:#fff;z-index:2">${i+1}</td><td style="${cs}white-space:nowrap;font-weight:700;position:sticky;left:30px;background:#fff;z-index:2">${name}</td><td style="${cs}color:var(--text-sub);font-size:11px;position:sticky;left:170px;background:#fff;z-index:2">${row.am||''}</td>`;
+  dates.forEach(d=>{const c=row[d];if(c){const gc=c.gtc>=65?'g':c.gtc>=50?'m':'b';h+=`<td style="${cs}text-align:right;border-left:2px solid #F3F4F6">${fmt(c.vol)}</td><td style="${cs}text-align:center">${c.gan.toFixed(1)}%</td><td style="${cs}text-align:center"><span class="pct ${gc}">${c.gtc.toFixed(1)}%</span></td><td style="${cs}text-align:right;color:var(--green);font-weight:600">${fmt(c.nGTC)}</td>`;}else{h+=`<td colspan="4" style="${cs}text-align:center;border-left:2px solid #F3F4F6;color:var(--text-sub)">—</td>`;}});
+  h+='</tr>';
+ });
+ if(Object.keys(gPivot).length){
+  h+=`<tr class="tot"><td style="${cs}position:sticky;left:0;background:#F8F9FA;z-index:2"></td><td colspan="2" style="${cs}position:sticky;left:30px;background:#F8F9FA;z-index:2">Grand Total</td>`;
+  dates.forEach(d=>{const c=gPivot[d];if(c){const gc=c.gtc>=65?'g':c.gtc>=50?'m':'b';h+=`<td style="${cs}text-align:right;border-left:2px solid #F3F4F6">${fmt(c.vol)}</td><td style="${cs}text-align:center">${c.gan.toFixed(1)}%</td><td style="${cs}text-align:center"><span class="pct ${gc}">${c.gtc.toFixed(1)}%</span></td><td style="${cs}text-align:right;color:var(--green);font-weight:600">${fmt(c.nGTC)}</td>`;}else{h+=`<td colspan="4" style="${cs}text-align:center;border-left:2px solid #F3F4F6">—</td>`;}});
+  h+='</tr>';
+ }
+ h+='</tbody></table></div>';
+ const hid=sortedNames.length-displayNames.length;
+ if(hid>0)h+=`<div style="padding:8px 16px;font-size:11px;color:var(--text-sub)">... và ${hid} bưu cục khác (đã ẩn)</div>`;
+ const lg=gPivot[latest];
+ if(lg)h+=`<div class="analysis-box">🏪 <strong>BC ngày ${shortD(latest)}:</strong> Hiển thị ${displayNames.length} BC (${activeNames.length} active trong 5 ngày gần nhất) · Grand Total Vol <strong>${fmt(lg.vol)}</strong> · GTC <strong>${fmt(lg.nGTC)}</strong> đơn (<span style="color:${lg.gtc>=65?'var(--green)':lg.gtc>=50?'var(--yellow)':'var(--red)'};font-weight:700">${lg.gtc.toFixed(1)}%</span>).</div>`;
+ return h;
+}
+function renderGTC(pid){
+ const g=window._GTC[pid];if(!g)return;
+ const {rowsAM,rowsBC}=g;
+ const dataAll=(rowsAM||[]).slice(1).filter(r=>r.length>4&&(r[0]||'').trim());
+ const allD=[...new Set(dataAll.map(r=>isoD(r[1])).filter(d=>d))].sort((a,b)=>b.localeCompare(a));
+ const dFrom=document.getElementById(pid+'_dFrom')?.value||allD[allD.length-1]||'';
+ const dTo=document.getElementById(pid+'_dTo')?.value||allD[0]||'';
+ const lo=dFrom<=dTo?dFrom:dTo,hi=dFrom<=dTo?dTo:dFrom;
+ const dates=allD.filter(d=>d>=lo&&d<=hi);
+ if(!dates.length){document.getElementById(pid+'_amTable').innerHTML='<p style="padding:16px;color:var(--text-sub)">Không có dữ liệu trong khoảng đã chọn</p>';document.getElementById(pid+'_bcTable').innerHTML='';return;}
+ const last5D=new Set(allD.slice(0,5));
+ document.getElementById(pid+'_amTable').innerHTML=renderGTCAmTable(rowsAM,dates);
+ document.getElementById(pid+'_bcTable').innerHTML=renderGTCBcTable(rowsBC,dates,last5D);
+}
+function buildGTCPage(rowsAM,rowsBC,title,pid){
+ window._GTC[pid]={rowsAM,rowsBC};
+ const dataAM=(rowsAM||[]).slice(1).filter(r=>r.length>4&&(r[0]||'').trim());
+ const allD=[...new Set(dataAM.map(r=>isoD(r[1])).filter(d=>d))].sort((a,b)=>b.localeCompare(a));
+ if(!allD.length)return errPage('Không có dữ liệu');
+ const dTo=allD[0],dFrom=allD[Math.min(6,allD.length-1)];
+ const mkOpts=sv=>allD.map(d=>`<option value="${d}"${d===sv?' selected':''}>${shortDDow(d)}</option>`).join('');
+ return`<div class="page-header">
+  <div class="page-title">${title}</div>
+  <div class="page-meta"><span class="tag tag-orange">📅 Lọc theo ngày · Nguồn: Google Sheet</span><span>%GTC: Xanh ≥65% · Vàng ≥50% · Đỏ &lt;50%</span></div>
+ </div>
+ <div class="date-filter-bar">
+  <label>Từ ngày:</label>
+  <select id="${pid}_dFrom" onchange="renderGTC('${pid}')">${mkOpts(dFrom)}</select>
+  <label>Đến ngày:</label>
+  <select id="${pid}_dTo" onchange="renderGTC('${pid}')">${mkOpts(dTo)}</select>
+ </div>
+ <div class="card"><div class="card-header"><div class="card-title"><div class="card-icon">👤</div>A. Theo AM</div><div class="card-info">Sắp xếp: %GTC cao → thấp · Cố định cột tên</div></div><div id="${pid}_amTable"></div></div>
+ <div class="card"><div class="card-header"><div class="card-title"><div class="card-icon">🏪</div>B. Theo Bưu Cục</div><div class="card-info">Top 30 BC · Grand Total cố định cuối</div></div><div id="${pid}_bcTable"></div></div>`;
+}
+
+/* ===== DASHBOARD 3: FD NGÀY ===== */
+// FD sheets cols: name(0), Ngày(1), %Vol(2), %FD(3), ...
+// BC FD sheets: same (BC name in col 0)
+window._FD={};
+const DC=['#FFF8F5','#F0FDF4','#EFF6FF','#FAF5FF','#FEFCE8','#F0FDFA'];
+function buildFDDayPage(fd){
+ if(!fd.totalAM||fd.totalAM.length<2)return errPage('Không có dữ liệu FD');
+ const allD=[...new Set(fd.totalAM.slice(1).map(r=>isoD(r[1])).filter(d=>d))].sort((a,b)=>b.localeCompare(a));
+ if(!allD.length)return errPage('Không có dữ liệu FD');
+ const dTo=allD[0],dFrom=allD[Math.min(1,allD.length-1)];
+ const mkOpts=sv=>allD.map(d=>`<option value="${d}"${d===sv?' selected':''}>${shortDDow(d)}</option>`).join('');
+ return`<div class="page-header">
+  <div class="page-title">Tổng quan Tỉ Lệ Trả - Ngày</div>
+  <div class="page-meta"><span class="tag tag-orange">📅 Tỉ lệ hoàn trả theo ngày · Nguồn: Google Sheet</span><span>Bôi đỏ: %FD ≥ 15%</span></div>
+ </div>
+ <div class="date-filter-bar">
+  <label>Từ ngày:</label>
+  <select id="fdDay_dFrom" onchange="renderFDDay()">${mkOpts(dFrom)}</select>
+  <label>Đến ngày:</label>
+  <select id="fdDay_dTo" onchange="renderFDDay()">${mkOpts(dTo)}</select>
+ </div>
+ <div class="card"><div class="card-header"><div class="card-title"><div class="card-icon">📅</div>A. Theo AM</div></div><div id="fdDayAMTable"></div></div>
+ <div class="card"><div class="card-header"><div class="card-title"><div class="card-icon">🏪</div>B. Theo Bưu Cục</div></div><div id="fdDayBCTable"></div></div>`;
+}
+function renderFDDay(){
+ const fd=window._FD;if(!fd.totalAM)return;
+ const allD=[...new Set(fd.totalAM.slice(1).map(r=>isoD(r[1])).filter(d=>d))].sort((a,b)=>b.localeCompare(a));
+ const dFrom=document.getElementById('fdDay_dFrom')?.value||allD[1]||allD[0];
+ const dTo=document.getElementById('fdDay_dTo')?.value||allD[0];
+ const lo=dFrom<=dTo?dFrom:dTo,hi=dFrom<=dTo?dTo:dFrom;
+ const dates=allD.filter(d=>d>=lo&&d<=hi);
+ document.getElementById('fdDayAMTable').innerHTML=buildFDDayTable([fd.totalAM,fd.smeAM,fd.ttsAM,fd.shopeeAM],['Total','SME','TTS','Shopee'],dates,'AM');
+ document.getElementById('fdDayBCTable').innerHTML=buildFDDayTable([fd.totalBC,fd.smeBC,fd.ttsBC,fd.shopeeBC],['Total','SME','TTS','Shopee'],dates,'Bưu Cục');
+}
+function buildFDDayTable(sheetArr,labels,dates,nameLabel){
+ if(!dates||!dates.length)return'<p style="padding:16px;color:var(--text-sub)">Chọn khoảng ngày hợp lệ</p>';
+ function getDataD(rows,dISO){
+  if(!rows||rows.length<2)return{};
+  const res={};
+  rows.slice(1).forEach(r=>{if(isoD(r[1])!==dISO)return;const name=(r[0]||'').trim();if(!name)return;res[name]={vol:parsePct(r[2]),fd:parsePct(r[3])};});
+  return res;
+ }
+ const dData=dates.map(d=>sheetArr.map(s=>getDataD(s,d)));
+ const allNames=new Set();
+ dData.forEach(dd=>dd.forEach(d=>Object.keys(d).forEach(n=>allNames.add(n))));
+ const isGrand=n=>n.toLowerCase().includes('grand total');
+ const regular=[...allNames].filter(n=>!isGrand(n));
+ const grands=[...allNames].filter(n=>isGrand(n));
+ const sorted=regular.sort((a,b)=>(dData[0]?.[0]?.[b]?.fd??-1)-(dData[0]?.[0]?.[a]?.fd??-1));
+ const names=[...sorted,...grands];
+ if(!names.length)return`<p style="padding:16px;color:var(--text-sub)">Không có dữ liệu</p>`;
+ const cs='padding:6px 8px;';
+ const isBC=nameLabel==='Bưu Cục';
+ let h=`<div class="table-wrap" style="overflow-x:auto${isBC?';max-height:1100px':''}"><table style="font-size:12px"><thead${isBC?' style="position:sticky;top:0;z-index:4"':''}>`;
+ h+=`<tr><th rowspan="2" style="${cs}position:sticky;left:0;z-index:5;background:#FEEDE4;width:32px;text-align:center">STT</th><th rowspan="2" style="${cs}position:sticky;left:32px;z-index:5;background:#FEEDE4;min-width:130px">${nameLabel}</th>`;
+ dates.forEach((d,di)=>{const bg=DC[di%DC.length];h+=`<th colspan="${labels.length}" style="${cs}text-align:center;border-left:3px solid #D1D5DB;background:${bg}"><strong>${shortDDow(d)}</strong></th>`;});
+ h+='</tr><tr>';
+ dates.forEach((d,di)=>{const bg=DC[di%DC.length];labels.forEach(l=>{h+=`<th style="${cs}text-align:center;border-left:1px solid #E5E7EB;background:${bg}">%FD<br><small style="font-weight:400;font-size:10px">${l}</small></th>`;});});
+ h+='</tr></thead><tbody>';
+ names.forEach((name,i)=>{
+  const isG=isGrand(name);
+  h+=`<tr${isG?' class="tot"':''}><td style="${cs}text-align:center;color:var(--text-sub);font-size:11px;position:sticky;left:0;background:${isG?'#F8F9FA':'#fff'};z-index:2">${isG?'':i+1}</td><td style="${cs}font-weight:${isG?800:600};white-space:nowrap;position:sticky;left:32px;background:${isG?'#F8F9FA':'#fff'};z-index:2">${name}</td>`;
+  dates.forEach((d,di)=>{
+   const bg=DC[di%DC.length];
+   labels.forEach((_,si)=>{
+    const cell=dData[di]?.[si]?.[name];const fd=cell?.fd??null;const red=fd!==null&&fd>=15;
+    h+=`<td style="${cs}text-align:center;border-left:${si===0?'3px solid #D1D5DB':'1px solid #E5E7EB'};background:${red?'#FEE2E2':bg};color:${red?'#DC2626':'inherit'};font-weight:${red?700:'inherit'}">${fd!==null?fd.toFixed(2)+'%':'—'}</td>`;
+   });
+  });
+  h+='</tr>';
+ });
+ h+='</tbody></table></div>';
+ if(dates.length>=2){
+  const grandKey=grands[0];
+  if(grandKey){
+   const grpLabels=[{l:'Total',si:0},{l:'SME',si:1},{l:'TTS',si:2},{l:'Shopee',si:3}];
+   h+=`<div class="analysis-box">📊 <strong>So sánh ${shortD(dates[1])} → ${shortD(dates[0])}:</strong><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">`;
+   grpLabels.forEach(g=>{
+    const fd0=dData[0]?.[g.si]?.[grandKey]?.fd??null;
+    const fd1=dData[1]?.[g.si]?.[grandKey]?.fd??null;
+    if(fd0!==null&&fd1!==null){
+     const diff=fd0-fd1;const isUp=diff>0;
+     const color=isUp?'var(--red)':'var(--green)';const arrow=isUp?'▲':'▼';
+     h+=`<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:8px 12px;min-width:110px;text-align:center"><div style="font-size:11px;font-weight:600;color:var(--text-sub);margin-bottom:4px">${g.l}</div><div style="font-size:14px;font-weight:700;color:${color}">${arrow} ${Math.abs(diff).toFixed(2)}%</div><div style="font-size:10px;color:var(--text-sub)">${fd1.toFixed(2)}% → ${fd0.toFixed(2)}%</div></div>`;
+    }
+   });
+   h+=`</div></div>`;
+  }
+ }
+ return h;
+}
+
+/* ===== DASHBOARD 4: FD TUẦN ===== */
+// Weekly data is in cols 7+ of each FD sheet
+// Row where col[7]==="AM"/"Bưu Cục" is the header; subsequent rows are data
+function parseWeeklySection(rows,headerLabel){
+ if(!rows||rows.length<2)return null;
+ let hIdx=-1;
+ for(let i=1;i<rows.length;i++){
+  const v=(rows[i][7]||'').trim();
+  if(v===headerLabel||v.toLowerCase()===headerLabel.toLowerCase()){hIdx=i;break;}
+ }
+ if(hIdx<0)return null;
+ const hRow=rows[hIdx];
+ const weeks=[];
+ for(let c=8;c<hRow.length;c++){const w=(hRow[c]||'').trim();if(w)weeks.push(w);else break;}
+ const data=[];
+ for(let i=hIdx+1;i<rows.length;i++){
+  const name=(rows[i][7]||'').trim();
+  if(!name)continue;
+  const wData={};
+  weeks.forEach((w,wi)=>{wData[w]=parsePct(rows[i][8+wi]||'');});
+  data.push({name,wData});
+ }
+ return{weeks,data};
+}
+const WC=['#FFF8F5','#F0FDF4','#EFF6FF','#FAF5FF','#FEFCE8','#F0FDFA'];
+function buildFDWeekTable(sheetArr,labels,isBC,selWeeks){
+ const hLabel=isBC?'Bưu Cục':'AM';
+ const parsed=sheetArr.map(s=>parseWeeklySection(s,hLabel));
+ const wMap={};parsed.forEach((p,si)=>{wMap[si]={};if(p)p.data.forEach(r=>{wMap[si][r.name]=r.wData;});});
+ const allNames=new Set();
+ parsed.forEach(p=>{if(p)p.data.forEach(r=>allNames.add(r.name));});
+ const isGrand=n=>n.toLowerCase().includes('grand total');
+ const regular=[...allNames].filter(n=>!isGrand(n));
+ const grands=[...allNames].filter(n=>isGrand(n));
+ const p0Map=wMap[0]||{};
+ // Remove rows where all selected weeks have 0% FD (quit employees)
+ const active=regular.filter(name=>selWeeks.some(w=>(p0Map[name]?.[w]??0)>0));
+ const latestWk=selWeeks[selWeeks.length-1];
+ const sorted=active.sort((a,b)=>(p0Map[b]?.[latestWk]??-1)-(p0Map[a]?.[latestWk]??-1));
+ const names=[...sorted,...grands];
+ const cs='padding:6px 9px;';
+ let h=`<div class="table-wrap" style="${isBC?'max-height:1100px;overflow-y:auto;':''}overflow-x:auto"><table style="font-size:12px"><thead${isBC?' style="position:sticky;top:0;z-index:4"':''}>`;
+ h+=`<tr><th rowspan="2" style="${cs}width:32px;text-align:center;background:#FEEDE4">STT</th><th rowspan="2" style="${cs}min-width:130px;background:#FEEDE4">${hLabel}</th>`;
+ selWeeks.forEach((w,wi)=>{const bg=WC[wi%WC.length];h+=`<th colspan="${labels.length}" style="${cs}text-align:center;border-left:3px solid #D1D5DB;background:${bg}"><strong>Tuần ${w}</strong></th>`;});
+ h+='</tr><tr>';
+ selWeeks.forEach((w,wi)=>{const bg=WC[wi%WC.length];labels.forEach(l=>{h+=`<th style="${cs}text-align:center;border-left:1px solid #E5E7EB;background:${bg}">%FD<br><small style="font-weight:400;font-size:10px">${l}</small></th>`;});});
+ h+='</tr></thead><tbody>';
+ names.forEach((name,i)=>{
+  const isG=isGrand(name);
+  h+=`<tr${isG?' class="tot"':''}><td style="${cs}text-align:center;color:var(--text-sub);font-size:11px">${isG?'':i+1}</td><td style="${cs}font-weight:${isG?800:600};white-space:nowrap">${name}</td>`;
+  selWeeks.forEach((w,wi)=>{
+   const bg=WC[wi%WC.length];
+   labels.forEach((_,si)=>{
+    const fd=wMap[si]?.[name]?.[w]??null;const red=fd!==null&&fd>=15;
+    h+=`<td style="${cs}text-align:center;border-left:${si===0?'3px solid #D1D5DB':'1px solid #E5E7EB'};background:${red?'#FEE2E2':bg};color:${red?'#DC2626':'inherit'};font-weight:${red?700:'inherit'}">${fd!==null?fd.toFixed(1)+'%':'—'}</td>`;
+   });
+  });
+  h+='</tr>';
+ });
+ h+='</tbody></table></div>';
+ if(selWeeks.length===2){
+  const w1=selWeeks[0],w2=selWeeks[1];const grandKey=grands[0];
+  if(grandKey){
+   h+=`<div class="analysis-box">📆 <strong>So sánh Tuần ${w1} → Tuần ${w2}:</strong><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">`;
+   labels.forEach((l,si)=>{
+    const fd1=wMap[si]?.[grandKey]?.[w1]??null;const fd2=wMap[si]?.[grandKey]?.[w2]??null;
+    if(fd1!==null&&fd2!==null){
+     const diff=fd2-fd1;const isUp=diff>0;
+     const color=isUp?'var(--red)':'var(--green)';const arrow=isUp?'▲':'▼';
+     h+=`<div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:8px 12px;min-width:110px;text-align:center"><div style="font-size:11px;font-weight:600;color:var(--text-sub);margin-bottom:4px">${l}</div><div style="font-size:14px;font-weight:700;color:${color}">${arrow} ${Math.abs(diff).toFixed(1)}%</div><div style="font-size:10px;color:var(--text-sub)">T${w1}: ${fd1.toFixed(1)}% → T${w2}: ${fd2.toFixed(1)}%</div></div>`;
+    }
+   });
+   h+=`</div></div>`;
+  }
+ }
+ return h;
+}
+function renderFDWeek(){
+ const fd=window._FD;if(!fd||!fd.totalAM)return;
+ const amP=parseWeeklySection(fd.totalAM,'AM');
+ if(!amP)return;
+ const weeks=amP.weeks;
+ const wFrom=document.getElementById('fdWk_from')?.value||weeks[0];
+ const wTo=document.getElementById('fdWk_to')?.value||weeks[weeks.length-1];
+ const fi=weeks.indexOf(wFrom),ti=weeks.indexOf(wTo);
+ const lo=Math.min(fi,ti),hi=Math.max(fi,ti);
+ const selWeeks=weeks.slice(lo,hi+1);
+ document.getElementById('fdWkAMTable').innerHTML=buildFDWeekTable([fd.totalAM,fd.smeAM,fd.ttsAM,fd.shopeeAM],['Total','SME','TTS','Shopee'],false,selWeeks);
+ document.getElementById('fdWkBCTable').innerHTML=buildFDWeekTable([fd.totalBC,fd.smeBC,fd.ttsBC,fd.shopeeBC],['Total','SME','TTS','Shopee'],true,selWeeks);
+}
+function buildFDWeekPage(fd){
+ const amP=parseWeeklySection(fd.totalAM,'AM');
+ if(!amP||!amP.weeks.length)return errPage('Không có dữ liệu tuần FD');
+ const weeks=amP.weeks;
+ const wTo=weeks[weeks.length-1],wFrom=weeks[Math.max(0,weeks.length-2)];
+ const mkWk=sv=>weeks.map(w=>`<option value="${w}"${w===sv?' selected':''}>Tuần ${w}</option>`).join('');
+ return`<div class="page-header">
+  <div class="page-title">Tổng quan Tỉ Lệ Trả - Tuần</div>
+  <div class="page-meta"><span class="tag tag-orange">📆 Tỉ lệ hoàn trả theo tuần · Nguồn: Google Sheet</span><span>Bôi đỏ: %FD ≥ 15%</span></div>
+ </div>
+ <div class="date-filter-bar">
+  <label>Từ tuần:</label>
+  <select id="fdWk_from" onchange="renderFDWeek()">${mkWk(wFrom)}</select>
+  <label>Đến tuần:</label>
+  <select id="fdWk_to" onchange="renderFDWeek()">${mkWk(wTo)}</select>
+ </div>
+ <div class="card"><div class="card-header"><div class="card-title"><div class="card-icon">👤</div>A. Theo AM</div></div><div id="fdWkAMTable"></div></div>
+ <div class="card"><div class="card-header"><div class="card-title"><div class="card-icon">🏪</div>B. Theo Bưu Cục</div></div><div id="fdWkBCTable"></div></div>`;
+}
+
+/* ===== DASHBOARD 5 & 6: ODR / OPR ===== */
+// AM cols: AM(0), Ngày(1), Vol(2), %Ontime(3), Count(4)
+// BC cols: AM(0), Bưu Cục(1), Ngày(2), Vol(3), %Ontime(4), Count(5)
+function buildOntimePage(rowsAM,rowsBC,title,volLabel,countLabel,greenThr,yellowThr){
+ function amTbl(rows){
+  if(!rows||rows.length<2)return'<p style="padding:16px;color:var(--text-sub)">Không có dữ liệu</p>';
+  const data=rows.slice(1).filter(r=>r.length>3&&(r[0]||'').trim());
+  const isGrand=r=>(r[0]||'').toLowerCase().includes('grand total');
+  const dRows=data.filter(r=>!isGrand(r));
+  const gRows=data.filter(r=>isGrand(r));
+  const allD=[...new Set(dRows.map(r=>isoD(r[1])).filter(d=>d))].sort((a,b)=>b.localeCompare(a));
+  const dates=allD.slice(0,7).reverse();
+  if(!dates.length)return'<p style="padding:16px;color:var(--text-sub)">Không có dữ liệu</p>';
+  const pivot={};
+  dRows.forEach(r=>{const name=(r[0]||'').trim(),d=isoD(r[1]);if(!name||!dates.includes(d))return;if(!pivot[name])pivot[name]={};pivot[name][d]={vol:Math.round(parseFloat(r[2])||0),pct:(parseFloat(r[3])||0)*100,cnt:Math.round(parseFloat(r[4])||0)};});
+  const gPivot={};
+  // For Grand Total, compute from sum of individual rows (more accurate)
+  dates.forEach(d=>{let tv=0,tc=0;Object.values(pivot).forEach(row=>{if(row[d]){tv+=row[d].vol;tc+=row[d].cnt;}});if(tv>0)gPivot[d]={vol:tv,pct:tc/tv*100,cnt:tc};});
+  // Fallback from gRows if available
+  gRows.forEach(r=>{const d=isoD(r[1]);if(!dates.includes(d))return;gPivot[d]={vol:Math.round(parseFloat(r[2])||0),pct:(parseFloat(r[3])||0)*100,cnt:Math.round(parseFloat(r[4])||0)};});
+  const latest=dates[dates.length-1];
+  const names=Object.keys(pivot).sort((a,b)=>(pivot[a][latest]?.pct??999)-(pivot[b][latest]?.pct??999));
+  const cs='padding:6px 10px;';
+  let h=`<div class="table-wrap" style="overflow-x:auto"><table style="font-size:12px"><thead>
+   <tr>
+    <th rowspan="2" style="${cs}text-align:center;width:32px">STT</th>
+    <th rowspan="2" style="${cs}min-width:130px">AM</th>
+    ${dates.map(d=>`<th colspan="2" style="${cs}text-align:center;border-left:2px solid #E5E7EB"><strong>${shortD(d)}</strong></th>`).join('')}
+   </tr>
+   <tr>${dates.map(()=>`<th style="${cs}text-align:right;border-left:2px solid #E5E7EB">${volLabel}</th><th style="${cs}text-align:center">%Ontime</th>`).join('')}</tr>
+  </thead><tbody>`;
+  names.forEach((name,i)=>{
+   h+=`<tr><td style="${cs}text-align:center;color:var(--text-sub);font-size:11px">${i+1}</td><td style="${cs}font-weight:700;white-space:nowrap">${name}</td>`;
+   dates.forEach(d=>{const c=pivot[name]?.[d];if(c){const gc=c.pct>=greenThr?'g':c.pct>=yellowThr?'m':'b';h+=`<td style="${cs}text-align:right;border-left:2px solid #F3F4F6">${fmt(c.vol)}</td><td style="${cs}text-align:center"><span class="pct ${gc}">${c.pct.toFixed(1)}%</span></td>`;}else{h+=`<td style="${cs}text-align:right;border-left:2px solid #F3F4F6;color:var(--text-sub)">—</td><td>—</td>`;}});
+   h+='</tr>';
+  });
+  if(Object.keys(gPivot).length){
+   h+=`<tr class="tot"><td colspan="2" style="${cs}">Grand Total</td>`;
+   dates.forEach(d=>{const c=gPivot[d];if(c){const gc=c.pct>=greenThr?'g':c.pct>=yellowThr?'m':'b';h+=`<td style="${cs}text-align:right;border-left:2px solid #F3F4F6">${fmt(c.vol)}</td><td style="${cs}text-align:center"><span class="pct ${gc}">${c.pct.toFixed(1)}%</span></td>`;}else{h+=`<td style="${cs}border-left:2px solid #F3F4F6">—</td><td>—</td>`;}});
+   h+='</tr>';
+  }
+  h+='</tbody></table></div>';
+  const lg=gPivot[latest];
+  if(lg){h+=`<div class="analysis-box">⏱️ <strong>AM ngày ${shortD(latest)}:</strong> Tổng ${volLabel} <strong>${fmt(lg.vol)}</strong> · Ontime <strong>${fmt(lg.cnt)}</strong> đơn (<span style="color:${lg.pct>=greenThr?'var(--green)':lg.pct>=yellowThr?'var(--yellow)':'var(--red)'};font-weight:700">${lg.pct.toFixed(1)}%</span>).</div>`;}
+  return h;
+ }
+ function bcTbl(rows){
+  if(!rows||rows.length<2)return'<p style="padding:16px;color:var(--text-sub)">Không có dữ liệu</p>';
+  const data=rows.slice(1).filter(r=>r.length>4&&(r[1]||'').trim());
+  const isGrand=r=>(r[1]||'').toLowerCase().includes('grand total')||(r[0]||'').toLowerCase().includes('grand total');
+  const dRows=data.filter(r=>!isGrand(r));
+  const allD=[...new Set(dRows.map(r=>isoD(r[2])).filter(d=>d))].sort((a,b)=>b.localeCompare(a));
+  const dates=allD.slice(0,7).reverse();
+  if(!dates.length)return'<p style="padding:16px;color:var(--text-sub)">Không có dữ liệu</p>';
+  const pivot={};
+  dRows.forEach(r=>{const am=(r[0]||'').trim(),bc=(r[1]||'').trim(),d=isoD(r[2]);if(!bc||!dates.includes(d))return;if(!pivot[bc])pivot[bc]={am};pivot[bc][d]={vol:Math.round(parseFloat(r[3])||0),pct:(parseFloat(r[4])||0)*100,cnt:Math.round(parseFloat(r[5])||0)};});
+  const gPivot={};
+  dates.forEach(d=>{let tv=0,tc=0;Object.values(pivot).forEach(row=>{if(row[d]){tv+=row[d].vol;tc+=row[d].cnt;}});if(tv>0)gPivot[d]={vol:tv,pct:tc/tv*100,cnt:tc};});
+  const latest=dates[dates.length-1];
+  const names=Object.keys(pivot).sort((a,b)=>(pivot[a][latest]?.pct??999)-(pivot[b][latest]?.pct??999));
+  const cs='padding:5px 8px;';
+  let h=`<div class="table-wrap" style="overflow-x:auto;max-height:1100px"><table style="font-size:12px"><thead style="position:sticky;top:0;z-index:4;background:#FEEDE4">
+   <tr>
+    <th rowspan="2" style="${cs}text-align:center;width:30px;position:sticky;left:0;z-index:5;background:#FEEDE4">STT</th>
+    <th rowspan="2" style="${cs}min-width:140px;position:sticky;left:30px;z-index:5;background:#FEEDE4">Bưu Cục</th>
+    <th rowspan="2" style="${cs}min-width:80px;position:sticky;left:170px;z-index:5;background:#FEEDE4">AM</th>
+    ${dates.map(d=>`<th colspan="2" style="${cs}text-align:center;border-left:2px solid #E5E7EB"><strong>${shortD(d)}</strong></th>`).join('')}
+   </tr>
+   <tr>${dates.map(()=>`<th style="${cs}text-align:right;border-left:2px solid #E5E7EB">${volLabel}</th><th style="${cs}text-align:center">%Ontime</th>`).join('')}</tr>
+  </thead><tbody>`;
+  names.forEach((name,i)=>{
+   const row=pivot[name];
+   h+=`<tr><td style="${cs}text-align:center;color:var(--text-sub);font-size:11px;position:sticky;left:0;background:#fff;z-index:2">${i+1}</td><td style="${cs}font-weight:700;white-space:nowrap;position:sticky;left:30px;background:#fff;z-index:2">${name}</td><td style="${cs}color:var(--text-sub);font-size:11px;position:sticky;left:170px;background:#fff;z-index:2">${row.am||''}</td>`;
+   dates.forEach(d=>{const c=row[d];if(c){const gc=c.pct>=greenThr?'g':c.pct>=yellowThr?'m':'b';h+=`<td style="${cs}text-align:right;border-left:2px solid #F3F4F6">${fmt(c.vol)}</td><td style="${cs}text-align:center"><span class="pct ${gc}">${c.pct.toFixed(1)}%</span></td>`;}else{h+=`<td style="${cs}text-align:right;border-left:2px solid #F3F4F6;color:var(--text-sub)">—</td><td>—</td>`;}});
+   h+='</tr>';
+  });
+  if(Object.keys(gPivot).length){
+   h+=`<tr class="tot"><td style="${cs}position:sticky;left:0;background:#F8F9FA;z-index:2"></td><td colspan="2" style="${cs}position:sticky;left:30px;background:#F8F9FA;z-index:2">Grand Total</td>`;
+   dates.forEach(d=>{const c=gPivot[d];if(c){const gc=c.pct>=greenThr?'g':c.pct>=yellowThr?'m':'b';h+=`<td style="${cs}text-align:right;border-left:2px solid #F3F4F6">${fmt(c.vol)}</td><td style="${cs}text-align:center"><span class="pct ${gc}">${c.pct.toFixed(1)}%</span></td>`;}else{h+=`<td style="${cs}border-left:2px solid #F3F4F6">—</td><td>—</td>`;}});
+   h+='</tr>';
+  }
+  h+='</tbody></table></div>';
+  const lg=gPivot[latest];
+  if(lg){h+=`<div class="analysis-box">🏪 <strong>BC ngày ${shortD(latest)}:</strong> Tổng ${volLabel} <strong>${fmt(lg.vol)}</strong> · Ontime <strong>${fmt(lg.cnt)}</strong> đơn (<span style="color:${lg.pct>=greenThr?'var(--green)':lg.pct>=yellowThr?'var(--yellow)':'var(--red)'};font-weight:700">${lg.pct.toFixed(1)}%</span>).</div>`;}
+  return h;
+ }
+ return`<div class="page-header">
+  <div class="page-title">${title}</div>
+  <div class="page-meta"><span class="tag tag-orange">⏱️ 7 ngày gần nhất · ONTIME SLA TTS</span><span>%Ontime: Xanh ≥${greenThr}% · Vàng ≥${yellowThr}% · Đỏ &lt;${yellowThr}%</span></div>
+ </div>
+ <div class="card"><div class="card-header"><div class="card-title"><div class="card-icon">👤</div>A. Theo AM</div><div class="card-info">Sắp xếp: %Ontime thấp → cao</div></div>${amTbl(rowsAM)}</div>
+ <div class="card"><div class="card-header"><div class="card-title"><div class="card-icon">🏪</div>B. Theo Bưu Cục</div><div class="card-info">Sắp xếp: %Ontime thấp → cao</div></div>${bcTbl(rowsBC)}</div>`;
+}
+
+/* ===== SPLASH ===== */
+function initSplash(){
+ const c=document.getElementById('splashParticles');
+ if(!c)return;
+ const cols=['#F15D29','#FF9A6C','#FBBF24','#38BDF8','#A78BFA','#34D399','#60A5FA','#ffffff'];
+ for(let i=0;i<55;i++){const el=document.createElement('div');el.className='spark';const sz=Math.random()*4+1.5,col=cols[Math.floor(Math.random()*cols.length)],op=Math.random()*0.5+0.2;el.style.cssText=`width:${sz}px;height:${sz}px;background:${col};left:${Math.random()*100}%;top:${Math.random()*100}%;--d:${(Math.random()*5+3).toFixed(1)}s;--delay:-${(Math.random()*6).toFixed(1)}s;--op:${op.toFixed(2)}`;c.appendChild(el);}
+}
+function dismissSplash(){const s=document.getElementById('splash');if(s){s.classList.add('fade-out');setTimeout(()=>s.remove(),700);}}
+
+/* ===== AGING > 5 NGÀY (p7) — GIỮ NGUYÊN ===== */
+const AGING_SHEET_ID='1jCWPRvfGA7d2uHL6_xT8ZxU3tgpOdlBK1-c4QT961ew';
+const AGING_GID='1424919323';
+function parseCsvRaw(text){return text.trim().split('\n').slice(1).map(l=>{const cols=[];let cur='',inQ=false;for(const c of l){if(c==='"')inQ=!inQ;else if(c===','&&!inQ){cols.push(cur.trim());cur='';}else cur+=c;}cols.push(cur.trim());return cols;});}
+function agingFmtDate(d){if(!d)return'';const p=d.split('-');return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:d;}
+function buildAgingHTML(rows){
+ const allDates=[...new Set(rows.map(r=>r[11]))].filter(d=>d&&d.startsWith('2026')).sort();
+ const last7=allDates.slice(-7);
+ const latest=last7[last7.length-1];
+ const prev=last7[last7.length-2];
+ const recent=rows.filter(r=>last7.includes(r[11]));
+ const unstableRows=recent.filter(r=>r[12]&&r[12].includes('bất ổn'));
+ const unstableBCSet=new Set(unstableRows.map(r=>r[2]));
+ const byDate={};recent.forEach(r=>{byDate[r[11]]=(byDate[r[11]]||0)+1;});
+ const latestTotal=byDate[latest]||0;const prevTotal=byDate[prev]||0;const delta=latestTotal-prevTotal;
+ const unstableLatest=unstableRows.filter(r=>r[11]===latest).length;
+ const deltaSign=delta>0?'+':'';const deltaIcon=delta<0?'▼':delta>0?'▲':'—';const deltaColor=delta<0?'var(--green)':delta>0?'var(--red)':'var(--text-sub)';
+ let h=`<div class="page-header"><div class="page-title">Tổng quan Aging &gt; 5 Ngày</div><div class="page-meta"><span class="tag tag-orange">⏳ 7 ngày gần nhất · Nguồn: Google Sheet Aging</span></div></div>`;
+ h+=`<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px">`;
+ [{icon:'📦',label:'Tổng Aging hôm nay',val:latestTotal.toLocaleString(),sub:agingFmtDate(latest),color:'var(--orange)'},
+  {icon:'📅',label:'Tổng Aging N-1',val:prevTotal.toLocaleString(),sub:agingFmtDate(prev),color:'#3182CE'},
+  {icon:delta<0?'📉':'📈',label:'Tăng/Giảm so N-1',val:`${deltaIcon} ${Math.abs(delta).toLocaleString()}`,sub:`${deltaSign}${delta} đơn`,color:deltaColor},
+  {icon:'⚠️',label:'Aging BC bất ổn hôm nay',val:unstableLatest.toLocaleString(),sub:`${unstableBCSet.size} bưu cục bất ổn`,color:'var(--red)'}
+ ].forEach(k=>{h+=`<div style="background:var(--card);border-radius:12px;padding:18px 16px;text-align:center;box-shadow:var(--shadow-sm);border-top:3px solid ${k.color}"><div style="font-size:24px;margin-bottom:8px">${k.icon}</div><div style="font-size:10px;font-weight:700;color:var(--text-sub);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">${k.label}</div><div style="font-size:32px;font-weight:800;color:${k.color};line-height:1">${k.val}</div><div style="font-size:11px;color:var(--text-sub);margin-top:5px">${k.sub}</div></div>`;});
+ h+=`</div>`;
+ function buildTable(arr,keyField,title,icon,badge){
+  const maxV=Math.max(...arr.map(r=>r[latest]||0),1);
+  let t=`<div style="background:var(--card);border-radius:12px;box-shadow:var(--shadow-sm);margin-bottom:20px;overflow:hidden"><div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px"><span style="font-size:18px">${icon}</span><span style="font-weight:700;font-size:14px">${title}</span><span style="background:var(--orange);color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px">${badge}</span></div><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:var(--bg)"><th style="padding:10px 14px;text-align:left;font-weight:700;font-size:11px;color:var(--text-sub);text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid var(--border);white-space:nowrap">#</th><th style="padding:10px 14px;text-align:left;font-weight:700;font-size:11px;color:var(--text-sub);text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid var(--border);white-space:nowrap">${keyField==='am'?'AM':'Bưu Cục'}</th>`;
+  last7.forEach((d,i)=>{const isLast=i===last7.length-1;const bg=isLast?'background:#FFF0EB;color:var(--orange-dark,#C8461A);font-size:12px':'color:var(--text-sub)';t+=`<th style="padding:10px 14px;text-align:right;font-weight:800;font-size:11px;text-transform:uppercase;letter-spacing:.3px;border-bottom:2px solid var(--border);white-space:nowrap;${bg}">${agingFmtDate(d)}</th>`;});
+  t+=`<th style="padding:10px 14px;text-align:right;font-weight:700;font-size:11px;color:var(--text-sub);text-transform:uppercase;border-bottom:2px solid var(--border)">Trend</th></tr></thead><tbody>`;
+  arr.forEach((row,idx)=>{
+   const name=row[keyField]||'—';const isUnstable=unstableBCSet.has(name);
+   const rankColor=idx<3?'color:var(--orange);font-weight:800;font-size:14px':'color:var(--text-sub);font-weight:600';
+   t+=`<tr style="border-bottom:1px solid var(--border)"><td style="padding:9px 14px;${rankColor}">${idx+1}</td><td style="padding:9px 14px;font-weight:600;font-size:13px">${name}${isUnstable?'<span style="display:inline-block;background:#FEE2E2;color:var(--red);border:1px solid #FECACA;border-radius:4px;font-size:9px;font-weight:700;padding:1px 5px;margin-left:5px">⚠ bất ổn</span>':''}</td>`;
+   last7.forEach((d,i)=>{const v=row[d]||0;const isLatest=i===last7.length-1;const barW=isLatest&&maxV>0?Math.round((v/maxV)*50):0;if(isLatest){t+=`<td style="padding:9px 14px;text-align:right;background:#FFF0EB"><div style="display:flex;align-items:center;justify-content:flex-end;gap:5px"><div style="height:5px;border-radius:3px;background:var(--orange);width:${barW}px;min-width:${v>0?2:0}px"></div><span style="font-weight:800;font-size:14px;color:var(--orange-dark,#C8461A)">${v>0?v.toLocaleString('vi-VN'):'—'}</span></div></td>`;}else{t+=`<td style="padding:9px 14px;text-align:right;font-weight:500;color:${v>0?'var(--text-main)':'var(--border)'}">${v>0?v.toLocaleString('vi-VN'):'—'}</td>`;}});
+   const curr=row[latest]||0,prevRow=row[prev]||0;const trendColor=curr<prevRow?'var(--green)':curr>prevRow?'var(--red)':'var(--text-sub)';const trendTxt=curr<prevRow?`▼ ${prevRow-curr}`:curr>prevRow?`▲ ${curr-prevRow}`:'—';
+   t+=`<td style="padding:9px 14px;text-align:right;color:${trendColor};font-weight:700;font-size:13px;white-space:nowrap">${trendTxt}</td></tr>`;
+  });
+  t+=`<tfoot><tr style="background:var(--orange-light,#FFF0EB);border-top:2px solid var(--orange)"><td style="padding:9px 12px;font-weight:800;color:var(--orange)"></td><td style="padding:9px 12px;font-weight:800;color:var(--orange)">TỔNG CỘNG</td>`;
+  last7.forEach((d,i)=>{const sum=arr.reduce((s,r)=>s+(r[d]||0),0);const isLatest=i===last7.length-1;t+=`<td style="padding:9px 12px;text-align:right;font-weight:800;${isLatest?'color:var(--orange-dark,#C8461A);background:#FFE0CC':'color:var(--text-main)'}">${sum.toLocaleString()}</td>`;});
+  const sC=arr.reduce((s,r)=>s+(r[latest]||0),0),sP=arr.reduce((s,r)=>s+(r[prev]||0),0),sD=sC-sP;
+  t+=`<td style="padding:9px 12px;text-align:right;color:${sD<0?'var(--green)':sD>0?'var(--red)':'var(--text-sub)'};font-weight:800;white-space:nowrap">${sD<0?`▼ ${sP-sC}`:sD>0?`▲ ${sC-sP}`:'—'}</td></tr></tfoot></table></div></div>`;
+  return t;
+ }
+ const unstableMap={};unstableRows.forEach(r=>{const bc=r[2],d=r[11];if(!unstableMap[bc])unstableMap[bc]={bc};unstableMap[bc][d]=(unstableMap[bc][d]||0)+1;});
+ const unstableArr=Object.values(unstableMap).sort((a,b)=>(b[latest]||0)-(a[latest]||0));
+ h+=buildTable(unstableArr,'bc','Bưu Cục Bất Ổn — 7 ngày','⚠️',`${unstableArr.length} bưu cục`);
+ const amMap={};recent.forEach(r=>{const am=r[10],d=r[11];if(!amMap[am])amMap[am]={am};amMap[am][d]=(amMap[am][d]||0)+1;});
+ const amArr=Object.values(amMap).sort((a,b)=>(b[latest]||0)-(a[latest]||0));
+ h+=buildTable(amArr,'am','Theo AM — 7 ngày gần nhất','👤',`${amArr.length} AM`);
+ const bcMap={};recent.forEach(r=>{const bc=r[2],d=r[11];if(!bcMap[bc])bcMap[bc]={bc};bcMap[bc][d]=(bcMap[bc][d]||0)+1;});
+ const bcArr=Object.values(bcMap).sort((a,b)=>(b[latest]||0)-(a[latest]||0));
+ h+=buildTable(bcArr,'bc','Theo Bưu Cục — 7 ngày gần nhất','🏪',`${bcArr.length} bưu cục`);
+ return`<div style="padding:4px 0">${h}</div>`;
+}
+async function buildAgingPage(){
+ const el=document.getElementById('p7');
+ try{
+  const resp=await fetch(`https://docs.google.com/spreadsheets/d/${AGING_SHEET_ID}/export?format=csv&gid=${AGING_GID}`);
+  if(!resp.ok)throw new Error(`HTTP ${resp.status}`);
+  const rows=parseCsvRaw(await resp.text());
+  el.innerHTML=buildAgingHTML(rows);
+ }catch(e){el.innerHTML=errPage(`Aging sheet: ${e.message}`);}
+}
+
+/* ===== AI PAGE ===== */
+window._D={};
+function buildAIPage(){
+ const p12=document.getElementById('p12');
+ const savedKey=localStorage.getItem('groqApiKey')||'';
+ p12.innerHTML=`<div class="page-header"><div class="page-title">✨ AI - Phân Tích Tổng Quan</div><div class="page-meta"><span class="tag tag-orange">🤖 Powered by Groq AI · Dữ liệu từ các dashboard</span></div></div>
+ <div class="card" style="margin-bottom:14px"><div class="card-header"><div class="card-title"><div class="card-icon">🔑</div>Groq API Key <span style="font-size:11px;font-weight:400;color:var(--text-sub)">(miễn phí — không cần thẻ)</span></div></div>
+ <div style="padding:14px 18px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+  <input type="password" id="groqKeyInput" value="${savedKey}" placeholder="gsk_..." style="flex:1;min-width:200px;padding:9px 12px;border-radius:8px;border:1px solid var(--border);font-size:13px">
+  <button onclick="saveGroqKey()" style="background:var(--orange);color:#fff;border:none;padding:9px 18px;border-radius:8px;cursor:pointer;font-weight:600;font-size:13px">Lưu</button>
+  <span id="groqKeySaved" style="font-size:12px;color:#4ade80">${savedKey?'✅ Đã lưu':''}</span>
+ </div>
+ <div style="padding:0 18px 12px;font-size:11px;color:var(--text-sub)">Lấy key tại <a href="https://console.groq.com/keys" target="_blank" style="color:var(--orange)">console.groq.com/keys</a></div></div>
+ <div class="card"><div class="card-header"><div class="card-title"><div class="card-icon">💬</div>Nội dung phân tích</div></div>
+ <div style="padding:14px 18px">
+  <div style="margin-bottom:10px;font-size:12px;color:var(--text-sub)">Chọn nhanh:</div>
+  <div class="ai-preset-row">
+   <button class="ai-preset-btn" onclick="setAIPrompt('tong-quan')">📊 Tổng quan vận hành</button>
+   <button class="ai-preset-btn" onclick="setAIPrompt('hl-ll')">🏆 Highlight / Lowlight</button>
+   <button class="ai-preset-btn" onclick="setAIPrompt('so-sanh-am')">👤 So sánh AM</button>
+   <button class="ai-preset-btn" onclick="setAIPrompt('tra-hang')">🔄 Phân tích tỉ lệ trả</button>
+   <button class="ai-preset-btn" onclick="setAIPrompt('kien-nghi')">💡 Kiến nghị cải thiện</button>
+  </div>
+  <textarea class="ai-textarea" id="aiPromptArea" placeholder="Hoặc tự nhập câu hỏi..."></textarea>
+  <div style="display:flex;align-items:center;gap:12px;margin-top:12px;flex-wrap:wrap">
+   <button class="ai-run-btn" id="aiRunBtn" onclick="runAIAnalysis()"><span>✨</span><span>Phân tích ngay</span></button>
+   <span style="font-size:12px;color:var(--text-sub)" id="aiStatus"></span>
+  </div>
+ </div></div>
+ <div class="card" id="aiResultCard" style="display:none;margin-top:14px">
+  <div class="card-header"><div class="card-title"><div class="card-icon">📊</div>Kết quả phân tích</div>
+  <button onclick="copyAIResult()" style="background:none;border:1px solid var(--border);padding:5px 12px;border-radius:6px;color:var(--text-sub);font-size:11px;cursor:pointer">📋 Copy</button></div>
+  <div class="ai-result" id="aiResultArea" style="padding:16px"></div>
+ </div>`;
+}
+const AI_PRESETS={
+ 'tong-quan':'Phân tích tổng quan hiệu suất vận hành GHN Vùng TNT. Nêu rõ: (1) Tình hình GTC Total và GTC TTS; (2) Top AM/BC làm tốt nhất; (3) AM/BC cần cải thiện; (4) Tỉ lệ trả và Ontime. Nhận xét tổng thể.',
+ 'hl-ll':'Liệt kê Highlight (điểm sáng) và Lowlight (điểm yếu):\n- HIGHLIGHT 🟢: Ai làm tốt, chỉ số nào ấn tượng?\n- LOWLIGHT 🔴: Ai tụt hậu, vấn đề gì nổi bật?\n- Gợi ý hành động cụ thể.',
+ 'so-sanh-am':'So sánh hiệu suất từng AM: xếp hạng theo %GTC, tỉ lệ trả, và ontime. Ai đang cải thiện? Ai đang giảm? Phân tích nguyên nhân có thể.',
+ 'tra-hang':'Phân tích sâu tỉ lệ trả hàng (%FD): (1) AM/BC nào cao/thấp nhất; (2) Xu hướng theo tuần; (3) So sánh FD Total vs SME vs TTS vs Shopee; (4) Đề xuất giảm FD.',
+ 'kien-nghi':'Dựa trên toàn bộ dữ liệu, đưa ra 5-7 kiến nghị cải thiện cụ thể. Mỗi kiến nghị: vấn đề → giải pháp → kỳ vọng kết quả.'
+};
+function setAIPrompt(key){document.getElementById('aiPromptArea').value=AI_PRESETS[key]||'';}
+function gatherDashboardData(){
+ const D=window._D;const lines=[];
+ function isoDate(d){return(d||'').match(/\d{4}-\d{2}-\d{2}/)?.[0]||'';}
+ if(D.gtcTotalAM&&D.gtcTotalAM.length>1){
+  const rows=D.gtcTotalAM.slice(1).filter(r=>(r[0]||'').trim());
+  const dates=[...new Set(rows.map(r=>isoD(r[1])).filter(d=>d))].sort((a,b)=>b.localeCompare(a)).slice(0,7);
+  const latest=dates[dates.length-1];
+  const grand=rows.filter(r=>(r[0]||'').toLowerCase().includes('grand total')&&isoD(r[1])===latest);
+  if(grand[0])lines.push(`GTC Total (${latest}): Vol=${Math.round(parseFloat(grand[0][2])||0)}, %Gán=${((parseFloat(grand[0][3])||0)*100).toFixed(1)}%, %GTC=${((parseFloat(grand[0][4])||0)*100).toFixed(1)}%, GTC=${Math.round(parseFloat(grand[0][5])||0)}`);
+  const ams=rows.filter(r=>!(r[0]||'').toLowerCase().includes('grand total')&&isoD(r[1])===latest);
+  lines.push('GTC Total theo AM ngày mới nhất:');
+  ams.forEach(r=>lines.push(`  ${(r[0]||'').trim()}: Vol=${Math.round(parseFloat(r[2])||0)}, %GTC=${((parseFloat(r[4])||0)*100).toFixed(1)}%`));
+ }
+ if(D.fdTotalAM&&D.fdTotalAM.length>1){
+  const rows=D.fdTotalAM.slice(1).filter(r=>(r[0]||'').trim());
+  const dates=[...new Set(rows.map(r=>isoD(r[1])).filter(d=>d))].sort((a,b)=>b.localeCompare(a)).slice(0,1);
+  const latest=dates[0]||'';
+  const dRows=rows.filter(r=>isoD(r[1])===latest);
+  lines.push(`\nFD Total Ngày (${shortD(latest)}):`);
+  dRows.forEach(r=>lines.push(`  ${(r[0]||'').trim()}: %Vol=${parsePct(r[2]).toFixed(2)}%, %FD=${parsePct(r[3]).toFixed(2)}%`));
+ }
+ if(D.odrAM&&D.odrAM.length>1){
+  const rows=D.odrAM.slice(1).filter(r=>(r[0]||'').trim());
+  const dates=[...new Set(rows.map(r=>isoD(r[1])).filter(d=>d))].sort((a,b)=>b.localeCompare(a)).slice(0,1);
+  const latest=dates[0]||'';
+  const dRows=rows.filter(r=>isoD(r[1])===latest);
+  let tv=0,tc=0;dRows.forEach(r=>{tv+=Math.round(parseFloat(r[2])||0);tc+=Math.round(parseFloat(r[4])||0);});
+  if(tv>0)lines.push(`\nODR TTS (${shortD(latest)}): Tổng Vol GTC=${tv}, Ontime=${tc} (${(tc/tv*100).toFixed(1)}%)`);
+ }
+ return lines.join('\n')||'(Dữ liệu chưa được tải)';
+}
+function md2html(text){return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/^### (.+)$/gm,'<h3>$1</h3>').replace(/^## (.+)$/gm,'<h2>$1</h2>').replace(/^# (.+)$/gm,'<h1>$1</h1>').replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\*(.+?)\*/g,'<em>$1</em>').replace(/`(.+?)`/g,'<code>$1</code>').replace(/^---$/gm,'<hr>').replace(/^> (.+)$/gm,'<blockquote>$1</blockquote>').replace(/^[\-\*] (.+)$/gm,'<li>$1</li>').replace(/(<li>.*<\/li>\n?)+/g,'<ul>$&</ul>').replace(/^\d+\. (.+)$/gm,'<li>$1</li>').replace(/\n\n/g,'</p><p>').replace(/^([^<\n].+)$/gm,'<p>$1</p>').replace(/<p><\/p>/g,'').replace(/🟢/g,'<span class="ai-tag-hl">🟢 HL</span>').replace(/🔴/g,'<span class="ai-tag-ll">🔴 LL</span>');}
+function saveGroqKey(){const k=(document.getElementById('groqKeyInput').value||'').trim();localStorage.setItem('groqApiKey',k);document.getElementById('groqKeySaved').textContent=k?'✅ Đã lưu':'';}
+async function runAIAnalysis(){
+ const key=localStorage.getItem('groqApiKey')||'';
+ if(!key){document.getElementById('aiStatus').textContent='⚠️ Chưa nhập Groq API Key';document.getElementById('groqKeyInput').focus();return;}
+ const userQ=(document.getElementById('aiPromptArea').value||'').trim();
+ if(!userQ){document.getElementById('aiStatus').textContent='⚠️ Vui lòng nhập nội dung';return;}
+ const btn=document.getElementById('aiRunBtn');btn.disabled=true;btn.innerHTML='<span>⏳</span><span>Đang phân tích...</span>';
+ document.getElementById('aiStatus').textContent='';
+ const card=document.getElementById('aiResultCard');card.style.display='block';
+ document.getElementById('aiResultArea').innerHTML='<div class="ai-thinking"><div class="ai-thinking-dot"></div><div class="ai-thinking-dot"></div><div class="ai-thinking-dot"></div><span style="margin-left:8px">AI đang phân tích...</span></div>';
+ const ctx=gatherDashboardData();
+ try{
+  const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model:'gemma2-9b-it',messages:[{role:'system',content:'Bạn là chuyên gia phân tích vận hành logistics GHN Vùng TNT. Phân tích chi tiết, dùng số liệu thực tế. Trả lời tiếng Việt, format rõ ràng.'},{role:'user',content:`DỮ LIỆU:\n${ctx}\n\nYÊU CẦU:\n${userQ}`}],temperature:0.7,max_tokens:4096})});
+  if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||`HTTP ${res.status}`);}
+  const data=await res.json();const text=data.choices?.[0]?.message?.content||'(Không có phản hồi)';
+  document.getElementById('aiResultArea').innerHTML=md2html(text);window._lastAIResult=text;
+  card.scrollIntoView({behavior:'smooth',block:'start'});
+ }catch(e){document.getElementById('aiResultArea').innerHTML=`<div style="color:#f87171;padding:12px;background:rgba(248,113,113,0.08);border-radius:8px">❌ ${e.message}</div>`;}
+ btn.disabled=false;btn.innerHTML='<span>✨</span><span>Phân tích ngay</span>';
+}
+function copyAIResult(){if(window._lastAIResult)navigator.clipboard.writeText(window._lastAIResult).then(()=>{const s=document.getElementById('aiStatus');s.textContent='✅ Đã copy!';setTimeout(()=>s.textContent='',2000);});}
+
+/* ===== INIT ===== */
+async function init(){
+ const btn=document.getElementById('refreshBtn');btn.classList.add('spinning');btn.disabled=true;
+ const sheetNames=[
+  'GTC Total theo AM','GTC Total theo Bưu Cục',
+  'GTC TTS theo AM','GTC TTS theo Bưu Cục',
+  'FD Total theo AM','FD SME theo AM','FD TTS theo AM','FD Shopee theo AM',
+  'FD Total theo Bưu Cục','FD SME theo Bưu Cục','FD TTS theo Bưu Cục','FD Shopee theo Bưu Cục',
+  'ODR TTS - AM','ODR TTS - Bưu Cục',
+  'OPR TTS - AM','OPR TTS - Bưu Cục'
+ ];
+ const R={};
+ await Promise.all(sheetNames.map(async n=>{try{R[n]=await fetchSheet(n);}catch(e){R[n]=null;console.warn('Lỗi sheet',n,e.message);}}));
+ // Save global cache for AI
+ window._D={
+  gtcTotalAM:R['GTC Total theo AM'],gtcTotalBC:R['GTC Total theo Bưu Cục'],
+  gtcTTSAM:R['GTC TTS theo AM'],gtcTTSBC:R['GTC TTS theo Bưu Cục'],
+  fdTotalAM:R['FD Total theo AM'],fdSMEAM:R['FD SME theo AM'],
+  odrAM:R['ODR TTS - AM'],odrBC:R['ODR TTS - Bưu Cục'],
+  oprAM:R['OPR TTS - AM'],oprBC:R['OPR TTS - Bưu Cục']
+ };
+ // p1 — GTC Total
+ const p1el=document.getElementById('p1');
+ if(R['GTC Total theo AM']&&R['GTC Total theo Bưu Cục']){
+  p1el.innerHTML=buildGTCPage(R['GTC Total theo AM'],R['GTC Total theo Bưu Cục'],'Tổng quan GTC Total','p1');
+  setTimeout(()=>renderGTC('p1'),0);
+ }else p1el.innerHTML=errPage('Không thể tải GTC Total. Kiểm tra sheet "GTC Total theo AM" / "GTC Total theo Bưu Cục".');
+ // p2 — GTC TTS
+ const p2el=document.getElementById('p2');
+ if(R['GTC TTS theo AM']&&R['GTC TTS theo Bưu Cục']){
+  p2el.innerHTML=buildGTCPage(R['GTC TTS theo AM'],R['GTC TTS theo Bưu Cục'],'Tổng quan GTC TTS','p2');
+  setTimeout(()=>renderGTC('p2'),0);
+ }else p2el.innerHTML=errPage('Không thể tải GTC TTS. Kiểm tra sheet "GTC TTS theo AM" / "GTC TTS theo Bưu Cục".');
+ // p3 — FD Ngày
+ window._FD={
+  totalAM:R['FD Total theo AM'],smeAM:R['FD SME theo AM'],
+  ttsAM:R['FD TTS theo AM'],shopeeAM:R['FD Shopee theo AM'],
+  totalBC:R['FD Total theo Bưu Cục'],smeBC:R['FD SME theo Bưu Cục'],
+  ttsBC:R['FD TTS theo Bưu Cục'],shopeeBC:R['FD Shopee theo Bưu Cục']
+ };
+ const p3el=document.getElementById('p3');
+ if(R['FD Total theo AM']){
+  p3el.innerHTML=buildFDDayPage(window._FD);
+  setTimeout(()=>renderFDDay(),0);
+ }else p3el.innerHTML=errPage('Không thể tải dữ liệu FD.');
+ // p4 — FD Tuần
+ const p4el=document.getElementById('p4');
+ if(R['FD Total theo AM']){p4el.innerHTML=buildFDWeekPage(window._FD);setTimeout(()=>renderFDWeek(),0);}
+ else p4el.innerHTML=errPage('Không thể tải dữ liệu FD Tuần.');
+ // p5 — ODR
+ const p5el=document.getElementById('p5');
+ if(R['ODR TTS - AM']&&R['ODR TTS - Bưu Cục'])
+  p5el.innerHTML=buildOntimePage(R['ODR TTS - AM'],R['ODR TTS - Bưu Cục'],'Tổng quan ODR TTS','Vol GTC','GTC đúng Ontime',98,96);
+ else p5el.innerHTML=errPage('Không thể tải ODR TTS. Kiểm tra sheet "ODR TTS - AM" / "ODR TTS - Bưu Cục".');
+ // p6 — OPR
+ const p6el=document.getElementById('p6');
+ if(R['OPR TTS - AM']&&R['OPR TTS - Bưu Cục'])
+  p6el.innerHTML=buildOntimePage(R['OPR TTS - AM'],R['OPR TTS - Bưu Cục'],'Tổng quan OPR TTS','Vol LTC','LTC đúng Ontime',90,80);
+ else p6el.innerHTML=errPage('Không thể tải OPR TTS. Kiểm tra sheet "OPR TTS - AM" / "OPR TTS - Bưu Cục".');
+ // p7 — Aging (tạm ẩn, triển khai sau)
+ // p12 — AI
+ buildAIPage();
+ btn.classList.remove('spinning');btn.disabled=false;
+ const now=new Date();document.getElementById('lastUpdate').textContent=`Cập nhật: ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
+}
+
+loadAll=async function(){
+ const btn=document.getElementById('refreshBtn');btn.classList.add('spinning');btn.disabled=true;
+ ['p1','p2','p3','p4','p5','p6','p7'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML='<div class="loading"><div class="spinner"></div><div class="loading-text">Đang tải dữ liệu mới...</div></div>';});
+ await init();
+};
+
+initSplash();
+init();
+</script>
+</body>
+</html>
