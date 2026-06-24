@@ -94,6 +94,9 @@ tr.tot td{background:#F8F9FA;font-weight:700;border-top:2px solid var(--orange-m
 .ai-preset-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
 .ai-preset-btn{padding:6px 14px;border-radius:20px;border:1px solid var(--border);background:#fff;color:var(--text-sub);font-size:12px;cursor:pointer;transition:all .15s}
 .ai-preset-btn:hover{border-color:var(--orange);color:var(--orange)}
+.ai-preset-btn.active{background:var(--orange);color:#fff;border-color:var(--orange)}
+.ai-cust-field label{font-size:11px;font-weight:600;color:var(--text-sub)}
+.ai-cust-field select{padding:6px 10px;border-radius:6px;border:1px solid var(--border);font-size:12px;font-family:inherit;background:#fff}
 .ai-textarea{width:100%;min-height:100px;padding:12px 14px;border-radius:8px;border:1px solid var(--border);background:#fff;color:var(--text-main);font-size:13px;font-family:inherit;resize:vertical;box-sizing:border-box}
 .ai-textarea:focus{outline:none;border-color:var(--orange)}
 .ai-run-btn{margin-top:12px;padding:11px 32px;background:linear-gradient(135deg,#7C3AED,#5B21B6);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:8px}
@@ -958,6 +961,7 @@ async function buildAgingPage(){
   ]);
   const rows=(backupSheet||[]).slice(1);
   const unstableBCSet=new Set((batonSheet||[]).slice(1).map(r=>(r[3]||'').trim()).filter(Boolean));
+  window._AGING={rows:normalizeAgingRows(rows),unstable:unstableBCSet};
   el.innerHTML=buildAgingHTML(rows,unstableBCSet);
  }catch(e){el.innerHTML=errPage(`Aging sheet: ${e.message}`);}
 }
@@ -977,15 +981,48 @@ function buildAIPage(){
  <div style="padding:0 18px 12px;font-size:11px;color:var(--text-sub)">Lấy key tại <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:var(--orange)">console.anthropic.com</a></div></div>
  <div class="card"><div class="card-header"><div class="card-title"><div class="card-icon">💬</div>Nội dung phân tích</div></div>
  <div style="padding:14px 18px">
-  <div style="margin-bottom:10px;font-size:12px;color:var(--text-sub)">Chọn nhanh:</div>
-  <div class="ai-preset-row">
-   <button class="ai-preset-btn" onclick="setAIPrompt('tong-quan')">📊 Tổng quan vận hành</button>
-   <button class="ai-preset-btn" onclick="setAIPrompt('hl-ll')">🏆 Highlight / Lowlight</button>
-   <button class="ai-preset-btn" onclick="setAIPrompt('so-sanh-am')">👤 So sánh AM</button>
-   <button class="ai-preset-btn" onclick="setAIPrompt('tra-hang')">🔄 Phân tích tỉ lệ trả</button>
-   <button class="ai-preset-btn" onclick="setAIPrompt('kien-nghi')">💡 Kiến nghị cải thiện</button>
+  <div style="margin-bottom:8px;font-size:12px;font-weight:600;color:var(--text-sub)">Chế độ phân tích:</div>
+  <div class="ai-preset-row" style="margin-bottom:14px">
+   <button class="ai-preset-btn aimode active" data-mode="preset" onclick="aiSetMode('preset')">⚡ Nhanh (preset)</button>
+   <button class="ai-preset-btn aimode" data-mode="all" onclick="aiSetMode('all')">🌐 Tổng quan toàn bộ dữ liệu</button>
+   <button class="ai-preset-btn aimode" data-mode="custom" onclick="aiSetMode('custom')">🎯 Custom (chọn dữ liệu cụ thể)</button>
   </div>
-  <textarea class="ai-textarea" id="aiPromptArea" placeholder="Hoặc tự nhập câu hỏi..."></textarea>
+  <div id="aiPresetBlock">
+   <div style="margin-bottom:8px;font-size:12px;color:var(--text-sub)">Chọn nhanh:</div>
+   <div class="ai-preset-row">
+    <button class="ai-preset-btn" onclick="setAIPrompt('tong-quan')">📊 Tổng quan vận hành</button>
+    <button class="ai-preset-btn" onclick="setAIPrompt('hl-ll')">🏆 Highlight / Lowlight</button>
+    <button class="ai-preset-btn" onclick="setAIPrompt('so-sanh-am')">👤 So sánh AM</button>
+    <button class="ai-preset-btn" onclick="setAIPrompt('tra-hang')">🔄 Phân tích tỉ lệ trả</button>
+    <button class="ai-preset-btn" onclick="setAIPrompt('kien-nghi')">💡 Kiến nghị cải thiện</button>
+   </div>
+  </div>
+  <div id="aiAllBlock" style="display:none">
+   <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:8px">
+    <div class="ai-cust-field"><label style="display:block;margin-bottom:3px">Khoảng thời gian</label>
+     <select id="aiAllDays"><option value="3">3 ngày gần nhất</option><option value="7" selected>7 ngày gần nhất</option><option value="14">14 ngày gần nhất</option><option value="30">30 ngày gần nhất</option></select></div>
+   </div>
+   <div style="font-size:11px;color:var(--text-sub);background:#FFF7ED;border-left:3px solid var(--orange);padding:8px 12px;border-radius:6px">Sẽ gửi cho AI: GTC Total · GTC TTS · GTC chi tiết (cân nặng) · FD · ODR · OPR · Aging — tổng hợp theo AM (Aging theo Bưu Cục).</div>
+  </div>
+  <div id="aiCustomBlock" style="display:none">
+   <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px">
+    <div class="ai-cust-field"><label style="display:block;margin-bottom:3px">Dữ liệu (tab)</label>
+     <select id="aiCustDataset" onchange="aiCustDatasetChange()">
+      <option value="gtcTotal">GTC Total</option>
+      <option value="gtcTTS">GTC TTS</option>
+      <option value="canNang">GTC chi tiết (cân nặng)</option>
+      <option value="fd">Tỉ lệ trả (FD)</option>
+      <option value="odr">ODR TTS (Ontime)</option>
+      <option value="opr">OPR TTS (Ontime)</option>
+      <option value="aging">Aging &gt; 5 ngày</option></select></div>
+    <div class="ai-cust-field"><label style="display:block;margin-bottom:3px">Khoảng thời gian</label>
+     <select id="aiCustDays"><option value="1">Ngày mới nhất</option><option value="3">3 ngày</option><option value="7" selected>7 ngày</option><option value="14">14 ngày</option><option value="30">30 ngày</option></select></div>
+    <div class="ai-cust-field"><label style="display:block;margin-bottom:3px">Phân tích theo</label>
+     <select id="aiCustSubject"><option value="am">AM</option><option value="bc">Bưu cục</option><option value="loai">Loại hàng (chỉ cân nặng)</option></select></div>
+   </div>
+   <div id="aiCustHint" style="font-size:11px;color:var(--text-sub);background:#FFF7ED;border-left:3px solid var(--orange);padding:8px 12px;border-radius:6px"></div>
+  </div>
+  <textarea class="ai-textarea" id="aiPromptArea" placeholder="Nhập câu hỏi / yêu cầu phân tích..." style="margin-top:12px"></textarea>
   <div style="display:flex;align-items:center;gap:12px;margin-top:12px;flex-wrap:wrap">
    <button class="ai-run-btn" id="aiRunBtn" onclick="runAIAnalysis()"><span>✨</span><span>Phân tích ngay</span></button>
    <span style="font-size:12px;color:var(--text-sub)" id="aiStatus"></span>
@@ -1005,6 +1042,119 @@ const AI_PRESETS={
  'kien-nghi':'Dựa trên toàn bộ dữ liệu, đưa ra 5-7 kiến nghị cải thiện cụ thể. Mỗi kiến nghị: vấn đề → giải pháp → kỳ vọng kết quả.'
 };
 function setAIPrompt(key){document.getElementById('aiPromptArea').value=AI_PRESETS[key]||'';}
+/* ===== AI: chế độ Tổng quan toàn bộ & Custom ===== */
+function aiSetMode(mode){
+ window._aiMode=mode;
+ document.querySelectorAll('.ai-preset-btn.aimode').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));
+ document.getElementById('aiPresetBlock').style.display=mode==='preset'?'block':'none';
+ document.getElementById('aiAllBlock').style.display=mode==='all'?'block':'none';
+ document.getElementById('aiCustomBlock').style.display=mode==='custom'?'block':'none';
+ if(mode==='custom')aiCustDatasetChange();
+}
+function aiCustDatasetChange(){
+ const ds=document.getElementById('aiCustDataset')?.value;
+ const subj=document.getElementById('aiCustSubject');
+ const loaiOpt=subj?.querySelector('option[value="loai"]');
+ if(loaiOpt){const ok=ds==='canNang';loaiOpt.disabled=!ok;if(!ok&&subj.value==='loai')subj.value='am';}
+ const hint=document.getElementById('aiCustHint');
+ if(hint){const map={gtcTotal:'GTC Total (Vol, %GTC, %Gán)',gtcTTS:'GTC TTS (Vol, %GTC, %Gán)',canNang:'GTC chi tiết theo cân nặng (Vol, %GTC, Tồn, %Cồng kềnh, phân bố khối lượng)',fd:'Tỉ lệ trả %FD',odr:'ODR Ontime',opr:'OPR Ontime',aging:'Số đơn Aging >5 ngày'};hint.textContent='Sẽ gửi: '+(map[ds]||'')+(ds==='aging'?' · chủ thể Loại hàng không áp dụng':'')+'.';}
+}
+function aiLastDateSet(rows,dateIdx,days){const s=[...new Set(rows.map(r=>isoD(r[dateIdx])).filter(Boolean))].sort();return new Set(s.slice(-days));}
+function aiGTC(label,sheetAM,sheetBC,days,subject){
+ const isBC=subject==='bc';const sh=isBC?sheetBC:sheetAM;if(!sh||sh.length<2)return'';
+ const ni=isBC?1:0,di=isBC?2:1,vi=isBC?3:2,gi=isBC?4:3,ci=isBC?6:5;
+ const rows=sh.slice(1).filter(r=>(r[ni]||'').trim()&&!(r[ni]||'').toLowerCase().includes('grand total'));
+ const ds=aiLastDateSet(rows,di,days),dl=[...ds].sort();if(!dl.length)return'';
+ const agg={};rows.forEach(r=>{const d=isoD(r[di]);if(!ds.has(d))return;const k=(r[ni]||'').trim();const v=Math.round(parseFloat(r[vi])||0);(agg[k]=agg[k]||{vol:0,cnt:0,gw:0});agg[k].vol+=v;agg[k].cnt+=Math.round(parseFloat(r[ci])||0);agg[k].gw+=v*((parseFloat(r[gi])||0)*100);});
+ let tv=0,tc=0;const arr=Object.entries(agg).map(([k,a])=>{tv+=a.vol;tc+=a.cnt;return{k,vol:a.vol,cnt:a.cnt,gtc:a.vol?a.cnt/a.vol*100:0,gan:a.vol?a.gw/a.vol:0};}).sort((a,b)=>b.gtc-a.gtc);
+ let s=`\n### ${label} — ${dl[0]}→${dl[dl.length-1]} (theo ${isBC?'Bưu Cục':'AM'})\nTổng: Vol=${tv}, GTC=${tc} (${tv?(tc/tv*100).toFixed(1):0}%)\n`;
+ arr.forEach((x,i)=>s+=`${i+1}. ${x.k}: Vol=${x.vol}, %GTC=${x.gtc.toFixed(1)}%, %Gán=${x.gan.toFixed(1)}%\n`);
+ return s;
+}
+function aiFD(days,subject){
+ const isBC=subject==='bc';const sh=isBC?window._D.fdTotalBC:window._D.fdTotalAM;if(!sh||sh.length<2)return'';
+ const rows=sh.slice(1).filter(r=>(r[0]||'').trim()&&!(r[0]||'').toLowerCase().includes('grand total'));
+ const ds=aiLastDateSet(rows,1,days),dl=[...ds].sort();if(!dl.length)return'';
+ const agg={};rows.forEach(r=>{const d=isoD(r[1]);if(!ds.has(d))return;const k=(r[0]||'').trim();(agg[k]=agg[k]||{f:0,n:0});agg[k].f+=parsePct(r[3]);agg[k].n++;});
+ const arr=Object.entries(agg).map(([k,a])=>({k,fd:a.n?a.f/a.n:0})).sort((a,b)=>b.fd-a.fd);
+ let s=`\n### FD Total %Trả — ${dl[0]}→${dl[dl.length-1]} (theo ${isBC?'Bưu Cục':'AM'}, %FD bình quân ngày)\n`;
+ arr.forEach((x,i)=>s+=`${i+1}. ${x.k}: %FD=${x.fd.toFixed(2)}%\n`);
+ return s;
+}
+function aiOnt(which,days,subject){
+ const isBC=subject==='bc';const sh=isBC?window._D[which+'BC']:window._D[which+'AM'];if(!sh||sh.length<2)return'';
+ const ni=isBC?1:0,di=isBC?2:1,vi=isBC?3:2,ci=isBC?5:4;
+ const rows=sh.slice(1).filter(r=>(r[ni]||'').trim()&&!(r[ni]||'').toLowerCase().includes('grand total'));
+ const ds=aiLastDateSet(rows,di,days),dl=[...ds].sort();if(!dl.length)return'';
+ const agg={};rows.forEach(r=>{const d=isoD(r[di]);if(!ds.has(d))return;const k=(r[ni]||'').trim();(agg[k]=agg[k]||{v:0,c:0});agg[k].v+=Math.round(parseFloat(r[vi])||0);agg[k].c+=Math.round(parseFloat(r[ci])||0);});
+ const arr=Object.entries(agg).map(([k,a])=>({k,v:a.v,p:a.v?a.c/a.v*100:0})).sort((a,b)=>a.p-b.p);
+ let s=`\n### ${which.toUpperCase()} TTS Ontime — ${dl[0]}→${dl[dl.length-1]} (theo ${isBC?'Bưu Cục':'AM'})\n`;
+ arr.forEach((x,i)=>s+=`${i+1}. ${x.k}: Vol=${x.v}, %Ontime=${x.p.toFixed(1)}%\n`);
+ return s;
+}
+function aiCanNang(days,subject){
+ const rows=(window._GTCD&&window._GTCD.rows)||[];if(!rows.length)return'';
+ const ds=[...new Set(rows.map(r=>r.date))].sort().slice(-days);if(!ds.length)return'';const dset=new Set(ds);
+ const f=rows.filter(r=>dset.has(r.date));
+ const key=subject==='bc'?'bc':subject==='loai'?'loai':'am';
+ const agg={};f.forEach(r=>{const k=r[key];if(!k)return;(agg[k]=agg[k]||{vol:0,ngtc:0,ntra:0,heavy:0});agg[k].vol+=r.vol;agg[k].ngtc+=r.ngtc;agg[k].ntra+=r.ntra;if(r.kl!=='1. <5Kg')agg[k].heavy+=r.vol;});
+ const arr=Object.entries(agg).map(([k,a])=>({k,vol:a.vol,gtc:a.vol?a.ngtc/a.vol*100:0,ton:a.vol-a.ngtc-a.ntra,heavyP:a.vol?a.heavy/a.vol*100:0})).sort((a,b)=>b.vol-a.vol);
+ const kl={};f.forEach(r=>{(kl[r.kl]=kl[r.kl]||{vol:0,ngtc:0});kl[r.kl].vol+=r.vol;kl[r.kl].ngtc+=r.ngtc;});
+ let s=`\n### GTC chi tiết theo cân nặng — ${ds[0]}→${ds[ds.length-1]} (theo ${subject==='bc'?'Bưu Cục':subject==='loai'?'Loại hàng':'AM'})\n`;
+ s+='Phân bố khối lượng: '+GTCD_KL.map(k=>`${k.label}: Vol=${kl[k.id]?kl[k.id].vol:0}, %GTC=${kl[k.id]&&kl[k.id].vol?(kl[k.id].ngtc/kl[k.id].vol*100).toFixed(1):0}%`).join(' | ')+'\n';
+ arr.forEach((x,i)=>{const u=subject==='bc'&&window._GTCD.unstable.has(x.k)?' [BẤT ỔN]':'';s+=`${i+1}. ${x.k}${u}: Vol=${x.vol}, %GTC=${x.gtc.toFixed(1)}%, Tồn=${x.ton}, %Cồng kềnh=${x.heavyP.toFixed(1)}%\n`;});
+ return s;
+}
+function aiAging(days,subject){
+ const A=window._AGING;if(!A||!A.rows||!A.rows.length)return'';
+ const ds=[...new Set(A.rows.map(r=>r.date))].sort().slice(-days);if(!ds.length)return'';const dset=new Set(ds);
+ const f=A.rows.filter(r=>dset.has(r.date));
+ const key=subject==='am'?'am':'bc';
+ const agg={};f.forEach(r=>{const k=r[key];if(!k)return;agg[k]=(agg[k]||0)+1;});
+ const arr=Object.entries(agg).map(([k,v])=>({k,v})).sort((a,b)=>b.v-a.v);
+ let s=`\n### Aging >5 ngày — ${ds[0]}→${ds[ds.length-1]} (theo ${key==='am'?'AM':'Bưu Cục'})\nTổng đơn aging: ${f.length}\n`;
+ arr.forEach((x,i)=>{const u=key==='bc'&&A.unstable.has(x.k)?' [BẤT ỔN]':'';s+=`${i+1}. ${x.k}${u}: ${x.v} đơn\n`;});
+ return s;
+}
+function aiCtxAll(days){
+ days=days||7;
+ let s=`TỔNG QUAN TOÀN BỘ DỮ LIỆU — ${days} ngày gần nhất (tổng hợp theo AM, Aging theo Bưu Cục):`;
+ s+=aiGTC('GTC Total',window._D.gtcTotalAM,window._D.gtcTotalBC,days,'am');
+ s+=aiGTC('GTC TTS',window._D.gtcTTSAM,window._D.gtcTTSBC,days,'am');
+ s+=aiCanNang(days,'am');
+ s+=aiFD(days,'am');
+ s+=aiOnt('odr',days,'am');
+ s+=aiOnt('opr',days,'am');
+ s+=aiAging(days,'bc');
+ return s||'(Dữ liệu chưa được tải)';
+}
+function aiCtxCustom(dataset,days,subject){
+ let s='';
+ if(dataset==='gtcTotal')s=aiGTC('GTC Total',window._D.gtcTotalAM,window._D.gtcTotalBC,days,subject);
+ else if(dataset==='gtcTTS')s=aiGTC('GTC TTS',window._D.gtcTTSAM,window._D.gtcTTSBC,days,subject);
+ else if(dataset==='canNang')s=aiCanNang(days,subject);
+ else if(dataset==='fd')s=aiFD(days,subject);
+ else if(dataset==='odr')s=aiOnt('odr',days,subject);
+ else if(dataset==='opr')s=aiOnt('opr',days,subject);
+ else if(dataset==='aging')s=aiAging(days,subject==='loai'?'bc':subject);
+ return s||'(Dữ liệu chưa được tải hoặc không có)';
+}
+async function aiEnsureData(needCanNang,needAging){
+ const jobs=[];
+ if(needCanNang&&!((window._GTCD&&window._GTCD.rows&&window._GTCD.rows.length))){
+  jobs.push((async()=>{try{const[raw,baton]=await Promise.all([fetchSheetByGid(GTCD_GID),fetchSheetById(AGING_SID,'Baton').catch(()=>null)]);
+   window._GTCD=window._GTCD||{charts:{}};
+   window._GTCD.rows=(raw||[]).slice(1).filter(r=>r.length>10&&(r[0]||'').trim()).map(r=>({am:(r[0]||'').trim(),bc:(r[1]||'').trim(),loai:gtcdLoaiKey(r[2]),kl:(r[3]||'').trim(),date:isoD(r[4]),vol:Math.round(parseFloat(r[5])||0),gan:(parseFloat(r[6])||0)*100,gtc:(parseFloat(r[7])||0)*100,ngtc:Math.round(parseFloat(r[10])||0),ntra:Math.round(parseFloat(r[11])||0)})).filter(r=>r.date&&r.loai);
+   if(!window._GTCD.unstable||!window._GTCD.unstable.size)window._GTCD.unstable=new Set((baton||[]).slice(1).map(r=>(r[3]||'').trim()).filter(Boolean));
+  }catch(e){}})());
+ }
+ if(needAging&&!((window._AGING&&window._AGING.rows&&window._AGING.rows.length))){
+  jobs.push((async()=>{try{const[bk,baton]=await Promise.all([fetchSheetById(AGING_SID,'Backupall'),fetchSheetById(AGING_SID,'Baton').catch(()=>null)]);
+   window._AGING={rows:normalizeAgingRows((bk||[]).slice(1)),unstable:new Set((baton||[]).slice(1).map(r=>(r[3]||'').trim()).filter(Boolean))};
+  }catch(e){}})());
+ }
+ if(jobs.length)await Promise.all(jobs);
+}
 function gatherDashboardData(){
  const D=window._D;const lines=[];
  function isoDate(d){return(d||'').match(/\d{4}-\d{2}-\d{2}/)?.[0]||'';}
@@ -1047,9 +1197,31 @@ async function runAIAnalysis(){
  document.getElementById('aiStatus').textContent='';
  const card=document.getElementById('aiResultCard');card.style.display='block';
  document.getElementById('aiResultArea').innerHTML='<div class="ai-thinking"><div class="ai-thinking-dot"></div><div class="ai-thinking-dot"></div><div class="ai-thinking-dot"></div><span style="margin-left:8px">AI đang phân tích...</span></div>';
- const ctx=gatherDashboardData();
+ const mode=window._aiMode||'preset';
+ let ctx,scopeNote='';
  try{
-  const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:4096,system:'Bạn là chuyên gia phân tích vận hành logistics GHN Vùng TNT. Phân tích chi tiết, dùng số liệu thực tế. Trả lời tiếng Việt, format rõ ràng.',messages:[{role:'user',content:`DỮ LIỆU:\n${ctx}\n\nYÊU CẦU:\n${userQ}`}]})});
+  if(mode==='all'){
+   document.getElementById('aiStatus').textContent='⏳ Đang nạp toàn bộ dữ liệu...';
+   await aiEnsureData(true,true);
+   const days=+(document.getElementById('aiAllDays')?.value)||7;
+   ctx=aiCtxAll(days);scopeNote=`Phạm vi: TOÀN BỘ dữ liệu, ${days} ngày gần nhất.`;
+  }else if(mode==='custom'){
+   const dataset=document.getElementById('aiCustDataset')?.value||'gtcTotal';
+   const days=+(document.getElementById('aiCustDays')?.value)||7;
+   const subject=document.getElementById('aiCustSubject')?.value||'am';
+   document.getElementById('aiStatus').textContent='⏳ Đang nạp dữ liệu...';
+   await aiEnsureData(dataset==='canNang',dataset==='aging');
+   ctx=aiCtxCustom(dataset,days,subject);
+   const dmap={gtcTotal:'GTC Total',gtcTTS:'GTC TTS',canNang:'GTC chi tiết cân nặng',fd:'Tỉ lệ trả FD',odr:'ODR Ontime',opr:'OPR Ontime',aging:'Aging >5 ngày'};
+   const smap={am:'AM',bc:'Bưu cục',loai:'Loại hàng'};
+   scopeNote=`Phạm vi: ${dmap[dataset]} · ${days} ngày · theo ${smap[subject]}.`;
+  }else{
+   ctx=gatherDashboardData();scopeNote='Phạm vi: dữ liệu nhanh (GTC Total 7 ngày, FD/ODR ngày mới nhất).';
+  }
+  document.getElementById('aiStatus').textContent='';
+ }catch(_){ctx=gatherDashboardData();}
+ try{
+  const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:4096,system:'Bạn là chuyên gia phân tích vận hành logistics GHN Vùng TNT. CHỈ phân tích dựa trên đúng phần DỮ LIỆU được cung cấp và đúng PHẠM VI nêu ở đầu; nếu dữ liệu không có thông tin cần thiết, nói rõ là thiếu, KHÔNG bịa số. Dùng số liệu thực tế trong dữ liệu, trả lời tiếng Việt, format rõ ràng.',messages:[{role:'user',content:`${scopeNote}\n\nDỮ LIỆU:\n${ctx}\n\nYÊU CẦU:\n${userQ}`}]})});
   if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||`HTTP ${res.status}`);}
   const data=await res.json();const text=(data.content&&data.content[0]&&data.content[0].text)||'(Không có phản hồi)';
   document.getElementById('aiResultArea').innerHTML=md2html(text);window._lastAIResult=text;
@@ -1076,7 +1248,7 @@ async function init(){
  window._D={
   gtcTotalAM:R['GTC Total theo AM'],gtcTotalBC:R['GTC Total theo Bưu Cục'],
   gtcTTSAM:R['GTC TTS theo AM'],gtcTTSBC:R['GTC TTS theo Bưu Cục'],
-  fdTotalAM:R['FD Total theo AM'],fdSMEAM:R['FD SME theo AM'],
+  fdTotalAM:R['FD Total theo AM'],fdTotalBC:R['FD Total theo Bưu Cục'],fdSMEAM:R['FD SME theo AM'],
   odrAM:R['ODR TTS - AM'],odrBC:R['ODR TTS - Bưu Cục'],
   oprAM:R['OPR TTS - AM'],oprBC:R['OPR TTS - Bưu Cục']
  };
