@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Báo Cáo Vận Hành TNT</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<title>TNT Logistics Console — Báo Cáo Vận Hành</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-:root{--orange:#F15D29;--orange-dark:#C8461A;--orange-light:#FFF0EB;--orange-mid:#FFD5C2;--sidebar-w:204px;--text-main:#1C1C1E;--text-sub:#6B7280;--border:#E5E7EB;--bg:#F4F6F9;--card:#FFFFFF;--shadow-sm:0 1px 3px rgba(0,0,0,0.08);--radius:10px;--green:#16A34A;--yellow:#D97706;--red:#DC2626;--green-bg:#DCFCE7;--yellow-bg:#FEF9C3;--red-bg:#FEE2E2}
+:root{--orange:#2563EB;--orange-dark:#1D4ED8;--orange-light:#EFF4FE;--orange-mid:#CBDDFB;--accent2:#0EA5E9;--accent3:#6366F1;--ink:#0F172A;--navy:#0F172A;--sidebar-w:0px;--text-main:#0F172A;--text-sub:#64748B;--border:#E6E9EF;--bg:#F5F6F8;--card:#FFFFFF;--shadow-sm:0 1px 2px rgba(15,23,42,0.04),0 1px 3px rgba(15,23,42,0.06);--shadow-md:0 6px 24px rgba(15,23,42,0.10);--radius:12px;--green:#059669;--yellow:#B45309;--red:#DC2626;--green-bg:#D1FAE5;--yellow-bg:#FEF3C7;--red-bg:#FEE2E2;--mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;--grid-line:rgba(15,23,42,0.035)}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text-main);display:flex;min-height:100vh;font-size:13px}
 .splash-overlay{position:fixed;inset:0;z-index:9999;background:url('bg.jpg') center/cover no-repeat;display:flex;align-items:center;justify-content:center;transition:opacity 0.7s ease;overflow:hidden}
@@ -130,84 +130,169 @@ tr.tot td{background:#F8F9FA;font-weight:700;border-top:2px solid var(--orange-m
 .chart-box h3{font-size:14px;font-weight:700;margin-bottom:2px}
 .chart-box .csub{font-size:11px;color:var(--text-sub);margin-bottom:12px}
 .chart-canvas-wrap{position:relative;height:300px}
+/* ===================================================================
+   PROFESSIONAL BI / OPERATIONS-REPORT THEME
+   Layout: top app bar + horizontal tab bar + centered report canvas.
+   (Chỉ thay đổi giao diện — KHÔNG đụng vào logic/JS)
+=================================================================== */
+body{display:block;background:var(--bg);color:var(--text-main);font-size:13px}
+/* ---- Top app bar ---- */
+.topbar{position:sticky;top:0;z-index:90;height:60px;background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 26px;box-shadow:0 1px 0 rgba(15,23,42,0.03)}
+.tb-brand{display:flex;align-items:center;gap:12px}
+.tb-mark{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--orange),var(--accent3));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:14px;letter-spacing:-.5px;box-shadow:0 4px 12px rgba(37,99,235,0.3)}
+.tb-titles{display:flex;flex-direction:column;line-height:1.2}
+.tb-name{font-size:14.5px;font-weight:800;letter-spacing:-.3px;color:var(--text-main)}
+.tb-sub{font-size:11px;color:var(--text-sub);font-weight:500}
+.tb-badge{padding:3px 10px;border-radius:6px;background:var(--orange-light);color:var(--orange-dark);font-size:11px;font-weight:700;border:1px solid var(--orange-mid);letter-spacing:.3px}
+.tb-actions{display:flex;align-items:center;gap:16px}
+.tb-status{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text-sub);font-weight:500}
+.tb-dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 0 3px rgba(5,150,105,0.16);animation:livePulse 2s ease-in-out infinite}
+@keyframes livePulse{0%,100%{box-shadow:0 0 0 2px rgba(5,150,105,0.18)}50%{box-shadow:0 0 0 5px rgba(5,150,105,0)}}
+.refresh-btn{display:inline-flex;align-items:center;gap:7px;margin:0;width:auto;padding:8px 15px;border-radius:8px;background:var(--orange);border:1px solid var(--orange);color:#fff;font-size:12.5px;font-weight:600;cursor:pointer;transition:all .15s}
+.refresh-btn:hover{background:var(--orange-dark)}
+.last-update{color:var(--text-sub);font-size:12px;font-weight:500;padding:0;text-align:left}
+/* ---- Horizontal tab bar ---- */
+.tabbar{position:sticky;top:60px;z-index:80;background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:stretch;padding:0 18px;overflow-x:auto;box-shadow:var(--shadow-sm)}
+.tabbar::-webkit-scrollbar{height:0}
+.nav-section{display:flex;align-items:center;font-size:9.5px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#94A3B8;padding:0 10px 0 14px;white-space:nowrap;border-left:1px solid var(--border)}
+.nav-section:first-of-type{border-left:none;padding-left:4px}
+.nav-item{display:inline-flex;align-items:center;gap:7px;height:48px;padding:0 14px;margin:0;width:auto;border:none;background:none;color:var(--text-sub);font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap;border-radius:0;border-bottom:2.5px solid transparent;transition:color .15s,border-color .15s,background .15s}
+.nav-item:hover{color:var(--text-main);background:#F8FAFC}
+.nav-item.active{color:var(--orange);border-bottom-color:var(--orange);background:linear-gradient(180deg,transparent,var(--orange-light))}
+.nav-item .icon{font-size:14px;width:auto}
+.nav-item.ai-tab{color:var(--accent3)}
+.nav-item.ai-tab.active{color:var(--accent3);border-bottom-color:var(--accent3);background:linear-gradient(180deg,transparent,#EEF0FF)}
+/* ---- Report canvas ---- */
+.main{margin:0 auto;max-width:1480px;width:100%;padding:26px 30px 56px;overflow-x:hidden}
+.page.active{animation:fadeUp .35s ease both}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+/* ---- Section / page header ---- */
+.page-header{margin-bottom:20px;padding:0}
+.page-title{font-size:22px;font-weight:800;letter-spacing:-.5px;color:var(--text-main)}
+.page-meta{color:var(--text-sub);font-size:12.5px;margin-top:6px}
+.tag{border-radius:6px;font-weight:600;border:1px solid transparent}
+.tag-orange{background:var(--orange-light);color:var(--orange-dark);border-color:var(--orange-mid)}
+/* ---- Cards / panels ---- */
+.card{border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow-sm);background:#fff}
+.card-header{background:#fff;border-bottom:1px solid var(--border);padding:15px 20px}
+.card-title{font-size:14px;font-weight:700;color:var(--text-main);letter-spacing:-.2px}
+.card-icon{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--orange),var(--accent3));color:#fff;box-shadow:0 3px 8px rgba(37,99,235,0.28)}
+.card-info{color:var(--text-sub);font-size:11.5px}
+/* ---- Data tables ---- */
+table{font-variant-numeric:tabular-nums}
+th{background:#F8FAFC;color:#475569;border-bottom:1px solid var(--border);font-size:11px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;padding:11px 13px}
+td{font-size:12.5px;color:var(--text-main);border-bottom:1px solid #F1F3F7;padding:9px 13px;font-variant-numeric:tabular-nums}
+tbody tr:nth-child(even) td{background:#FBFCFE}
+tr:hover td{background:#F1F6FF}
+tr.tot td{background:#F4F8FF;font-weight:700;border-top:2px solid var(--orange-mid)}
+.pct{border-radius:6px;font-weight:700;padding:2px 8px;font-variant-numeric:tabular-nums}
+.g{background:var(--green-bg);color:var(--green)}.m{background:var(--yellow-bg);color:var(--yellow)}.b{background:var(--red-bg);color:var(--red)}
+/* ---- KPI scorecards ---- */
+.kpi-grid{gap:14px}
+.kpi-card{background:#fff;border:1px solid var(--border);border-top:none;border-radius:14px;padding:16px 18px;box-shadow:var(--shadow-sm);position:relative;overflow:hidden;transition:box-shadow .18s,transform .18s}
+.kpi-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:linear-gradient(180deg,var(--orange),var(--accent3))}
+.kpi-card:hover{box-shadow:var(--shadow-md);transform:translateY(-2px)}
+.kpi-ico{width:32px;height:32px;border-radius:9px}
+.kpi-label{font-size:10.5px;font-weight:700;color:var(--text-sub);letter-spacing:.6px;text-transform:uppercase}
+.kpi-val{font-size:25px;font-weight:800;letter-spacing:-.6px;color:var(--text-main)}
+/* ---- Chips / filters ---- */
+.chip{border:1px solid var(--border);border-radius:9px;background:#fff;color:var(--text-sub);font-weight:600;font-size:12px;padding:6px 13px}
+.chip:hover{border-color:var(--orange);color:var(--orange)}
+.chip.active{background:var(--orange);border-color:var(--orange);color:#fff}
+.chip-label{color:var(--text-sub);font-weight:700}
+.date-filter-bar{background:#F8FAFC;border-bottom:1px solid var(--border)}
+.date-filter-bar select,.ai-cust-field select{border-radius:8px}
+.date-filter-bar select:focus,.ai-cust-field select:focus,.ai-textarea:focus,.groq-input:focus{outline:none;border-color:var(--orange);box-shadow:0 0 0 3px var(--orange-light)}
+.analysis-box{background:var(--orange-light);border-left:3px solid var(--orange);border-radius:10px}
+/* ---- Chart panels ---- */
+.chart-box{border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow-sm)}
+.chart-box h3{font-size:14px;font-weight:700;color:var(--text-main);letter-spacing:-.2px}
+.chart-box .csub{color:var(--text-sub)}
+/* ---- AI panel ---- */
+.ai-preset-btn{border:1px solid var(--border);border-radius:9px;background:#fff}
+.ai-preset-btn:hover{border-color:var(--orange);color:var(--orange)}
+.ai-preset-btn.active{background:var(--orange);border-color:var(--orange);color:#fff}
+.ai-run-btn{background:var(--accent3);border-radius:9px}
+.ai-run-btn:hover{box-shadow:var(--shadow-md);transform:translateY(-1px)}
+.ai-result h1,.ai-result h2{color:var(--orange)}
+.ai-thinking-dot{background:var(--accent3)}
+/* ---- Splash: bìa báo cáo điều hành ---- */
+.splash-overlay{background:linear-gradient(135deg,#0B1326 0%,#13233F 55%,#0B1326 100%)}
+.splash-overlay::before{background:radial-gradient(900px 480px at 72% 18%,rgba(37,99,235,0.22),transparent 60%),radial-gradient(700px 420px at 20% 90%,rgba(14,165,233,0.14),transparent 60%)}
+.splash-cover{position:relative;z-index:2;max-width:680px;width:100%;padding:28px 34px;display:flex;flex-direction:column;align-items:flex-start;gap:16px}
+.splash-cover>*{animation:fadeUp .6s cubic-bezier(.22,.68,0,1.2) both}
+.splash-cover>*:nth-child(1){animation-delay:.05s}.splash-cover>*:nth-child(2){animation-delay:.14s}.splash-cover>*:nth-child(3){animation-delay:.24s}.splash-cover>*:nth-child(4){animation-delay:.34s}.splash-cover>*:nth-child(5){animation-delay:.44s}.splash-cover>*:nth-child(6){animation-delay:.54s}
+.sc-top{display:flex;align-items:center;gap:12px}
+.sc-mark{width:42px;height:42px;border-radius:11px;background:linear-gradient(135deg,var(--orange),var(--accent3));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:17px;letter-spacing:-.5px;box-shadow:0 8px 24px rgba(37,99,235,0.45)}
+.sc-badge{padding:5px 14px;border-radius:8px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.16);color:#CBD5E1;font-size:12px;font-weight:700;letter-spacing:2px}
+.sc-kicker{font-size:12px;font-weight:700;letter-spacing:2.5px;color:#60A5FA;text-transform:uppercase}
+.sc-title{font-size:44px;font-weight:800;line-height:1.12;letter-spacing:-1px;color:#F8FAFC}
+.sc-title span{background:linear-gradient(135deg,#60A5FA,#22D3EE);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.sc-desc{font-size:15px;line-height:1.6;color:rgba(226,232,240,0.78);max-width:560px}
+.sc-regions{display:flex;flex-wrap:wrap;gap:8px}
+.sc-regions span{padding:6px 13px;border-radius:8px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);color:#CBD5E1;font-size:12.5px;font-weight:600}
+.splash-cta{margin-top:8px;padding:15px 38px;background:linear-gradient(135deg,var(--orange),var(--accent3));color:#fff;font-size:15px;font-weight:700;border:none;border-radius:11px;cursor:pointer;letter-spacing:.3px;box-shadow:0 10px 32px rgba(37,99,235,0.5);transition:all .2s;animation:ctaPulse 2.6s ease-in-out infinite 1.2s}
+.splash-cta:hover{transform:translateY(-2px)}
+@keyframes ctaPulse{0%,100%{box-shadow:0 8px 26px rgba(37,99,235,.45),0 0 0 0 rgba(37,99,235,.34)}50%{box-shadow:0 8px 26px rgba(37,99,235,.45),0 0 0 12px rgba(37,99,235,0)}}
+/* ---- Scrollbar ---- */
+*::-webkit-scrollbar{width:11px;height:11px}
+*::-webkit-scrollbar-track{background:transparent}
+*::-webkit-scrollbar-thumb{background:#CBD5E1;border-radius:7px;border:3px solid var(--bg)}
+*::-webkit-scrollbar-thumb:hover{background:var(--orange)}
+@media(max-width:760px){.topbar{padding:0 14px}.tb-sub{display:none}.main{padding:18px 14px 40px}.sc-title{font-size:32px}}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
 
-<!-- SPLASH -->
+<!-- SPLASH: bìa báo cáo điều hành -->
 <div id="splash" class="splash-overlay">
  <div class="splash-particles" id="splashParticles"></div>
- <div class="splash-glow"></div>
- <div class="splash-inner">
-  <div class="splash-logo-wrap">
-   <div class="splash-logo-txt">GHN</div>
-   <div class="splash-divider"></div>
-   <div class="splash-vung">Vùng TNT</div>
+ <div class="splash-cover">
+  <div class="sc-top">
+   <div class="sc-mark">GHN</div>
+   <div class="sc-badge">VÙNG TNT</div>
   </div>
-  <div class="splash-title">GHN – Vùng TNT<br><span>XIN CHÀO BẠN! 👋</span></div>
-  <div class="map-row">
-   <svg viewBox="0 0 480 340" width="330" height="234" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-     <filter id="glowA"><feGaussianBlur stdDeviation="3.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-    </defs>
-    <rect width="480" height="340" fill="rgba(255,255,255,0.015)" rx="12"/>
-    <path class="prov-shape" d="M 58,34 L 150,22 L 200,42 L 210,84 L 176,116 L 116,120 L 70,98 L 54,58 Z" fill="#FF8A56" fill-opacity=".82" stroke="#FFD9C2" stroke-width="2" filter="url(#glowA)"/>
-    <text x="132" y="68" text-anchor="middle" fill="white" font-size="12" font-weight="800" font-family="Inter,sans-serif">Phú Thọ</text>
-    <text x="132" y="84" text-anchor="middle" fill="rgba(255,255,255,.82)" font-size="9" font-family="Inter,sans-serif">🍊 Bưởi Đoan Hùng</text>
-    <path class="prov-shape" d="M 216,46 L 286,28 L 338,52 L 332,98 L 278,120 L 224,100 L 210,66 Z" fill="#FBBF24" fill-opacity=".8" stroke="#fff" stroke-width="1.8" filter="url(#glowA)"/>
-    <text x="272" y="72" text-anchor="middle" fill="white" font-size="12" font-weight="800" font-family="Inter,sans-serif">Vĩnh Phúc</text>
-    <text x="272" y="88" text-anchor="middle" fill="rgba(255,255,255,.8)" font-size="9" font-family="Inter,sans-serif">🥬 Su su Tam Đảo</text>
-    <path class="prov-shape" d="M 50,128 L 140,122 L 182,150 L 176,212 L 132,252 L 80,244 L 48,202 L 40,160 Z" fill="#34D399" fill-opacity=".74" stroke="#fff" stroke-width="1.8"/>
-    <text x="108" y="186" text-anchor="middle" fill="white" font-size="12" font-weight="800" font-family="Inter,sans-serif">Hòa Bình</text>
-    <text x="108" y="202" text-anchor="middle" fill="rgba(255,255,255,.78)" font-size="9" font-family="Inter,sans-serif">🌾 Cam · Cơm lam</text>
-    <path class="prov-shape" d="M 188,154 L 262,142 L 302,170 L 292,210 L 244,230 L 196,212 L 182,178 Z" fill="#A78BFA" fill-opacity=".8" stroke="#fff" stroke-width="1.8"/>
-    <text x="240" y="184" text-anchor="middle" fill="white" font-size="11" font-weight="800" font-family="Inter,sans-serif">Hà Nam</text>
-    <text x="240" y="199" text-anchor="middle" fill="rgba(255,255,255,.8)" font-size="9" font-family="Inter,sans-serif">🐟 Cá kho Nhân Hậu</text>
-    <path class="prov-shape" d="M 308,172 L 388,150 L 446,196 L 450,254 L 418,300 L 358,304 L 312,262 L 300,212 Z" fill="#60A5FA" fill-opacity=".78" stroke="#fff" stroke-width="1.8"/>
-    <text x="376" y="228" text-anchor="middle" fill="white" font-size="12" font-weight="800" font-family="Inter,sans-serif">Nam Định</text>
-    <text x="376" y="244" text-anchor="middle" fill="rgba(255,255,255,.78)" font-size="9" font-family="Inter,sans-serif">🍜 Phở bò</text>
-    <path class="prov-shape" d="M 138,260 L 222,240 L 288,250 L 296,298 L 256,332 L 190,336 L 138,310 L 124,282 Z" fill="#38BDF8" fill-opacity=".74" stroke="#fff" stroke-width="1.8"/>
-    <text x="208" y="290" text-anchor="middle" fill="white" font-size="12" font-weight="800" font-family="Inter,sans-serif">Ninh Bình</text>
-    <text x="208" y="306" text-anchor="middle" fill="rgba(255,255,255,.78)" font-size="9" font-family="Inter,sans-serif">🐐 Dê núi · Cơm cháy</text>
-   </svg>
-   <div class="prov-grid">
-    <div class="prov-card"><div class="prov-name c-ls">🥬 Vĩnh Phúc</div><div class="prov-spec">Su su Tam Đảo<br>Cá thính Lập Thạch<br>Bánh trùng mật mía</div></div>
-    <div class="prov-card"><div class="prov-name c-bg">🍊 Phú Thọ</div><div class="prov-spec">Bưởi Đoan Hùng<br>Thịt chua Thanh Sơn<br>Cọ ỏm, Bánh tai</div></div>
-    <div class="prov-card"><div class="prov-name c-hd">🌾 Hòa Bình</div><div class="prov-spec">Cam Cao Phong<br>Lợn cắp nách<br>Cơm lam, Rượu cần</div></div>
-    <div class="prov-card"><div class="prov-name c-hp">🍜 Nam Định</div><div class="prov-spec">Phở bò Nam Định<br>Bánh gai Bà Thi<br>Nem nắm Giao Thủy</div></div>
-    <div class="prov-card"><div class="prov-name c-bn">🐟 Hà Nam</div><div class="prov-spec">Cá kho Nhân Hậu<br>Chuối ngự Đại Hoàng<br>Bánh cuốn Phủ Lý</div></div>
-    <div class="prov-card"><div class="prov-name c-qn">🐐 Ninh Bình</div><div class="prov-spec">Thịt dê núi<br>Cơm cháy Ninh Bình<br>Mắm tép Gia Viễn</div></div>
-   </div>
+  <div class="sc-kicker">Báo cáo Vận hành · Operations Report</div>
+  <h1 class="sc-title">Trung tâm Dữ liệu Vận hành<br><span>GHN — Vùng TNT</span></h1>
+  <p class="sc-desc">Tổng hợp GTC, Tỉ lệ trả hàng, Ontime SLA và Aging — đồng bộ trực tiếp từ nguồn dữ liệu, kèm phân tích AI theo thời gian thực.</p>
+  <div class="sc-regions">
+   <span>Phú Thọ</span><span>Vĩnh Phúc</span><span>Hòa Bình</span><span>Hà Nam</span><span>Nam Định</span><span>Ninh Bình</span>
   </div>
-  <button class="splash-cta" onclick="dismissSplash()">Click vào đây để xem Dashboard <span class="splash-cta-arrow">→</span></button>
+  <button class="splash-cta" onclick="dismissSplash()">Vào Dashboard <span class="splash-cta-arrow">→</span></button>
  </div>
 </div>
 
-<nav class="sidebar">
- <div class="logo-area">
-  <img src="https://cdn.hstatic.net/themes/200000472237/1001423864/14/logo.png?v=2874" alt="GHN">
-  <div class="logo-sub">Báo Cáo Vận Hành TNT</div>
-  <div class="logo-author">Người làm: Phan Văn Quân</div>
+<header class="topbar">
+ <div class="tb-brand">
+  <div class="tb-mark">GHN</div>
+  <div class="tb-titles">
+   <div class="tb-name">Báo cáo Vận hành — Vùng TNT</div>
+   <div class="tb-sub">Operations Analytics · Phan Văn Quân</div>
+  </div>
+  <span class="tb-badge">TNT</span>
  </div>
+ <div class="tb-actions">
+  <div class="tb-status"><span class="tb-dot"></span><span class="last-update" id="lastUpdate">Đang tải…</span></div>
+  <button class="refresh-btn" id="refreshBtn" onclick="loadAll()"><span class="spin" id="spinIcon">🔄</span> Cập nhật</button>
+ </div>
+</header>
+
+<nav class="tabbar">
  <div class="nav-section">GTC</div>
- <button class="nav-item active" onclick="show('p1',this)"><span class="icon">📦</span>Tổng quan GTC Total</button>
- <button class="nav-item" onclick="show('p2',this)"><span class="icon">🎯</span>Tổng quan GTC TTS</button>
+ <button class="nav-item active" onclick="show('p1',this)"><span class="icon">📦</span>GTC Total</button>
+ <button class="nav-item" onclick="show('p2',this)"><span class="icon">🎯</span>GTC TTS</button>
  <button class="nav-item" onclick="show('p8',this)"><span class="icon">📊</span>GTC chi tiết</button>
- <div class="nav-section">Tỉ Lệ Trả</div>
+ <div class="nav-section">Tỉ lệ trả</div>
  <button class="nav-item" onclick="show('p3',this)"><span class="icon">📅</span>TLT theo Ngày</button>
  <button class="nav-item" onclick="show('p4',this)"><span class="icon">📆</span>TLT theo Tuần</button>
- <div class="nav-section">Ontime SLA TTS</div>
- <button class="nav-item" onclick="show('p5',this)"><span class="icon">⏱️</span>Tổng quan ODR TTS</button>
- <button class="nav-item" onclick="show('p6',this)"><span class="icon">🚀</span>Tổng quan OPR TTS</button>
+ <div class="nav-section">Ontime SLA</div>
+ <button class="nav-item" onclick="show('p5',this)"><span class="icon">⏱️</span>ODR TTS</button>
+ <button class="nav-item" onclick="show('p6',this)"><span class="icon">🚀</span>OPR TTS</button>
  <div class="nav-section">Aging</div>
  <button class="nav-item" onclick="show('p7',this)"><span class="icon">⏳</span>Aging &gt; 5 ngày</button>
  <div class="nav-section">AI</div>
- <button class="nav-item" onclick="show('p12',this)" style="background:linear-gradient(135deg,rgba(124,58,237,0.18),rgba(91,33,182,0.1));border:1px solid rgba(124,58,237,0.3);color:#A78BFA;font-weight:700"><span class="icon">✨</span>AI - Phân tích tổng quan</button>
- <button class="refresh-btn" id="refreshBtn" onclick="loadAll()">
-  <span class="spin" id="spinIcon">🔄</span> Cập nhật dữ liệu
- </button>
- <div class="last-update" id="lastUpdate"></div>
+ <button class="nav-item ai-tab" onclick="show('p12',this)"><span class="icon">✨</span>Phân tích AI</button>
 </nav>
 
 <main class="main">
