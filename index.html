@@ -1002,7 +1002,9 @@ function buildAIPage(){
     <div class="ai-cust-field"><label style="display:block;margin-bottom:3px">Khoảng thời gian</label>
      <select id="aiAllDays"><option value="3">3 ngày gần nhất</option><option value="7" selected>7 ngày gần nhất</option><option value="14">14 ngày gần nhất</option><option value="30">30 ngày gần nhất</option></select></div>
    </div>
-   <div style="font-size:11px;color:var(--text-sub);background:#FFF7ED;border-left:3px solid var(--orange);padding:8px 12px;border-radius:6px">Sẽ gửi cho AI: GTC Total · GTC TTS · GTC chi tiết (cân nặng) · FD · ODR · OPR · Aging — tổng hợp theo AM (Aging theo Bưu Cục).</div>
+   <div style="font-size:11px;color:var(--text-sub);background:#FFF7ED;border-left:3px solid var(--orange);padding:8px 12px;border-radius:6px;margin-bottom:10px">Sẽ gửi cho AI: GTC Total · GTC TTS · GTC chi tiết (cân nặng) · FD · ODR · OPR · Aging — tổng hợp theo AM (Aging theo Bưu Cục).</div>
+   <div style="font-size:12px;color:var(--text-sub);margin-bottom:6px">Gợi ý câu hỏi:</div>
+   <div class="ai-preset-row" id="aiAllSuggest"></div>
   </div>
   <div id="aiCustomBlock" style="display:none">
    <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px">
@@ -1018,9 +1020,11 @@ function buildAIPage(){
     <div class="ai-cust-field"><label style="display:block;margin-bottom:3px">Khoảng thời gian</label>
      <select id="aiCustDays"><option value="1">Ngày mới nhất</option><option value="3">3 ngày</option><option value="7" selected>7 ngày</option><option value="14">14 ngày</option><option value="30">30 ngày</option></select></div>
     <div class="ai-cust-field"><label style="display:block;margin-bottom:3px">Phân tích theo</label>
-     <select id="aiCustSubject"><option value="am">AM</option><option value="bc">Bưu cục</option><option value="loai">Loại hàng (chỉ cân nặng)</option></select></div>
+     <select id="aiCustSubject" onchange="aiCustDatasetChange()"><option value="am">AM</option><option value="bc">Bưu cục</option><option value="loai">Loại hàng (chỉ cân nặng)</option></select></div>
    </div>
-   <div id="aiCustHint" style="font-size:11px;color:var(--text-sub);background:#FFF7ED;border-left:3px solid var(--orange);padding:8px 12px;border-radius:6px"></div>
+   <div id="aiCustHint" style="font-size:11px;color:var(--text-sub);background:#FFF7ED;border-left:3px solid var(--orange);padding:8px 12px;border-radius:6px;margin-bottom:10px"></div>
+   <div style="font-size:12px;color:var(--text-sub);margin-bottom:6px">Gợi ý câu hỏi:</div>
+   <div class="ai-preset-row" id="aiCustSuggest"></div>
   </div>
   <textarea class="ai-textarea" id="aiPromptArea" placeholder="Nhập câu hỏi / yêu cầu phân tích..." style="margin-top:12px"></textarea>
   <div style="display:flex;align-items:center;gap:12px;margin-top:12px;flex-wrap:wrap">
@@ -1043,12 +1047,36 @@ const AI_PRESETS={
 };
 function setAIPrompt(key){document.getElementById('aiPromptArea').value=AI_PRESETS[key]||'';}
 /* ===== AI: chế độ Tổng quan toàn bộ & Custom ===== */
+function aiFillPrompt(t){const a=document.getElementById('aiPromptArea');a.value=t;a.focus();}
+function aiChips(list){return list.map(t=>`<button class="ai-preset-btn" onclick="aiFillPrompt(this.dataset.q)" data-q="${t.replace(/"/g,'&quot;')}">${t}</button>`).join('');}
+const AI_ALL_SUGGEST=[
+ 'Tổng quan toàn cảnh vận hành Vùng TNT: nêu 3 điểm sáng (highlight) và 3 điểm yếu (lowlight) quan trọng nhất, kèm số liệu minh chứng.',
+ 'AM nào đang là điểm nghẽn của Vùng? Đối chiếu chéo %GTC, %FD, Ontime (ODR/OPR) và Aging để chỉ ra AM cần ưu tiên xử lý.',
+ 'Đánh giá sức khỏe chất lượng giao - trả: %FD và Aging có tương quan với %GTC/Ontime ở AM nào không? Cảnh báo rủi ro.',
+ 'Tóm tắt điều hành (executive summary) cho lãnh đạo Vùng: tình hình chung, 3 việc cần làm ngay tuần tới.',
+ 'So sánh hiệu suất giữa các AM trên tất cả chỉ số, xếp hạng tổng hợp và chỉ ra ai vượt/dưới mặt bằng chung của Vùng.'
+];
+function aiSubjLabel(s){return s==='bc'?'bưu cục':s==='loai'?'loại hàng':'AM';}
+function aiCustSuggest(ds,subject){
+ const S=aiSubjLabel(subject);
+ const m={
+  gtcTotal:[`Xếp hạng ${S} theo %GTC; chỉ ra ${S} thấp nhất và phân tích nguyên nhân có thể (Vol, %Gán).`,`${S} nào có %Gán cao nhưng %GTC vẫn thấp? Đề xuất hành động cải thiện.`,`Phân tích tương quan giữa sản lượng (Vol) và %GTC theo ${S}.`],
+  gtcTTS:[`Xếp hạng ${S} theo %GTC của TTS; ${S} nào cần ưu tiên cải thiện?`,`So sánh chênh lệch %GTC TTS giữa nhóm ${S} tốt nhất và kém nhất.`,`${S} nào %Gán cao mà %GTC TTS thấp? Vì sao?`],
+  canNang:[`Phân tích %GTC theo nhóm khối lượng cho từng ${S}; nhóm cân nặng nào kéo tụt %GTC?`,`${S} nào tồn đọng (Số đơn tồn) cao nhất và tỉ trọng hàng cồng kềnh ra sao?`,`Hàng cồng kềnh (>=5kg) ảnh hưởng thế nào đến %GTC của ${S}? Đề xuất xử lý.`],
+  fd:[`${S} nào có %FD (tỉ lệ trả) cao nhất? Phân tích mức độ nghiêm trọng và rủi ro.`,`Xu hướng %FD theo ${S} có đáng báo động không? Top cần can thiệp ngay.`,`Đề xuất giải pháp giảm %FD cho nhóm ${S} có tỉ lệ trả cao.`],
+  odr:[`${S} nào có %Ontime ODR thấp nhất? Phân tích nguyên nhân và rủi ro vận hành.`,`Xếp hạng ${S} theo %Ontime ODR, chỉ ra nhóm dưới chuẩn.`,`${S} sản lượng lớn nhưng Ontime thấp: ưu tiên xử lý ai trước?`],
+  opr:[`${S} nào có %Ontime OPR thấp nhất? Phân tích điểm nghẽn lấy hàng.`,`Xếp hạng ${S} theo %Ontime OPR và chỉ ra nhóm cần cải thiện.`,`So sánh %Ontime OPR giữa các ${S}, ai bất thường?`],
+  aging:[`${S} nào có nhiều đơn Aging >5 ngày nhất? Mức độ tồn đọng có nghiêm trọng không?`,`Bưu cục bất ổn có phải là nơi phát sinh nhiều đơn Aging? Đối chiếu và cảnh báo.`,`Xu hướng số đơn Aging theo ${S}, đề xuất phương án giải phóng tồn.`]
+ };
+ return m[ds]||[];
+}
 function aiSetMode(mode){
  window._aiMode=mode;
  document.querySelectorAll('.ai-preset-btn.aimode').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));
  document.getElementById('aiPresetBlock').style.display=mode==='preset'?'block':'none';
  document.getElementById('aiAllBlock').style.display=mode==='all'?'block':'none';
  document.getElementById('aiCustomBlock').style.display=mode==='custom'?'block':'none';
+ if(mode==='all'){const c=document.getElementById('aiAllSuggest');if(c)c.innerHTML=aiChips(AI_ALL_SUGGEST);}
  if(mode==='custom')aiCustDatasetChange();
 }
 function aiCustDatasetChange(){
@@ -1058,6 +1086,7 @@ function aiCustDatasetChange(){
  if(loaiOpt){const ok=ds==='canNang';loaiOpt.disabled=!ok;if(!ok&&subj.value==='loai')subj.value='am';}
  const hint=document.getElementById('aiCustHint');
  if(hint){const map={gtcTotal:'GTC Total (Vol, %GTC, %Gán)',gtcTTS:'GTC TTS (Vol, %GTC, %Gán)',canNang:'GTC chi tiết theo cân nặng (Vol, %GTC, Tồn, %Cồng kềnh, phân bố khối lượng)',fd:'Tỉ lệ trả %FD',odr:'ODR Ontime',opr:'OPR Ontime',aging:'Số đơn Aging >5 ngày'};hint.textContent='Sẽ gửi: '+(map[ds]||'')+(ds==='aging'?' · chủ thể Loại hàng không áp dụng':'')+'.';}
+ const sug=document.getElementById('aiCustSuggest');if(sug)sug.innerHTML=aiChips(aiCustSuggest(ds,subj?subj.value:'am'));
 }
 function aiLastDateSet(rows,dateIdx,days){const s=[...new Set(rows.map(r=>isoD(r[dateIdx])).filter(Boolean))].sort();return new Set(s.slice(-days));}
 function aiGTC(label,sheetAM,sheetBC,days,subject){
