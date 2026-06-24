@@ -737,15 +737,15 @@ async function buildAgingPage(){
 window._D={};
 function buildAIPage(){
  const p12=document.getElementById('p12');
- const savedKey=localStorage.getItem('groqApiKey')||'';
- p12.innerHTML=`<div class="page-header"><div class="page-title">✨ AI - Phân Tích Tổng Quan</div><div class="page-meta"><span class="tag tag-orange">🤖 Powered by Groq AI · Dữ liệu từ các dashboard</span></div></div>
- <div class="card" style="margin-bottom:14px"><div class="card-header"><div class="card-title"><div class="card-icon">🔑</div>Groq API Key <span style="font-size:11px;font-weight:400;color:var(--text-sub)">(miễn phí — không cần thẻ)</span></div></div>
+ const savedKey=localStorage.getItem('claudeApiKey')||'';
+ p12.innerHTML=`<div class="page-header"><div class="page-title">✨ AI - Phân Tích Tổng Quan</div><div class="page-meta"><span class="tag tag-orange">🤖 Powered by Claude (Anthropic) · Dữ liệu từ các dashboard</span></div></div>
+ <div class="card" style="margin-bottom:14px"><div class="card-header"><div class="card-title"><div class="card-icon">🔑</div>Claude API Key <span style="font-size:11px;font-weight:400;color:var(--text-sub)">(Anthropic — trả phí theo token)</span></div></div>
  <div style="padding:14px 18px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-  <input type="password" id="groqKeyInput" value="${savedKey}" placeholder="gsk_..." style="flex:1;min-width:200px;padding:9px 12px;border-radius:8px;border:1px solid var(--border);font-size:13px">
+  <input type="password" id="groqKeyInput" value="${savedKey}" placeholder="sk-ant-..." style="flex:1;min-width:200px;padding:9px 12px;border-radius:8px;border:1px solid var(--border);font-size:13px">
   <button onclick="saveGroqKey()" style="background:var(--orange);color:#fff;border:none;padding:9px 18px;border-radius:8px;cursor:pointer;font-weight:600;font-size:13px">Lưu</button>
   <span id="groqKeySaved" style="font-size:12px;color:#4ade80">${savedKey?'✅ Đã lưu':''}</span>
  </div>
- <div style="padding:0 18px 12px;font-size:11px;color:var(--text-sub)">Lấy key tại <a href="https://console.groq.com/keys" target="_blank" style="color:var(--orange)">console.groq.com/keys</a></div></div>
+ <div style="padding:0 18px 12px;font-size:11px;color:var(--text-sub)">Lấy key tại <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:var(--orange)">console.anthropic.com</a></div></div>
  <div class="card"><div class="card-header"><div class="card-title"><div class="card-icon">💬</div>Nội dung phân tích</div></div>
  <div style="padding:14px 18px">
   <div style="margin-bottom:10px;font-size:12px;color:var(--text-sub)">Chọn nhanh:</div>
@@ -808,10 +808,10 @@ function gatherDashboardData(){
  return lines.join('\n')||'(Dữ liệu chưa được tải)';
 }
 function md2html(text){return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/^### (.+)$/gm,'<h3>$1</h3>').replace(/^## (.+)$/gm,'<h2>$1</h2>').replace(/^# (.+)$/gm,'<h1>$1</h1>').replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\*(.+?)\*/g,'<em>$1</em>').replace(/`(.+?)`/g,'<code>$1</code>').replace(/^---$/gm,'<hr>').replace(/^> (.+)$/gm,'<blockquote>$1</blockquote>').replace(/^[\-\*] (.+)$/gm,'<li>$1</li>').replace(/(<li>.*<\/li>\n?)+/g,'<ul>$&</ul>').replace(/^\d+\. (.+)$/gm,'<li>$1</li>').replace(/\n\n/g,'</p><p>').replace(/^([^<\n].+)$/gm,'<p>$1</p>').replace(/<p><\/p>/g,'').replace(/🟢/g,'<span class="ai-tag-hl">🟢 HL</span>').replace(/🔴/g,'<span class="ai-tag-ll">🔴 LL</span>');}
-function saveGroqKey(){const k=(document.getElementById('groqKeyInput').value||'').trim();localStorage.setItem('groqApiKey',k);document.getElementById('groqKeySaved').textContent=k?'✅ Đã lưu':'';}
+function saveGroqKey(){const k=(document.getElementById('groqKeyInput').value||'').trim();localStorage.setItem('claudeApiKey',k);document.getElementById('groqKeySaved').textContent=k?'✅ Đã lưu':'';}
 async function runAIAnalysis(){
- const key=localStorage.getItem('groqApiKey')||'';
- if(!key){document.getElementById('aiStatus').textContent='⚠️ Chưa nhập Groq API Key';document.getElementById('groqKeyInput').focus();return;}
+ const key=localStorage.getItem('claudeApiKey')||'';
+ if(!key){document.getElementById('aiStatus').textContent='⚠️ Chưa nhập Claude API Key';document.getElementById('groqKeyInput').focus();return;}
  const userQ=(document.getElementById('aiPromptArea').value||'').trim();
  if(!userQ){document.getElementById('aiStatus').textContent='⚠️ Vui lòng nhập nội dung';return;}
  const btn=document.getElementById('aiRunBtn');btn.disabled=true;btn.innerHTML='<span>⏳</span><span>Đang phân tích...</span>';
@@ -820,9 +820,9 @@ async function runAIAnalysis(){
  document.getElementById('aiResultArea').innerHTML='<div class="ai-thinking"><div class="ai-thinking-dot"></div><div class="ai-thinking-dot"></div><div class="ai-thinking-dot"></div><span style="margin-left:8px">AI đang phân tích...</span></div>';
  const ctx=gatherDashboardData();
  try{
-  const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model:' llama-3.3-70b-versatile',messages:[{role:'system',content:'Bạn là chuyên gia phân tích vận hành logistics GHN Vùng TNT. Phân tích chi tiết, dùng số liệu thực tế. Trả lời tiếng Việt, format rõ ràng.'},{role:'user',content:`DỮ LIỆU:\n${ctx}\n\nYÊU CẦU:\n${userQ}`}],temperature:0.7,max_tokens:4096})});
+  const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:4096,system:'Bạn là chuyên gia phân tích vận hành logistics GHN Vùng TNT. Phân tích chi tiết, dùng số liệu thực tế. Trả lời tiếng Việt, format rõ ràng.',messages:[{role:'user',content:`DỮ LIỆU:\n${ctx}\n\nYÊU CẦU:\n${userQ}`}]})});
   if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||`HTTP ${res.status}`);}
-  const data=await res.json();const text=data.choices?.[0]?.message?.content||'(Không có phản hồi)';
+  const data=await res.json();const text=(data.content&&data.content[0]&&data.content[0].text)||'(Không có phản hồi)';
   document.getElementById('aiResultArea').innerHTML=md2html(text);window._lastAIResult=text;
   card.scrollIntoView({behavior:'smooth',block:'start'});
  }catch(e){document.getElementById('aiResultArea').innerHTML=`<div style="color:#f87171;padding:12px;background:rgba(248,113,113,0.08);border-radius:8px">❌ ${e.message}</div>`;}
