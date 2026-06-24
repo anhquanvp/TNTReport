@@ -820,7 +820,7 @@ async function runAIAnalysis(){
  document.getElementById('aiResultArea').innerHTML='<div class="ai-thinking"><div class="ai-thinking-dot"></div><div class="ai-thinking-dot"></div><div class="ai-thinking-dot"></div><span style="margin-left:8px">AI đang phân tích...</span></div>';
  const ctx=gatherDashboardData();
  try{
-  const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model:'gemma2-9b-it',messages:[{role:'system',content:'Bạn là chuyên gia phân tích vận hành logistics GHN Vùng TNT. Phân tích chi tiết, dùng số liệu thực tế. Trả lời tiếng Việt, format rõ ràng.'},{role:'user',content:`DỮ LIỆU:\n${ctx}\n\nYÊU CẦU:\n${userQ}`}],temperature:0.7,max_tokens:4096})});
+  const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model:' llama-3.3-70b-versatile',messages:[{role:'system',content:'Bạn là chuyên gia phân tích vận hành logistics GHN Vùng TNT. Phân tích chi tiết, dùng số liệu thực tế. Trả lời tiếng Việt, format rõ ràng.'},{role:'user',content:`DỮ LIỆU:\n${ctx}\n\nYÊU CẦU:\n${userQ}`}],temperature:0.7,max_tokens:4096})});
   if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||`HTTP ${res.status}`);}
   const data=await res.json();const text=data.choices?.[0]?.message?.content||'(Không có phản hồi)';
   document.getElementById('aiResultArea').innerHTML=md2html(text);window._lastAIResult=text;
