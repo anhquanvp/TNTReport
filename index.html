@@ -235,8 +235,7 @@ tr.tot td{background:#F4F8FF;font-weight:700;border-top:2px solid var(--orange-m
 .splash-cta:hover{transform:translateY(-2px)}
 @keyframes ctaPulse{0%,100%{box-shadow:0 8px 26px rgba(37,99,235,.45),0 0 0 0 rgba(37,99,235,.34)}50%{box-shadow:0 8px 26px rgba(37,99,235,.45),0 0 0 12px rgba(37,99,235,0)}}
 /* ---- Navbar nút tròn + dropdown ---- */
-.navbar{position:sticky;top:60px;z-index:80;background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:8px;padding:13px 26px 11px;overflow-x:auto;box-shadow:var(--shadow-sm)}
-.navbar::-webkit-scrollbar{height:0}
+.navbar{position:sticky;top:60px;z-index:80;background:#fff;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;align-items:flex-start;gap:8px 4px;padding:13px 26px 11px;overflow:visible;box-shadow:var(--shadow-sm)}
 .nav-pod{position:relative;display:flex;flex-direction:column;align-items:center;gap:5px;min-width:76px;flex-shrink:0}
 .nav-circle{width:50px;height:50px;border-radius:50%;border:1.5px solid var(--border);background:#fff;color:var(--text-sub);font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .16s,box-shadow .16s,background .16s,border-color .16s;position:relative}
 .nav-circle:hover{border-color:var(--orange);color:var(--orange);transform:translateY(-2px);box-shadow:0 5px 14px rgba(37,99,235,0.18)}
@@ -256,8 +255,8 @@ tr.tot td{background:#F4F8FF;font-weight:700;border-top:2px solid var(--orange-m
 .dd-item.active{background:var(--orange);color:#fff}
 .dd-ico{font-size:15px;width:20px;text-align:center}
 /* ---- Logo & con trỏ chuột CTA ---- */
-.tb-logo{height:40px;width:auto;max-width:200px;display:block;object-fit:contain;border-radius:8px}
-.sc-logo{width:340px;max-width:78vw;height:auto;display:block;object-fit:contain;border-radius:16px;box-shadow:0 14px 40px rgba(0,0,0,0.45)}
+.tb-logo{height:30px;width:auto;max-width:200px;display:block;object-fit:contain}
+.sc-logo{height:46px;width:auto;max-width:78vw;display:block;object-fit:contain;background:#fff;border-radius:12px;padding:10px 18px;box-shadow:0 12px 34px rgba(0,0,0,0.4)}
 .splash-cta{display:inline-flex;align-items:center;gap:6px}
 .splash-cta-arrow{display:inline-flex;align-items:center;justify-content:center;margin-left:4px;animation:ctaClick 1.8s ease-in-out infinite}
 .splash-cta:hover .splash-cta-arrow{transform:none}
@@ -280,7 +279,7 @@ tr.tot td{background:#F4F8FF;font-weight:700;border-top:2px solid var(--orange-m
  <div class="splash-particles" id="splashParticles"></div>
  <div class="splash-cover">
   <div class="sc-top">
-   <img class="sc-logo" src="ghn-logo.png" alt="GiaoHangNhanh">
+   <img class="sc-logo" src="https://cdn.hstatic.net/themes/200000472237/1001423864/14/logo.png?v=2874" alt="GiaoHangNhanh">
    <div class="sc-badge">VÙNG TNT</div>
   </div>
   <div class="sc-kicker">Báo cáo Vận hành · Operations Report</div>
@@ -297,7 +296,7 @@ tr.tot td{background:#F4F8FF;font-weight:700;border-top:2px solid var(--orange-m
 
 <header class="topbar">
  <div class="tb-brand">
-  <img class="tb-logo" src="ghn-logo.png" alt="GiaoHangNhanh">
+  <img class="tb-logo" src="https://cdn.hstatic.net/themes/200000472237/1001423864/14/logo.png?v=2874" alt="GiaoHangNhanh">
   <div class="tb-titles">
    <div class="tb-name">Báo cáo Vận hành — Vùng TNT</div>
    <div class="tb-sub">Operations Analytics · Phan Văn Quân</div>
