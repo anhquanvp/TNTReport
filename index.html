@@ -590,7 +590,7 @@ function buildFDDayTable(sheetArr,labels,dates,nameLabel){
  function getDataD(rows,dISO){
   if(!rows||rows.length<2)return{};
   const res={};
-  rows.slice(1).forEach(r=>{if(isoD(r[1])!==dISO)return;const name=(r[0]||'').trim();if(!name)return;res[name]={vol:parsePct(r[2]),fd:parsePct(r[3])};});
+  rows.slice(1).forEach(r=>{if(isoD(r[1])!==dISO)return;const name=(r[0]||'').trim();if(!name)return;res[name]={vol:parsePct(r[2]),fd:parsePct(r[3]),tra:parsePct(r[4])};});
   return res;
  }
  const dData=dates.map(d=>sheetArr.map(s=>getDataD(s,d)));
@@ -600,7 +600,7 @@ function buildFDDayTable(sheetArr,labels,dates,nameLabel){
  const regular=[...allNames].filter(n=>!isGrand(n));
  const grands=[...allNames].filter(n=>isGrand(n));
  const sorted=regular.sort((a,b)=>(dData[0]?.[0]?.[b]?.fd??-1)-(dData[0]?.[0]?.[a]?.fd??-1));
- const names=[...sorted,...grands];
+ const names=sorted;
  if(!names.length)return`<p style="padding:16px;color:var(--text-sub)">Không có dữ liệu</p>`;
  const cs='padding:6px 8px;';
  const isBC=nameLabel==='Bưu Cục';
@@ -622,6 +622,10 @@ function buildFDDayTable(sheetArr,labels,dates,nameLabel){
   });
   h+='</tr>';
  });
+ // Dòng TỔNG — Σ Trả Total / Σ %Vol (theo từng ngày & từng loại hàng)
+ h+=`<tr class="tot"><td style="${cs}position:sticky;left:0;background:#FFE0CC;z-index:2"></td><td style="${cs}font-weight:800;white-space:nowrap;position:sticky;left:32px;background:#FFE0CC;z-index:2">TỔNG (Σ Trả / Σ %Vol)</td>`;
+ dates.forEach((d,di)=>{labels.forEach((_,si)=>{let tra=0,vol=0;regular.forEach(n=>{const c=dData[di]?.[si]?.[n];if(c){tra+=c.tra||0;vol+=c.vol||0;}});const fd=vol>0?tra/vol*100:null;const red=fd!==null&&fd>=15;h+=`<td style="${cs}text-align:center;border-left:${si===0?'3px solid #D1D5DB':'1px solid #E5E7EB'};background:#FFE0CC;font-weight:800;color:${red?'#DC2626':'inherit'}">${fd!==null?fd.toFixed(2)+'%':'—'}</td>`;});});
+ h+='</tr>';
  h+='</tbody></table></div>';
  if(dates.length>=2){
   const grandKey=grands[0];
@@ -702,7 +706,8 @@ function buildFDWeekTable(sheetArr,labels,isBC,selWeeks){
  const active=regular.filter(name=>selWeeks.some(w=>(p0Map[name]?.[w]??0)>0));
  const latestWk=selWeeks[selWeeks.length-1];
  const sorted=active.sort((a,b)=>(p0Map[b]?.[latestWk]??-1)-(p0Map[a]?.[latestWk]??-1));
- const names=[...sorted,...grands];
+ const names=sorted;
+ const fdWk=(sheet,w)=>{let tra=0,vol=0;(sheet||[]).slice(1).forEach(r=>{if((r[5]||'').trim()!==String(w))return;const nm=(r[0]||'').trim();if(!nm||nm.toLowerCase().includes('grand total'))return;tra+=parsePct(r[4]);vol+=parsePct(r[2]);});return vol>0?tra/vol*100:null;};
  const cs='padding:6px 9px;';
  let h=`<div class="table-wrap" style="${isBC?'max-height:1100px;overflow-y:auto;':''}overflow-x:auto"><table style="font-size:12px"><thead${isBC?' style="position:sticky;top:0;z-index:4"':''}>`;
  h+=`<tr><th rowspan="2" style="${cs}width:32px;text-align:center;background:#FEEDE4">STT</th><th rowspan="2" style="${cs}min-width:130px;background:#FEEDE4">${hLabel}</th>`;
@@ -722,6 +727,10 @@ function buildFDWeekTable(sheetArr,labels,isBC,selWeeks){
   });
   h+='</tr>';
  });
+ // Dòng TỔNG — Σ Trả Total / Σ %Vol (theo từng tuần & từng loại hàng)
+ h+=`<tr class="tot"><td style="${cs}"></td><td style="${cs}font-weight:800;white-space:nowrap">TỔNG (Σ Trả / Σ %Vol)</td>`;
+ selWeeks.forEach((w,wi)=>{labels.forEach((_,si)=>{const fd=fdWk(sheetArr[si],w);const red=fd!==null&&fd>=15;h+=`<td style="${cs}text-align:center;border-left:${si===0?'3px solid #D1D5DB':'1px solid #E5E7EB'};background:#FFE0CC;font-weight:800;color:${red?'#DC2626':'inherit'}">${fd!==null?fd.toFixed(1)+'%':'—'}</td>`;});});
+ h+='</tr>';
  h+='</tbody></table></div>';
  if(selWeeks.length===2){
   const w1=selWeeks[0],w2=selWeeks[1];const grandKey=grands[0];
