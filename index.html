@@ -234,6 +234,27 @@ tr.tot td{background:#F4F8FF;font-weight:700;border-top:2px solid var(--orange-m
 .splash-cta{margin-top:8px;padding:15px 38px;background:linear-gradient(135deg,var(--orange),var(--accent3));color:#fff;font-size:15px;font-weight:700;border:none;border-radius:11px;cursor:pointer;letter-spacing:.3px;box-shadow:0 10px 32px rgba(37,99,235,0.5);transition:all .2s;animation:ctaPulse 2.6s ease-in-out infinite 1.2s}
 .splash-cta:hover{transform:translateY(-2px)}
 @keyframes ctaPulse{0%,100%{box-shadow:0 8px 26px rgba(37,99,235,.45),0 0 0 0 rgba(37,99,235,.34)}50%{box-shadow:0 8px 26px rgba(37,99,235,.45),0 0 0 12px rgba(37,99,235,0)}}
+/* ---- Navbar nút tròn + dropdown ---- */
+.navbar{position:sticky;top:60px;z-index:80;background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:8px;padding:13px 26px 11px;overflow-x:auto;box-shadow:var(--shadow-sm)}
+.navbar::-webkit-scrollbar{height:0}
+.nav-pod{position:relative;display:flex;flex-direction:column;align-items:center;gap:5px;min-width:76px;flex-shrink:0}
+.nav-circle{width:50px;height:50px;border-radius:50%;border:1.5px solid var(--border);background:#fff;color:var(--text-sub);font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .16s,box-shadow .16s,background .16s,border-color .16s;position:relative}
+.nav-circle:hover{border-color:var(--orange);color:var(--orange);transform:translateY(-2px);box-shadow:0 5px 14px rgba(37,99,235,0.18)}
+.nav-circle.active{background:linear-gradient(135deg,var(--orange),var(--accent3));border-color:transparent;color:#fff;box-shadow:0 7px 18px rgba(37,99,235,0.38)}
+.nav-pod.ai .nav-circle.active{background:linear-gradient(135deg,var(--accent3),#22D3EE);box-shadow:0 7px 18px rgba(99,102,241,0.4)}
+.nav-caret{position:absolute;right:-3px;bottom:-3px;width:17px;height:17px;border-radius:50%;background:var(--orange);color:#fff;font-size:9px;line-height:1;display:flex;align-items:center;justify-content:center;border:2px solid #fff}
+.nav-pod.ai .nav-caret{background:var(--accent3)}
+.nav-label{font-size:11.5px;font-weight:700;color:var(--text-sub);white-space:nowrap}
+.nav-pod.cur .nav-label{color:var(--orange)}
+.nav-pod.ai.cur .nav-label{color:var(--accent3)}
+.nav-cap{font-size:9.5px;color:#94A3B8;font-weight:600;white-space:nowrap;margin-top:-2px}
+.nav-dd{position:absolute;top:62px;left:50%;transform:translateX(-50%) translateY(-6px);min-width:196px;background:#fff;border:1px solid var(--border);border-radius:13px;box-shadow:var(--shadow-md);padding:6px;opacity:0;visibility:hidden;transition:opacity .16s,transform .16s,visibility .16s;z-index:120}
+.nav-pod.open .nav-dd{opacity:1;visibility:visible;transform:translateX(-50%) translateY(0)}
+.nav-dd::before{content:'';position:absolute;top:-6px;left:50%;transform:translateX(-50%) rotate(45deg);width:11px;height:11px;background:#fff;border-left:1px solid var(--border);border-top:1px solid var(--border)}
+.dd-item{display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;background:none;border-radius:9px;cursor:pointer;font-size:13px;font-weight:600;color:var(--text-main);text-align:left;transition:background .12s,color .12s}
+.dd-item:hover{background:var(--orange-light);color:var(--orange-dark)}
+.dd-item.active{background:var(--orange);color:#fff}
+.dd-ico{font-size:15px;width:20px;text-align:center}
 /* ---- Logo & con trỏ chuột CTA ---- */
 .tb-logo{height:40px;width:auto;max-width:200px;display:block;object-fit:contain;border-radius:8px}
 .sc-logo{width:340px;max-width:78vw;height:auto;display:block;object-fit:contain;border-radius:16px;box-shadow:0 14px 40px rgba(0,0,0,0.45)}
@@ -289,25 +310,11 @@ tr.tot td{background:#F4F8FF;font-weight:700;border-top:2px solid var(--orange-m
  </div>
 </header>
 
-<nav class="tabbar">
- <div class="nav-section">GTC</div>
- <button class="nav-item active" onclick="show('p1',this)"><span class="icon">📦</span>GTC Total</button>
- <button class="nav-item" onclick="show('p2',this)"><span class="icon">🎯</span>GTC TTS</button>
- <button class="nav-item" onclick="show('p8',this)"><span class="icon">📊</span>GTC chi tiết</button>
- <div class="nav-section">Tỉ lệ trả</div>
- <button class="nav-item" onclick="show('p3',this)"><span class="icon">📅</span>TLT theo Ngày</button>
- <button class="nav-item" onclick="show('p4',this)"><span class="icon">📆</span>TLT theo Tuần</button>
- <div class="nav-section">Ontime SLA</div>
- <button class="nav-item" onclick="show('p5',this)"><span class="icon">⏱️</span>ODR TTS</button>
- <button class="nav-item" onclick="show('p6',this)"><span class="icon">🚀</span>OPR TTS</button>
- <div class="nav-section">Aging</div>
- <button class="nav-item" onclick="show('p7',this)"><span class="icon">⏳</span>Aging &gt; 5 ngày</button>
- <div class="nav-section">AI</div>
- <button class="nav-item ai-tab" onclick="show('p12',this)"><span class="icon">✨</span>Phân tích AI</button>
-</nav>
+<nav class="navbar" id="navbar"></nav>
 
 <main class="main">
- <div class="page active" id="p1"><div class="loading"><div class="spinner"></div><div class="loading-text">Đang tải dữ liệu...</div></div></div>
+ <div class="page active" id="p0"><div class="loading"><div class="spinner"></div><div class="loading-text">Đang tải dữ liệu...</div></div></div>
+ <div class="page" id="p1"><div class="loading"><div class="spinner"></div><div class="loading-text">Đang tải dữ liệu...</div></div></div>
  <div class="page" id="p2"><div class="loading"><div class="spinner"></div><div class="loading-text">Đang tải dữ liệu...</div></div></div>
  <div class="page" id="p3"><div class="loading"><div class="spinner"></div><div class="loading-text">Đang tải dữ liệu...</div></div></div>
  <div class="page" id="p4"><div class="loading"><div class="spinner"></div><div class="loading-text">Đang tải dữ liệu...</div></div></div>
@@ -315,12 +322,59 @@ tr.tot td{background:#F4F8FF;font-weight:700;border-top:2px solid var(--orange-m
  <div class="page" id="p6"><div class="loading"><div class="spinner"></div><div class="loading-text">Đang tải dữ liệu...</div></div></div>
  <div class="page" id="p7"><div class="loading"><div class="spinner"></div><div class="loading-text">Đang tải dữ liệu...</div></div></div>
  <div class="page" id="p8"><div class="loading"><div class="spinner"></div><div class="loading-text">Đang tải dữ liệu...</div></div></div>
+ <div class="page" id="p9"><div class="loading"><div class="spinner"></div><div class="loading-text">Đang tải dữ liệu...</div></div></div>
  <div class="page" id="p12"></div>
 </main>
 
 <script>
 /* ===== HELPERS ===== */
-function show(id,btn){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('active'));const el=document.getElementById(id);el.classList.add('active');el.style.animation='none';el.offsetHeight;el.style.animation='';btn.classList.add('active');if(id==='p8'&&!window._gtcdLoaded){window._gtcdLoaded=true;buildGTCDetailPage();}}
+/* ===== NAV: nút tròn + dropdown ===== */
+const NAV_GROUPS=[
+ {id:'g_ov',icon:'🗺️',label:'Tổng quan',page:'p0'},
+ {id:'g_gtc',icon:'📦',label:'GTC',items:[['p1','📊','% GTC'],['p2','🛡️','TITAN TTS'],['p8','🧰','GTC Bulky']]},
+ {id:'g_fd',icon:'🔄',label:'FD',items:[['p3','📅','FD Daily'],['p4','🗓️','FD Weekly']]},
+ {id:'g_ot',icon:'⏱️',label:'Ontime',items:[['p5','🛰️','ODR TTS'],['p6','🚀','OPR TTS']]},
+ {id:'g_ag',icon:'⏳',label:'Aging',page:'p7',cap:'Aging Daily'},
+ {id:'g_rl',icon:'📉',label:'Rớt LC',page:'p9',cap:'Rớt LC Daily'},
+ {id:'g_ai',icon:'✨',label:'AI',page:'p12',cap:'AI Analysis',cls:'ai'}
+];
+const PAGE2GRP={};NAV_GROUPS.forEach(g=>{if(g.page)PAGE2GRP[g.page]=g.id;(g.items||[]).forEach(it=>PAGE2GRP[it[0]]=g.id);});
+function buildNav(){
+ const nb=document.getElementById('navbar');if(!nb)return;
+ nb.innerHTML=NAV_GROUPS.map(g=>{
+  const hasDD=!!g.items;
+  const onclick=hasDD?`navOpen(event,'${g.id}')`:`nav('${g.page}','${g.id}')`;
+  const caret=hasDD?'<span class="nav-caret">▾</span>':'';
+  const cap=g.cap?`<div class="nav-cap">${g.cap}</div>`:'';
+  let dd='';
+  if(hasDD)dd=`<div class="nav-dd">${g.items.map(it=>`<button class="dd-item" data-pg="${it[0]}" onclick="nav('${it[0]}','${g.id}')"><span class="dd-ico">${it[1]}</span>${it[2]}</button>`).join('')}</div>`;
+  return`<div class="nav-pod${g.cls==='ai'?' ai':''}" id="pod_${g.id}"><button class="nav-circle" onclick="${onclick}">${g.icon}${caret}</button><div class="nav-label">${g.label}</div>${cap}${dd}</div>`;
+ }).join('');
+}
+function navOpen(e,grpId){
+ e.stopPropagation();
+ const pod=document.getElementById('pod_'+grpId);if(!pod)return;
+ const wasOpen=pod.classList.contains('open');
+ document.querySelectorAll('.nav-pod.open').forEach(p=>p.classList.remove('open'));
+ if(!wasOpen)pod.classList.add('open');
+}
+function nav(id,grpId){
+ document.querySelectorAll('.nav-pod.open').forEach(p=>p.classList.remove('open'));
+ document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+ const el=document.getElementById(id);if(!el)return;
+ el.classList.add('active');el.style.animation='none';el.offsetHeight;el.style.animation='';
+ window._curPage=id;
+ grpId=grpId||PAGE2GRP[id];
+ document.querySelectorAll('.nav-pod').forEach(p=>p.classList.remove('cur'));
+ document.querySelectorAll('.nav-circle').forEach(c=>c.classList.remove('active'));
+ const pod=document.getElementById('pod_'+grpId);
+ if(pod){pod.classList.add('cur');pod.querySelector('.nav-circle')?.classList.add('active');}
+ document.querySelectorAll('.dd-item').forEach(d=>d.classList.toggle('active',d.dataset.pg===id));
+ if(id==='p8'&&!window._gtcdLoaded){window._gtcdLoaded=true;buildGTCDetailPage();}
+ if(id==='p9'&&!window._rotlcLoaded){window._rotlcLoaded=true;buildRotLCPage();}
+}
+function show(id,btn){nav(id,PAGE2GRP[id]);}
+document.addEventListener('click',()=>document.querySelectorAll('.nav-pod.open').forEach(p=>p.classList.remove('open')));
 function fmt(n){return(+n||0).toLocaleString('vi-VN');}
 function isoD(d){return(d||'').match(/\d{4}-\d{2}-\d{2}/)?.[0]||'';}
 function shortD(iso){const p=(iso||'').split('-');return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:iso;}
@@ -1062,6 +1116,147 @@ async function buildAgingPage(){
  }catch(e){el.innerHTML=errPage(`Aging sheet: ${e.message}`);}
 }
 
+/* ===== RỚT LC DAILY (p9) — sheet Rot_LC_Raw ===== */
+// cols: Ngày ghi(0), file(1), order_code(2), Vung_xuat(3), tinh_xuat(4), IDBC(5), tenbcxuat(6), Loai_hang(7), Loai_KH(8), ..., AM(14)
+const ROTLC_SID='1YnQZMnCdr0vzBLqpfnocWSULJiV2zBeY85eYLzqKUt4';
+function normalizeRotLC(rows){
+ return(rows||[]).map(r=>({
+  date:agingIsoDate(r[0]),tinh:(r[4]||'').trim(),bc:(r[6]||'').trim(),
+  loaihang:(r[7]||'').trim()||'(trống)',loaikh:(r[8]||'').trim()||'(trống)',am:(r[14]||'').trim()||'(trống)'
+ })).filter(r=>r.date&&r.date.startsWith('20'));
+}
+async function buildRotLCPage(){
+ const el=document.getElementById('p9');
+ try{
+  let data=window._ROTLC;
+  if(!data||!data.length){const raw=await fetchSheetById(ROTLC_SID,'Rot_LC_Raw');data=normalizeRotLC((raw||[]).slice(1));window._ROTLC=data;}
+  el.innerHTML=buildRotLCHTML(data);
+ }catch(e){el.innerHTML=errPage(`Rớt LC (Rot_LC_Raw): ${e.message}`);}
+}
+function buildRotLCHTML(data){
+ if(!data.length)return errPage('Sheet Rot_LC_Raw không có dữ liệu hợp lệ.');
+ const allDates=[...new Set(data.map(r=>r.date))].sort();
+ const last7=allDates.slice(-7);
+ const latest=last7[last7.length-1],prev=last7[last7.length-2];
+ const recent=data.filter(r=>last7.includes(r.date));
+ const cntBy=(d)=>recent.filter(r=>r.date===d).length;
+ const latestTotal=cntBy(latest),prevTotal=cntBy(prev||'');
+ const delta=latestTotal-prevTotal;
+ const deltaIcon=delta<0?'▼':delta>0?'▲':'—',deltaColor=delta<0?'var(--green)':delta>0?'var(--red)':'var(--text-sub)';
+ const nAM=new Set(recent.filter(r=>r.date===latest).map(r=>r.am)).size;
+ const nTinh=new Set(recent.filter(r=>r.date===latest).map(r=>r.tinh)).size;
+ let h=`<div class="page-header"><div class="page-title">Rớt LC Daily</div><div class="page-meta"><span class="tag tag-orange">📉 Số lượng đơn rớt LC · 7 ngày gần nhất · Nguồn: Rot_LC_Raw</span><span>Ngày mới nhất: ${agingFmtDate(latest)}</span></div></div>`;
+ h+=`<div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">`;
+ [{ic:'📦',label:'Rớt LC hôm nay',val:fmt(latestTotal),sub:agingFmtDate(latest),c:'var(--orange)',bg:'#FFF0EB'},
+  {ic:'📅',label:'Rớt LC N-1',val:fmt(prevTotal),sub:agingFmtDate(prev),c:'#3182CE',bg:'#EFF6FF'},
+  {ic:delta<0?'📉':'📈',label:'Tăng/Giảm so N-1',val:`${deltaIcon} ${fmt(Math.abs(delta))}`,sub:`${delta>0?'+':''}${delta} đơn`,c:deltaColor,bg:'#FEF9C3'},
+  {ic:'🗺️',label:'Phạm vi hôm nay',val:`${nTinh} tỉnh`,sub:`${nAM} AM phát sinh`,c:'#7C3AED',bg:'#FAF5FF'}
+ ].forEach(k=>{h+=`<div class="kpi-card" style="border-top:none"><div class="kpi-ico" style="background:${k.bg}">${k.ic}</div><div class="kpi-label">${k.label}</div><div class="kpi-val" style="color:${k.c}">${k.val}</div><div style="font-size:11px;color:var(--text-sub);margin-top:4px">${k.sub}</div></div>`;});
+ h+=`</div>`;
+ function rlcTable(field,title,icon,nameLabel){
+  const map={};recent.forEach(r=>{const k=r[field]||'(trống)';if(!map[k])map[k]={name:k};map[k][r.date]=(map[k][r.date]||0)+1;});
+  const arr=Object.values(map).sort((a,b)=>(b[latest]||0)-(a[latest]||0));
+  const maxV=Math.max(...arr.map(r=>r[latest]||0),1);
+  let t=`<div class="card"><div class="card-header"><div class="card-title"><div class="card-icon">${icon}</div>${title}</div><div class="card-info">${arr.length} ${nameLabel} · sắp xếp theo hôm nay</div></div><div class="table-wrap" style="max-height:560px;overflow:auto"><table style="font-size:12.5px"><thead style="position:sticky;top:0;z-index:3"><tr><th style="text-align:center;width:38px">#</th><th style="min-width:170px">${nameLabel}</th>`;
+  last7.forEach((d,i)=>{const isL=i===last7.length-1;t+=`<th style="text-align:right;white-space:nowrap${isL?';background:#FFE0CC;color:var(--orange-dark)':''}">${agingFmtDate(d)}</th>`;});
+  t+=`<th style="text-align:right">Trend</th></tr></thead><tbody>`;
+  arr.forEach((row,idx)=>{
+   t+=`<tr><td style="text-align:center;color:var(--text-sub);font-size:11px">${idx+1}</td><td style="font-weight:700;white-space:nowrap">${row.name}</td>`;
+   last7.forEach((d,i)=>{const v=row[d]||0;const isL=i===last7.length-1;if(isL){const bw=maxV>0?Math.round(v/maxV*46):0;t+=`<td style="text-align:right;background:#FFF0EB"><div style="display:flex;align-items:center;justify-content:flex-end;gap:5px"><div style="height:5px;border-radius:3px;background:var(--orange);width:${bw}px;min-width:${v>0?2:0}px"></div><span style="font-weight:800;color:var(--orange-dark)">${v>0?fmt(v):'—'}</span></div></td>`;}else t+=`<td style="text-align:right;color:${v>0?'var(--text-main)':'#D7E1E8'}">${v>0?fmt(v):'—'}</td>`;});
+   const c=row[latest]||0,p=row[prev]||0;const tc=c<p?'var(--green)':c>p?'var(--red)':'var(--text-sub)';const tt=c<p?`▼ ${p-c}`:c>p?`▲ ${c-p}`:'—';
+   t+=`<td style="text-align:right;color:${tc};font-weight:700;white-space:nowrap">${tt}</td></tr>`;
+  });
+  t+=`<tr class="tot"><td></td><td style="font-weight:800;color:var(--orange)">TỔNG CỘNG</td>`;
+  last7.forEach((d,i)=>{const s=arr.reduce((a,r)=>a+(r[d]||0),0);const isL=i===last7.length-1;t+=`<td style="text-align:right;font-weight:800;${isL?'color:var(--orange-dark);background:#FFE0CC':''}">${fmt(s)}</td>`;});
+  const sC=arr.reduce((a,r)=>a+(r[latest]||0),0),sP=arr.reduce((a,r)=>a+(r[prev]||0),0),sD=sC-sP;
+  t+=`<td style="text-align:right;font-weight:800;color:${sD<0?'var(--green)':sD>0?'var(--red)':'var(--text-sub)'};white-space:nowrap">${sD<0?`▼ ${sP-sC}`:sD>0?`▲ ${sC-sP}`:'—'}</td></tr>`;
+  t+=`</tbody></table></div></div>`;
+  return t;
+ }
+ h+=rlcTable('loaikh','A. Theo Loại KH','🏷️','Loại KH');
+ h+=rlcTable('loaihang','B. Theo Loại hàng','📦','Loại hàng');
+ h+=rlcTable('am','C. Theo AM','👤','AM');
+ h+=rlcTable('bc','D. Theo Bưu Cục xuất','🏪','Bưu cục xuất');
+ return h;
+}
+
+/* ===== TỔNG QUAN VẬN HÀNH (p0) ===== */
+const TNT_TINH=['Hòa Bình','Phú Thọ','Vĩnh Phúc','Hà Nam','Nam Định','Ninh Bình'];
+function tinhFromBC(bc){const p=(bc||'').split('-');return p.length>1?p[p.length-1].trim():'';}
+function ovDatesDesc(sheet,dateIdx){return[...new Set((sheet||[]).slice(1).map(r=>isoD(r[dateIdx])).filter(Boolean))].sort((a,b)=>b.localeCompare(a));}
+function ovGrand(sheet,dateIdx,date){return(sheet||[]).slice(1).find(r=>(r[0]||'').toLowerCase().includes('grand total')&&isoD(r[dateIdx])===date);}
+function ovOntime(sheet,date){ // AM-type ontime: name0,date1,vol2,pct3,cnt4
+ const rows=(sheet||[]).slice(1).filter(r=>(r[0]||'').trim()&&!(r[0]||'').toLowerCase().includes('grand total')&&isoD(r[1])===date);
+ let v=0,c=0;rows.forEach(r=>{v+=Math.round(parseFloat(r[2])||0);c+=Math.round(parseFloat(r[4])||0);});
+ return{vol:v,ok:c,pct:v?c/v*100:0};
+}
+function buildOverviewPage(R,rotData){
+ const el=document.getElementById('p0');
+ const gAM=R['GTC Total theo AM'],gBC=R['GTC Total theo Bưu Cục'];
+ const dts=ovDatesDesc(gAM,1);const latest=dts[0]||'',prev=dts[1]||'';
+ // KPI tổng — từ grand total + tổng hợp
+ const gr=ovGrand(gAM,1,latest),grP=ovGrand(gAM,1,prev);
+ const ganPct=gr?(parseFloat(gr[3])||0)*100:0,gtcPct=gr?(parseFloat(gr[4])||0)*100:0,vol=gr?Math.round(parseFloat(gr[2])||0):0;
+ const ganP=grP?(parseFloat(grP[3])||0)*100:0,gtcP=grP?(parseFloat(grP[4])||0)*100:0;
+ const odr=ovOntime(R['ODR TTS - AM'],ovDatesDesc(R['ODR TTS - AM'],1)[0]||'');
+ const opr=ovOntime(R['OPR TTS - AM'],ovDatesDesc(R['OPR TTS - AM'],1)[0]||'');
+ // FD grand
+ const fdAM=R['FD Total theo AM'];const fdLatest=ovDatesDesc(fdAM,1)[0]||'';const fdGr=ovGrand(fdAM,1,fdLatest);
+ const fdPct=fdGr?parsePct(fdGr[3]):0;
+ // Rớt LC tổng ngày mới nhất
+ const rotDates=[...new Set((rotData||[]).map(r=>r.date))].sort();const rotLatest=rotDates[rotDates.length-1]||'';
+ const rotTotal=(rotData||[]).filter(r=>r.date===rotLatest).length;
+ const dlt=(c,p)=>{const d=c-p;return{txt:d===0?'— không đổi':`${d>0?'▲':'▼'} ${Math.abs(d).toFixed(1)} điểm vs hôm trước`,col:d===0?'var(--text-sub)':d>0?'var(--green)':'var(--red)'};};
+ const kAttr=[
+  {ic:'🔗',label:'Tỉ lệ gán giao (GTC)',val:ganPct.toFixed(1)+'%',tgt:'Mục tiêu 95%',d:dlt(ganPct,ganP),c:'var(--orange)',bg:'#FFF0EB',good:ganPct>=95},
+  {ic:'🎯',label:'% GTC Tổng',val:gtcPct.toFixed(1)+'%',tgt:'Mục tiêu 80%',d:dlt(gtcPct,gtcP),c:'#0EA5E9',bg:'#E8F4FA',good:gtcPct>=80},
+  {ic:'🛰️',label:'ODR TTS — Giao đúng hạn',val:odr.pct.toFixed(1)+'%',tgt:'Mục tiêu 95%',c:'#16A34A',bg:'#DCFCE7',good:odr.pct>=95},
+  {ic:'🚀',label:'OPR TTS — Lấy đúng hạn',val:opr.pct.toFixed(1)+'%',tgt:'Mục tiêu 95%',c:'#7C3AED',bg:'#FAF5FF',good:opr.pct>=95},
+  {ic:'↩️',label:'FD — Tỉ lệ giao thất bại',val:fdPct.toFixed(1)+'%',tgt:'Mục tiêu ≤5%',c:'#DC2626',bg:'#FEE2E2',good:fdPct<=5},
+  {ic:'📉',label:'Rớt LC — Đơn lấy không thành công',val:fmt(rotTotal),tgt:'Tổng vùng '+(rotLatest?agingFmtDate(rotLatest):''),c:'#B45309',bg:'#FEF3C7',good:rotTotal===0}
+ ];
+ // Theo tỉnh từ GTC BC + Rớt LC
+ const tinhAgg={};TNT_TINH.forEach(t=>tinhAgg[t]={tinh:t,vol:0,ngtc:0,ganW:0,rot:0,amStat:{}});
+ (gBC||[]).slice(1).forEach(r=>{
+  if(!(r[1]||'').trim()||(r[1]||'').toLowerCase().includes('grand total'))return;
+  if(isoD(r[2])!==latest)return;
+  const t=tinhFromBC(r[1]);if(!tinhAgg[t])return;
+  const v=Math.round(parseFloat(r[3])||0),n=Math.round(parseFloat(r[6])||0),g=(parseFloat(r[4])||0)*100;
+  const a=tinhAgg[t];a.vol+=v;a.ngtc+=n;a.ganW+=v*g;
+  const am=(r[0]||'').trim();if(am){if(!a.amStat[am])a.amStat[am]={am,vol:0,ngtc:0};a.amStat[am].vol+=v;a.amStat[am].ngtc+=n;}
+ });
+ (rotData||[]).filter(r=>r.date===rotLatest).forEach(r=>{if(tinhAgg[r.tinh])tinhAgg[r.tinh].rot++;});
+ // Cảnh báo: tỉnh có %GTC thấp / có rớt LC + AM yếu
+ const alerts=[];
+ const tinhCards=TNT_TINH.map(t=>{
+  const a=tinhAgg[t];const gtc=a.vol?a.ngtc/a.vol*100:0;const gan=a.vol?a.ganW/a.vol:0;
+  let status,scol,sbg;
+  if(a.vol===0){status='CHƯA CÓ DL';scol='#94A3B8';sbg='#F1F5F9';}
+  else if(gtc<55||a.rot>0){status='VẤN ĐỀ';scol='#DC2626';sbg='#FEE2E2';}
+  else if(gtc<70){status='THEO DÕI';scol='#B45309';sbg='#FEF3C7';}
+  else{status='TỐT';scol='#16A34A';sbg='#DCFCE7';}
+  // AM yếu nhất trong tỉnh (vol>0, %GTC thấp nhất)
+  const ams=Object.values(a.amStat).filter(x=>x.vol>0).map(x=>({am:x.am,gtc:x.gtc=x.ngtc/x.vol*100,vol:x.vol})).sort((x,y)=>x.gtc-y.gtc);
+  const weak=ams[0];
+  if(a.vol>0&&(gtc<55||a.rot>0)&&weak)alerts.push(`<b>${t}</b>: %GTC ${gtc.toFixed(1)}%${a.rot>0?`, Rớt LC ${a.rot} đơn`:''} — AM cần chú ý: <b>${weak.am}</b> (%GTC ${weak.gtc.toFixed(1)}%).`);
+  const row=(lb,vl,c)=>`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #F1F3F7"><span style="color:var(--text-sub)">${lb}</span><span style="font-weight:700${c?`;color:${c}`:''}">${vl}</span></div>`;
+  return`<div class="card" style="margin-bottom:0"><div class="card-header" style="justify-content:space-between"><div class="card-title"><div class="card-icon">📍</div>${t}</div><span style="background:${sbg};color:${scol};font-size:10px;font-weight:800;letter-spacing:.5px;padding:3px 9px;border-radius:6px">${status}</span></div>
+   <div style="padding:12px 18px 14px">
+    ${row('Sản lượng (Vol)',fmt(a.vol))}
+    ${row('% Gán giao',gan.toFixed(1)+'%',gan>=95?'var(--green)':'var(--orange)')}
+    ${row('% GTC Tổng',gtc.toFixed(1)+'%',gtc>=70?'var(--green)':gtc>=55?'var(--yellow)':'var(--red)')}
+    ${row('Rớt LC',a.rot+' đơn',a.rot>0?'var(--red)':'var(--text-sub)')}
+    ${weak?`<div style="margin-top:8px;font-size:11px;color:var(--text-sub)">⚠️ AM yếu nhất: <b style="color:var(--red)">${weak.am}</b> · %GTC ${weak.gtc.toFixed(1)}%</div>`:''}
+   </div></div>`;
+ }).join('');
+ let h=`<div class="page-header"><div class="page-title">Tổng Quan Vận Hành TNT</div><div class="page-meta"><span class="tag tag-orange">🗺️ Dữ liệu ngày ${shortD(latest)} · Vùng Tây Nam Thủ Đô</span><span>${TNT_TINH.join(' · ')}</span></div></div>`;
+ h+=`<div class="kpi-grid">${kAttr.map(k=>`<div class="kpi-card" style="border-top:none"><div class="kpi-ico" style="background:${k.bg}">${k.ic}</div><div class="kpi-label">${k.label}</div><div class="kpi-val" style="color:${k.c}">${k.val}</div><div style="font-size:11px;color:var(--text-sub);margin-top:4px">${k.tgt}</div>${k.d?`<div style="font-size:11px;font-weight:700;color:${k.d.col};margin-top:3px">${k.d.txt}</div>`:''}</div>`).join('')}</div>`;
+ h+=`<div class="card" style="background:${alerts.length?'#FFF5F5':'#F0FDF4'};border-color:${alerts.length?'#FECACA':'#BBF7D0'}"><div class="card-header" style="background:transparent;border-bottom:1px solid ${alerts.length?'#FECACA':'#BBF7D0'}"><div class="card-title"><div class="card-icon" style="background:${alerts.length?'#DC2626':'#16A34A'}">${alerts.length?'🔔':'✅'}</div>Cảnh báo quan trọng</div></div><div style="padding:12px 18px;font-size:12.5px;line-height:1.7;color:var(--text-main)">${alerts.length?alerts.map(a=>'• '+a).join('<br>'):'✅ Không có cảnh báo nghiêm trọng trong ngày.'}</div></div>`;
+ h+=`<div style="display:flex;align-items:center;justify-content:space-between;margin:18px 0 12px"><div style="font-size:15px;font-weight:800">📍 6 tỉnh Vùng TNT</div><div style="font-size:11.5px;color:var(--text-sub)">Bấm tab phía trên để xem phân tích chi tiết từng chỉ số</div></div>`;
+ h+=`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px">${tinhCards}</div>`;
+ el.innerHTML=h;
+}
+
 /* ===== AI PAGE ===== */
 window._D={};
 function buildAIPage(){
@@ -1417,10 +1612,19 @@ async function init(){
  else p6el.innerHTML=errPage('Không thể tải OPR TTS. Kiểm tra sheet "OPR TTS - AM" / "OPR TTS - Bưu Cục".');
  // p7 — Aging
  await buildAgingPage();
- // p8 — GTC chi tiết: lazy-load khi mở tab (sheet ~23.7k dòng)
+ // Rớt LC raw (dùng cho Tổng quan + tab Rớt LC)
+ let rotData=[];
+ try{const rotRaw=await fetchSheetById(ROTLC_SID,'Rot_LC_Raw');rotData=normalizeRotLC((rotRaw||[]).slice(1));window._ROTLC=rotData;}catch(e){console.warn('Rot LC lỗi',e.message);}
+ // p0 — Tổng quan vận hành
+ try{buildOverviewPage(R,rotData);}catch(e){document.getElementById('p0').innerHTML=errPage('Tổng quan: '+e.message);}
+ // p8 — GTC Bulky: lazy-load khi mở tab (sheet ~23.7k dòng)
  const p8Active=document.getElementById('p8')?.classList.contains('active');
  window._gtcdLoaded=false;
  if(p8Active){window._gtcdLoaded=true;buildGTCDetailPage();}
+ // p9 — Rớt LC Daily: render lại nếu đang mở
+ const p9Active=document.getElementById('p9')?.classList.contains('active');
+ window._rotlcLoaded=false;
+ if(p9Active){window._rotlcLoaded=true;document.getElementById('p9').innerHTML=buildRotLCHTML(rotData);}
  // p12 — AI
  buildAIPage();
  btn.classList.remove('spinning');btn.disabled=false;
@@ -1429,10 +1633,13 @@ async function init(){
 
 loadAll=async function(){
  const btn=document.getElementById('refreshBtn');btn.classList.add('spinning');btn.disabled=true;
- ['p1','p2','p3','p4','p5','p6','p7','p8'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML='<div class="loading"><div class="spinner"></div><div class="loading-text">Đang tải dữ liệu mới...</div></div>';});
+ window._ROTLC=null;
+ ['p0','p1','p2','p3','p4','p5','p6','p7','p8','p9'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML='<div class="loading"><div class="spinner"></div><div class="loading-text">Đang tải dữ liệu mới...</div></div>';});
  await init();
 };
 
+buildNav();
+nav('p0','g_ov');
 initSplash();
 init();
 </script>
