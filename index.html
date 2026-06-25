@@ -322,6 +322,7 @@ tr.tot td{background:#F4F8FF;font-weight:700;border-top:2px solid var(--orange-m
  <div class="page" id="p7"><div class="loading"><div class="spinner"></div><div class="loading-text">Đang tải dữ liệu...</div></div></div>
  <div class="page" id="p8"><div class="loading"><div class="spinner"></div><div class="loading-text">Đang tải dữ liệu...</div></div></div>
  <div class="page" id="p9"><div class="loading"><div class="spinner"></div><div class="loading-text">Đang tải dữ liệu...</div></div></div>
+ <div class="page" id="p10"></div>
  <div class="page" id="p12"></div>
 </main>
 
@@ -335,6 +336,7 @@ const NAV_GROUPS=[
  {id:'g_ot',icon:'⏱️',label:'Ontime',items:[['p5','🛰️','ODR TTS'],['p6','🚀','OPR TTS']]},
  {id:'g_ag',icon:'⏳',label:'Aging',page:'p7',cap:'Aging Daily'},
  {id:'g_rl',icon:'📉',label:'Rớt LC',page:'p9',cap:'Rớt LC Daily'},
+ {id:'g_cs',icon:'🚧',label:'Coming soon',page:'p10',cap:'Sắp ra mắt'},
  {id:'g_ai',icon:'✨',label:'AI',page:'p12',cap:'AI Analysis',cls:'ai'}
 ];
 const PAGE2GRP={};NAV_GROUPS.forEach(g=>{if(g.page)PAGE2GRP[g.page]=g.id;(g.items||[]).forEach(it=>PAGE2GRP[it[0]]=g.id);});
@@ -1299,6 +1301,28 @@ function buildOverviewPage(R,rotData){
  el.innerHTML=h;
 }
 
+/* ===== COMING SOON (p10) ===== */
+function buildComingSoonPage(){
+ const el=document.getElementById('p10');if(!el)return;
+ const items=[
+  {ic:'🧑‍💼',c:'#2563EB',bg:'#EFF4FE',title:'Định biên nhân sự',desc:'Chuẩn hóa số lượng nhân sự theo từng bưu cục/AM, so sánh định biên chuẩn vs thực tế, cảnh báo thừa/thiếu người.'},
+  {ic:'📈',c:'#0EA5E9',bg:'#E8F4FA',title:'Năng suất nhân viên',desc:'Sản lượng xử lý / nhân sự theo ngày, ca; xếp hạng năng suất và phát hiện điểm nghẽn vận hành.'},
+  {ic:'💰',c:'#16A34A',bg:'#DCFCE7',title:'Thu nhập trung bình',desc:'Thu nhập bình quân theo vị trí/bưu cục, tương quan với năng suất và sản lượng vùng.'}
+ ];
+ el.innerHTML=`<div class="page-header"><div class="page-title">🚧 Coming soon — Triển khai trong tương lai</div><div class="page-meta"><span class="tag tag-orange">Các phân hệ đang phát triển · sẽ cập nhật khi có nguồn dữ liệu</span></div></div>
+ <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+ ${items.map(it=>`<div class="card" style="margin-bottom:0;position:relative;overflow:hidden">
+   <div style="position:absolute;top:12px;right:12px;font-size:9.5px;font-weight:800;letter-spacing:.5px;color:#94A3B8;background:#F1F5F9;border:1px solid var(--border);border-radius:6px;padding:3px 9px">SẮP RA MẮT</div>
+   <div style="padding:22px 20px 24px">
+    <div style="width:52px;height:52px;border-radius:14px;background:${it.bg};display:flex;align-items:center;justify-content:center;font-size:26px;margin-bottom:14px">${it.ic}</div>
+    <div style="font-size:16px;font-weight:800;color:${it.c};margin-bottom:8px">${it.title}</div>
+    <div style="font-size:12.5px;line-height:1.65;color:var(--text-sub)">${it.desc}</div>
+    <div style="margin-top:16px;height:8px;border-radius:5px;background:#F1F5F9;overflow:hidden"><div style="height:100%;width:22%;background:linear-gradient(90deg,${it.c},${it.c}88);border-radius:5px"></div></div>
+    <div style="font-size:10.5px;color:#94A3B8;margin-top:6px">Đang chuẩn bị dữ liệu…</div>
+   </div></div>`).join('')}
+ </div>`;
+}
+
 /* ===== AI PAGE ===== */
 window._D={};
 function buildAIPage(){
@@ -1667,6 +1691,8 @@ async function init(){
  const p9Active=document.getElementById('p9')?.classList.contains('active');
  window._rotlcLoaded=false;
  if(p9Active){window._rotlcLoaded=true;document.getElementById('p9').innerHTML=buildRotLCHTML(rotData);}
+ // p10 — Coming soon
+ buildComingSoonPage();
  // p12 — AI
  buildAIPage();
  btn.classList.remove('spinning');btn.disabled=false;
