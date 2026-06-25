@@ -1181,7 +1181,6 @@ function buildRotLCHTML(data){
 
 /* ===== TỔNG QUAN VẬN HÀNH (p0) ===== */
 const TNT_TINH=['Hòa Bình','Phú Thọ','Vĩnh Phúc','Hà Nam','Nam Định','Ninh Bình'];
-function tinhFromBC(bc){const p=(bc||'').split('-');return p.length>1?p[p.length-1].trim():'';}
 function ovDatesDesc(sheet,dateIdx){return[...new Set((sheet||[]).slice(1).map(r=>isoD(r[dateIdx])).filter(Boolean))].sort((a,b)=>b.localeCompare(a));}
 function ovGrand(sheet,dateIdx,date){return(sheet||[]).slice(1).find(r=>(r[0]||'').toLowerCase().includes('grand total')&&isoD(r[dateIdx])===date);}
 function ovOntime(sheet,date){ // AM-type ontime: name0,date1,vol2,pct3,cnt4
@@ -1189,68 +1188,112 @@ function ovOntime(sheet,date){ // AM-type ontime: name0,date1,vol2,pct3,cnt4
  let v=0,c=0;rows.forEach(r=>{v+=Math.round(parseFloat(r[2])||0);c+=Math.round(parseFloat(r[4])||0);});
  return{vol:v,ok:c,pct:v?c/v*100:0};
 }
+function ovPf(v){const s=(v||'').toString().trim();if(!s)return 0;if(s.endsWith('%'))return(parseFloat(s)||0)/100;return parseFloat(s)||0;}
+// FD theo công thức: Σ(Trả Total) / Σ(%Vol)  — cols: AM0, Ngày1, %Vol2, %FD3, Trả Total4
+function ovFDRate(sheet){
+ const dt=ovDatesDesc(sheet,1)[0]||'';
+ const rows=(sheet||[]).slice(1).filter(r=>(r[0]||'').trim()&&!(r[0]||'').toLowerCase().includes('grand total')&&isoD(r[1])===dt);
+ let tra=0,vol=0;rows.forEach(r=>{tra+=ovPf(r[4]);vol+=ovPf(r[2]);});
+ return vol>0?tra/vol*100:0;
+}
+// Ontime BC theo AM: AM0, BC1, Ngày2, Vol3, %Ontime4, cnt5
+function ovAmOnt(sheet){
+ const dt=ovDatesDesc(sheet,2)[0]||'';const m={};
+ (sheet||[]).slice(1).forEach(r=>{
+  if(!(r[1]||'').trim()||(r[1]||'').toLowerCase().includes('grand total')||isoD(r[2])!==dt)return;
+  const am=(r[0]||'').trim();if(!am)return;
+  const v=Math.round(parseFloat(r[3])||0),pct=(parseFloat(r[4])||0)*100,ok=Math.round(parseFloat(r[5])||0);
+  if(!m[am])m[am]={am,vol:0,ok:0,bcs:[]};
+  m[am].vol+=v;m[am].ok+=ok;m[am].bcs.push({bc:(r[1]||'').trim(),vol:v,pct});
+ });
+ return m;
+}
 function buildOverviewPage(R,rotData){
  const el=document.getElementById('p0');
- const gAM=R['GTC Total theo AM'],gBC=R['GTC Total theo Bưu Cục'];
- const dts=ovDatesDesc(gAM,1);const latest=dts[0]||'',prev=dts[1]||'';
- // KPI tổng — từ grand total + tổng hợp
+ const gAM=R['GTC Total theo AM'],gBC=R['GTC Total theo Bưu Cục'],fdAM=R['FD Total theo AM'];
+ const odrBC=R['ODR TTS - Bưu Cục'],oprBC=R['OPR TTS - Bưu Cục'];
+ const latest=ovDatesDesc(gAM,1)[0]||'',prev=ovDatesDesc(gAM,1)[1]||'';
+ // ===== KPI tổng =====
  const gr=ovGrand(gAM,1,latest),grP=ovGrand(gAM,1,prev);
- const ganPct=gr?(parseFloat(gr[3])||0)*100:0,gtcPct=gr?(parseFloat(gr[4])||0)*100:0,vol=gr?Math.round(parseFloat(gr[2])||0):0;
+ const ganPct=gr?(parseFloat(gr[3])||0)*100:0,gtcPct=gr?(parseFloat(gr[4])||0)*100:0;
  const ganP=grP?(parseFloat(grP[3])||0)*100:0,gtcP=grP?(parseFloat(grP[4])||0)*100:0;
  const odr=ovOntime(R['ODR TTS - AM'],ovDatesDesc(R['ODR TTS - AM'],1)[0]||'');
  const opr=ovOntime(R['OPR TTS - AM'],ovDatesDesc(R['OPR TTS - AM'],1)[0]||'');
- // FD grand
- const fdAM=R['FD Total theo AM'];const fdLatest=ovDatesDesc(fdAM,1)[0]||'';const fdGr=ovGrand(fdAM,1,fdLatest);
- const fdPct=fdGr?parsePct(fdGr[3]):0;
- // Rớt LC tổng ngày mới nhất
+ const fdTotal=ovFDRate(fdAM),fdTTS=ovFDRate(R['FD TTS theo AM']),fdSME=ovFDRate(R['FD SME theo AM']),fdShopee=ovFDRate(R['FD Shopee theo AM']);
  const rotDates=[...new Set((rotData||[]).map(r=>r.date))].sort();const rotLatest=rotDates[rotDates.length-1]||'';
  const rotTotal=(rotData||[]).filter(r=>r.date===rotLatest).length;
  const dlt=(c,p)=>{const d=c-p;return{txt:d===0?'— không đổi':`${d>0?'▲':'▼'} ${Math.abs(d).toFixed(1)} điểm vs hôm trước`,col:d===0?'var(--text-sub)':d>0?'var(--green)':'var(--red)'};};
+ const fdC=v=>v<=5?'var(--green)':v<=10?'var(--yellow)':'var(--red)';
  const kAttr=[
-  {ic:'🔗',label:'Tỉ lệ gán giao (GTC)',val:ganPct.toFixed(1)+'%',tgt:'Mục tiêu 95%',d:dlt(ganPct,ganP),c:'var(--orange)',bg:'#FFF0EB',good:ganPct>=95},
-  {ic:'🎯',label:'% GTC Tổng',val:gtcPct.toFixed(1)+'%',tgt:'Mục tiêu 80%',d:dlt(gtcPct,gtcP),c:'#0EA5E9',bg:'#E8F4FA',good:gtcPct>=80},
-  {ic:'🛰️',label:'ODR TTS — Giao đúng hạn',val:odr.pct.toFixed(1)+'%',tgt:'Mục tiêu 95%',c:'#16A34A',bg:'#DCFCE7',good:odr.pct>=95},
-  {ic:'🚀',label:'OPR TTS — Lấy đúng hạn',val:opr.pct.toFixed(1)+'%',tgt:'Mục tiêu 95%',c:'#7C3AED',bg:'#FAF5FF',good:opr.pct>=95},
-  {ic:'↩️',label:'FD — Tỉ lệ giao thất bại',val:fdPct.toFixed(1)+'%',tgt:'Mục tiêu ≤5%',c:'#DC2626',bg:'#FEE2E2',good:fdPct<=5},
-  {ic:'📉',label:'Rớt LC — Đơn lấy không thành công',val:fmt(rotTotal),tgt:'Tổng vùng '+(rotLatest?agingFmtDate(rotLatest):''),c:'#B45309',bg:'#FEF3C7',good:rotTotal===0}
+  {ic:'🔗',label:'Tỉ lệ gán giao (GTC)',val:ganPct.toFixed(1)+'%',tgt:'Mục tiêu 95%',d:dlt(ganPct,ganP),c:'var(--orange)',bg:'#FFF0EB'},
+  {ic:'🎯',label:'% GTC Tổng',val:gtcPct.toFixed(1)+'%',tgt:'Mục tiêu 80%',d:dlt(gtcPct,gtcP),c:'#0EA5E9',bg:'#E8F4FA'},
+  {ic:'🛰️',label:'ODR TTS — Giao đúng hạn',val:odr.pct.toFixed(1)+'%',tgt:'Mục tiêu 95%',c:'#16A34A',bg:'#DCFCE7'},
+  {ic:'🚀',label:'OPR TTS — Lấy đúng hạn',val:opr.pct.toFixed(1)+'%',tgt:'Mục tiêu 95%',c:'#7C3AED',bg:'#FAF5FF'},
+  {ic:'↩️',label:'FD — Tỉ lệ giao thất bại',val:fdTotal.toFixed(2)+'%',tgt:'Mục tiêu ≤5% · Σ Trả Total / Σ %Vol',c:'#DC2626',bg:'#FEE2E2',sub:[{l:'TTS',v:fdTTS.toFixed(2)+'%',c:fdC(fdTTS)},{l:'SME',v:fdSME.toFixed(2)+'%',c:fdC(fdSME)},{l:'Shopee',v:fdShopee.toFixed(2)+'%',c:fdC(fdShopee)}]},
+  {ic:'📉',label:'Rớt LC — Đơn lấy không thành công',val:fmt(rotTotal),tgt:'Tổng vùng '+(rotLatest?agingFmtDate(rotLatest):''),c:'#B45309',bg:'#FEF3C7'}
  ];
- // Theo tỉnh từ GTC BC + Rớt LC
- const tinhAgg={};TNT_TINH.forEach(t=>tinhAgg[t]={tinh:t,vol:0,ngtc:0,ganW:0,rot:0,amStat:{}});
+ // ===== Theo tỉnh (cột H = index 7) + Aging + Rớt LC =====
+ const AG=window._AGING||{rows:[]};
+ const agDates=[...new Set(AG.rows.map(r=>r.date))].sort();const agLatest=agDates[agDates.length-1]||'';
+ const bc2tinh={};(gBC||[]).slice(1).forEach(r=>{const bc=(r[1]||'').trim(),t=(r[7]||'').trim();if(bc&&t)bc2tinh[bc]=t;});
+ const tinhAgg={};TNT_TINH.forEach(t=>tinhAgg[t]={tinh:t,vol:0,ngtc:0,ganW:0,rot:0,aging:0});
  (gBC||[]).slice(1).forEach(r=>{
-  if(!(r[1]||'').trim()||(r[1]||'').toLowerCase().includes('grand total'))return;
-  if(isoD(r[2])!==latest)return;
-  const t=tinhFromBC(r[1]);if(!tinhAgg[t])return;
+  if(!(r[1]||'').trim()||(r[1]||'').toLowerCase().includes('grand total')||isoD(r[2])!==latest)return;
+  const t=(r[7]||'').trim();if(!tinhAgg[t])return;
   const v=Math.round(parseFloat(r[3])||0),n=Math.round(parseFloat(r[6])||0),g=(parseFloat(r[4])||0)*100;
   const a=tinhAgg[t];a.vol+=v;a.ngtc+=n;a.ganW+=v*g;
-  const am=(r[0]||'').trim();if(am){if(!a.amStat[am])a.amStat[am]={am,vol:0,ngtc:0};a.amStat[am].vol+=v;a.amStat[am].ngtc+=n;}
  });
  (rotData||[]).filter(r=>r.date===rotLatest).forEach(r=>{if(tinhAgg[r.tinh])tinhAgg[r.tinh].rot++;});
- // Cảnh báo: tỉnh có %GTC thấp / có rớt LC + AM yếu
- const alerts=[];
+ AG.rows.filter(r=>r.date===agLatest).forEach(r=>{const t=bc2tinh[r.bc];if(t&&tinhAgg[t])tinhAgg[t].aging++;});
  const tinhCards=TNT_TINH.map(t=>{
-  const a=tinhAgg[t];const gtc=a.vol?a.ngtc/a.vol*100:0;const gan=a.vol?a.ganW/a.vol:0;
+  const a=tinhAgg[t];const gtc=a.vol?a.ngtc/a.vol*100:0,gan=a.vol?a.ganW/a.vol:0;
   let status,scol,sbg;
   if(a.vol===0){status='CHƯA CÓ DL';scol='#94A3B8';sbg='#F1F5F9';}
   else if(gtc<55||a.rot>0){status='VẤN ĐỀ';scol='#DC2626';sbg='#FEE2E2';}
   else if(gtc<70){status='THEO DÕI';scol='#B45309';sbg='#FEF3C7';}
   else{status='TỐT';scol='#16A34A';sbg='#DCFCE7';}
-  // AM yếu nhất trong tỉnh (vol>0, %GTC thấp nhất)
-  const ams=Object.values(a.amStat).filter(x=>x.vol>0).map(x=>({am:x.am,gtc:x.gtc=x.ngtc/x.vol*100,vol:x.vol})).sort((x,y)=>x.gtc-y.gtc);
-  const weak=ams[0];
-  if(a.vol>0&&(gtc<55||a.rot>0)&&weak)alerts.push(`<b>${t}</b>: %GTC ${gtc.toFixed(1)}%${a.rot>0?`, Rớt LC ${a.rot} đơn`:''} — AM cần chú ý: <b>${weak.am}</b> (%GTC ${weak.gtc.toFixed(1)}%).`);
   const row=(lb,vl,c)=>`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #F1F3F7"><span style="color:var(--text-sub)">${lb}</span><span style="font-weight:700${c?`;color:${c}`:''}">${vl}</span></div>`;
   return`<div class="card" style="margin-bottom:0"><div class="card-header" style="justify-content:space-between"><div class="card-title"><div class="card-icon">📍</div>${t}</div><span style="background:${sbg};color:${scol};font-size:10px;font-weight:800;letter-spacing:.5px;padding:3px 9px;border-radius:6px">${status}</span></div>
    <div style="padding:12px 18px 14px">
     ${row('Sản lượng (Vol)',fmt(a.vol))}
     ${row('% Gán giao',gan.toFixed(1)+'%',gan>=95?'var(--green)':'var(--orange)')}
     ${row('% GTC Tổng',gtc.toFixed(1)+'%',gtc>=70?'var(--green)':gtc>=55?'var(--yellow)':'var(--red)')}
-    ${row('Rớt LC',a.rot+' đơn',a.rot>0?'var(--red)':'var(--text-sub)')}
-    ${weak?`<div style="margin-top:8px;font-size:11px;color:var(--text-sub)">⚠️ AM yếu nhất: <b style="color:var(--red)">${weak.am}</b> · %GTC ${weak.gtc.toFixed(1)}%</div>`:''}
+    ${row('Aging > 5 ngày',fmt(a.aging)+' đơn',a.aging>0?'var(--yellow)':'var(--text-sub)')}
+    ${row('Rớt LC',fmt(a.rot)+' đơn',a.rot>0?'var(--red)':'var(--text-sub)')}
    </div></div>`;
  }).join('');
+ // ===== KIẾN NGHỊ / CẢNH BÁO theo AM → bưu cục =====
+ const amGTC={};
+ (gBC||[]).slice(1).forEach(r=>{
+  if(!(r[1]||'').trim()||(r[1]||'').toLowerCase().includes('grand total')||isoD(r[2])!==latest)return;
+  const am=(r[0]||'').trim();if(!am)return;
+  const v=Math.round(parseFloat(r[3])||0),g=(parseFloat(r[4])||0)*100,n=Math.round(parseFloat(r[6])||0);
+  if(!amGTC[am])amGTC[am]={am,vol:0,ganW:0,ngtc:0,bcs:[]};
+  const a=amGTC[am];a.vol+=v;a.ganW+=v*g;a.ngtc+=n;
+  a.bcs.push({bc:(r[1]||'').trim(),vol:v,gan:g,gtc:v?n/v*100:0});
+ });
+ const odrM=ovAmOnt(odrBC),oprM=ovAmOnt(oprBC);
+ const fdDate=ovDatesDesc(fdAM,1)[0]||'';const amFD={};
+ (fdAM||[]).slice(1).forEach(r=>{if(!(r[0]||'').trim()||(r[0]||'').toLowerCase().includes('grand total')||isoD(r[1])!==fdDate)return;amFD[(r[0]||'').trim()]=parsePct(r[3]);});
+ const bcList=(bcs,bad,fmtV)=>bcs.filter(bad).sort((x,y)=>fmtV(x).n-fmtV(y).n).slice(0,8).map(b=>`${b.bc} <b>${fmtV(b).t}</b>`).join(', ');
+ const recGan=Object.values(amGTC).filter(a=>a.vol>0&&a.ganW/a.vol<90).sort((a,b)=>a.ganW/a.vol-b.ganW/b.vol).map(a=>{const p=a.ganW/a.vol;const d=bcList(a.bcs,b=>b.gan<90,b=>({n:b.gan,t:b.gan.toFixed(0)+'%'}));return`<b>${a.am}</b> — Gán giao ${p.toFixed(1)}%${d?': '+d:''}`;});
+ const recGTC=Object.values(amGTC).filter(a=>a.vol>0&&a.ngtc/a.vol*100<60).sort((a,b)=>a.ngtc/a.vol-b.ngtc/b.vol).map(a=>{const p=a.ngtc/a.vol*100;const d=bcList(a.bcs,b=>b.gtc<60,b=>({n:b.gtc,t:b.gtc.toFixed(0)+'%'}));return`<b>${a.am}</b> — %GTC ${p.toFixed(1)}%${d?': '+d:''}`;});
+ const recODR=Object.values(odrM).filter(a=>a.vol>0&&a.ok/a.vol*100<95).sort((a,b)=>a.ok/a.vol-b.ok/b.vol).map(a=>{const p=a.ok/a.vol*100;const d=bcList(a.bcs,b=>b.pct<95,b=>({n:b.pct,t:b.pct.toFixed(0)+'%'}));return`<b>${a.am}</b> — ODR ${p.toFixed(1)}%${d?': '+d:''}`;});
+ const recOPR=Object.values(oprM).filter(a=>a.vol>0&&a.ok/a.vol*100<90).sort((a,b)=>a.ok/a.vol-b.ok/b.vol).map(a=>{const p=a.ok/a.vol*100;const d=bcList(a.bcs,b=>b.pct<90,b=>({n:b.pct,t:b.pct.toFixed(0)+'%'}));return`<b>${a.am}</b> — OPR ${p.toFixed(1)}%${d?': '+d:''}`;});
+ const recFD=Object.entries(amFD).filter(([am,v])=>v>10).sort((a,b)=>b[1]-a[1]).map(([am,v])=>`<b>${am}</b> — FD ${v.toFixed(1)}% (vượt ngưỡng 10%)`);
+ const recSections=[
+  {t:'Gán giao < 90%',ic:'🔗',c:'#B45309',items:recGan},
+  {t:'%GTC < 60%',ic:'🎯',c:'#DC2626',items:recGTC},
+  {t:'ODR TTS < 95%',ic:'🛰️',c:'#0EA5E9',items:recODR},
+  {t:'OPR TTS < 90%',ic:'🚀',c:'#7C3AED',items:recOPR},
+  {t:'FD > 10%',ic:'↩️',c:'#DC2626',items:recFD}
+ ].filter(s=>s.items.length);
+ const hasRec=recSections.length>0;
+ const recHTML=hasRec?recSections.map(s=>`<div style="margin-bottom:12px"><div style="font-size:12px;font-weight:800;color:${s.c};margin-bottom:5px">${s.ic} ${s.t} <span style="color:var(--text-sub);font-weight:600">(${s.items.length} AM)</span></div>${s.items.map(it=>`<div style="font-size:12px;line-height:1.55;padding:5px 10px;background:#fff;border:1px solid var(--border);border-radius:8px;margin-bottom:5px">• ${it}</div>`).join('')}</div>`).join(''):'✅ Không có AM nào dưới ngưỡng cảnh báo trong ngày.';
+ // ===== Render =====
  let h=`<div class="page-header"><div class="page-title">Tổng Quan Vận Hành TNT</div><div class="page-meta"><span class="tag tag-orange">🗺️ Dữ liệu ngày ${shortD(latest)} · Vùng Tây Nam Thủ Đô</span><span>${TNT_TINH.join(' · ')}</span></div></div>`;
- h+=`<div class="kpi-grid">${kAttr.map(k=>`<div class="kpi-card" style="border-top:none"><div class="kpi-ico" style="background:${k.bg}">${k.ic}</div><div class="kpi-label">${k.label}</div><div class="kpi-val" style="color:${k.c}">${k.val}</div><div style="font-size:11px;color:var(--text-sub);margin-top:4px">${k.tgt}</div>${k.d?`<div style="font-size:11px;font-weight:700;color:${k.d.col};margin-top:3px">${k.d.txt}</div>`:''}</div>`).join('')}</div>`;
- h+=`<div class="card" style="background:${alerts.length?'#FFF5F5':'#F0FDF4'};border-color:${alerts.length?'#FECACA':'#BBF7D0'}"><div class="card-header" style="background:transparent;border-bottom:1px solid ${alerts.length?'#FECACA':'#BBF7D0'}"><div class="card-title"><div class="card-icon" style="background:${alerts.length?'#DC2626':'#16A34A'}">${alerts.length?'🔔':'✅'}</div>Cảnh báo quan trọng</div></div><div style="padding:12px 18px;font-size:12.5px;line-height:1.7;color:var(--text-main)">${alerts.length?alerts.map(a=>'• '+a).join('<br>'):'✅ Không có cảnh báo nghiêm trọng trong ngày.'}</div></div>`;
+ h+=`<div class="kpi-grid">${kAttr.map(k=>`<div class="kpi-card" style="border-top:none"><div class="kpi-ico" style="background:${k.bg}">${k.ic}</div><div class="kpi-label">${k.label}</div><div class="kpi-val" style="color:${k.c}">${k.val}</div><div style="font-size:10.5px;color:var(--text-sub);margin-top:4px">${k.tgt}</div>${k.d?`<div style="font-size:11px;font-weight:700;color:${k.d.col};margin-top:3px">${k.d.txt}</div>`:''}${k.sub?`<div style="display:flex;gap:6px;margin-top:8px">${k.sub.map(s=>`<div style="flex:1;background:#F8FAFC;border-radius:7px;padding:5px 4px;text-align:center"><div style="font-size:9px;font-weight:700;color:var(--text-sub)">${s.l}</div><div style="font-size:12px;font-weight:800;color:${s.c}">${s.v}</div></div>`).join('')}</div>`:''}</div>`).join('')}</div>`;
+ h+=`<div class="card" style="background:${hasRec?'#FFF8F0':'#F0FDF4'};border-color:${hasRec?'#FED7AA':'#BBF7D0'}"><div class="card-header" style="background:transparent;border-bottom:1px solid ${hasRec?'#FED7AA':'#BBF7D0'}"><div class="card-title"><div class="card-icon" style="background:${hasRec?'#EA580C':'#16A34A'}">${hasRec?'🔔':'✅'}</div>Kiến nghị &amp; Cảnh báo — AM dưới ngưỡng (kèm bưu cục)</div></div><div style="padding:14px 18px;color:var(--text-main)">${recHTML}</div></div>`;
  h+=`<div style="display:flex;align-items:center;justify-content:space-between;margin:18px 0 12px"><div style="font-size:15px;font-weight:800">📍 6 tỉnh Vùng TNT</div><div style="font-size:11.5px;color:var(--text-sub)">Bấm tab phía trên để xem phân tích chi tiết từng chỉ số</div></div>`;
  h+=`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px">${tinhCards}</div>`;
  el.innerHTML=h;
