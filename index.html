@@ -277,6 +277,11 @@ tr.tot td{background:#F4F8FF;font-weight:700;border-top:2px solid var(--orange-m
 .mono-copy-body{padding:14px 16px;overflow-x:auto;-webkit-overflow-scrolling:touch}
 .mono-copy-title{font-family:var(--mono);font-size:12px;font-weight:700;color:#166534;margin-bottom:10px}
 .mono-copy-pre{font-family:var(--mono);font-size:12px;line-height:1.55;color:#14532D;white-space:pre!important;word-break:normal!important;overflow-wrap:normal!important;margin:0;tab-size:4;display:inline-block;min-width:max-content}
+.copy-tbl{width:100%;border-collapse:collapse;font-size:12px;font-family:var(--mono);table-layout:auto}
+.copy-tbl th,.copy-tbl td{border:1px solid #BBF7D0;padding:5px 10px;vertical-align:top;line-height:1.5}
+.copy-tbl th{background:#DCFCE7;color:#166534;font-weight:700;white-space:nowrap}
+.copy-tbl td{color:#14532D}
+.copy-tbl tbody tr:nth-child(even){background:#F0FDF4}
 .mono-copy-note{font-size:11px;color:var(--text-sub);padding:0 16px 12px}
 .ai-saved-q{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .ai-saved-chip{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:8px;border:1px solid var(--border);background:#fff;font-size:11px;cursor:pointer;max-width:280px}
@@ -411,26 +416,44 @@ function buildMonoTableText(headers,rows){
  const body=rows.map(r=>r.map((c,i)=>monoPad(c,ws[i],i===0?'right':'left')).join(' | ')).join('\n');
  return top+'\n'+sep+'\n'+body;
 }
-// Canh lại bảng markdown pipe do AI sinh ra → cột đều, không lệch
-function realignMarkdownTable(raw){
+function escHtml(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+// Tự nhận diện cột số → căn phải, cột chữ → căn trái
+function colAligns(headers,rows){
+ return headers.map((_,i)=>{
+  const vals=rows.map(r=>String(r[i]??'').trim()).filter(Boolean);
+  const num=vals.length&&vals.every(v=>/^[\d.,%+\-▲▼()\s]+$/.test(v));
+  return num?'right':'left';
+ });
+}
+// Bảng HTML full-width, cột thẳng hàng, tự giãn lấp khoảng trống + ô ẩn chứa TSV để copy sang Sheet
+function buildCopyTableHTML(id,headers,rows){
+ const al=colAligns(headers,rows);
+ const tsv=[headers.join('\t'),...rows.map(r=>headers.map((_,i)=>String(r[i]??'')).join('\t'))].join('\n');
+ let h='<table class="copy-tbl"><thead><tr>'+headers.map((hd,i)=>`<th style="text-align:${al[i]}">${escHtml(hd)}</th>`).join('')+'</tr></thead><tbody>';
+ rows.forEach(r=>{h+='<tr>'+headers.map((_,i)=>`<td style="text-align:${al[i]}">${escHtml(r[i])}</td>`).join('')+'</tr>';});
+ h+='</tbody></table><textarea id="'+id+'" style="position:absolute;left:-9999px;top:0;opacity:0" readonly>'+escHtml(tsv)+'</textarea>';
+ return h;
+}
+// Tách bảng markdown pipe do AI sinh ra → {headers, rows}
+function parseMdTable(raw){
  const lines=String(raw||'').split('\n').map(l=>l.trim()).filter(Boolean);
  const isSep=l=>/^[\s\-:|]+$/.test(l)&&l.includes('-');
  const cells=l=>l.replace(/^\||\|$/g,'').split('|').map(c=>c.trim());
  const dataLines=lines.filter(l=>!isSep(l));
- if(dataLines.length<2)return raw.trim();
+ if(dataLines.length<2)return null;
  const headers=cells(dataLines[0]);
  const nc=headers.length;
  const body=dataLines.slice(1).map(cells).map(r=>{while(r.length<nc)r.push('');return r.slice(0,nc);});
- return buildMonoTableText(headers,body);
+ return{headers,rows:body};
 }
 let _monoId=0;
 function monoCopyBox(title,headers,rows,note){
- const id='mono_'+(_monoId++);const text=buildMonoTableText(headers,rows);
- return`<div class="mono-copy-wrap"><div class="mono-copy-head"><span>📋 ${title}</span><button type="button" class="mono-copy-btn" onclick="copyMonoText('${id}')">copy</button></div><div class="mono-copy-body"><pre class="mono-copy-pre" id="${id}">${text.replace(/</g,'&lt;')}</pre></div>${note?`<div class="mono-copy-note">${note}</div>`:''}</div>`;
+ const id='mono_'+(_monoId++);
+ return`<div class="mono-copy-wrap"><div class="mono-copy-head"><span>📋 ${title}</span><button type="button" class="mono-copy-btn" onclick="copyMonoText('${id}')">copy</button></div><div class="mono-copy-body">${buildCopyTableHTML(id,headers,rows)}</div>${note?`<div class="mono-copy-note">${note}</div>`:''}</div>`;
 }
 function copyMonoText(id){
  const el=document.getElementById(id);if(!el)return;
- navigator.clipboard.writeText(el.textContent).then(()=>{const s=document.getElementById('aiStatus');if(s){s.textContent='✅ Đã copy bảng!';setTimeout(()=>s.textContent='',2000);}});
+ navigator.clipboard.writeText(el.value!==undefined?el.value:el.textContent).then(()=>{const s=document.getElementById('aiStatus');if(s){s.textContent='✅ Đã copy bảng!';setTimeout(()=>s.textContent='',2000);}});
 }
 
 /* ===== BATON / BƯU CỤC BẤT ỔN ===== */
@@ -1144,6 +1167,17 @@ function gtcdSurgeWarnHTML(base,keyFn,label){
  if(!warns.length)return'';
  return`<div class="analysis-box" style="margin-top:8px;font-size:12px">⚠️ ${label} tăng &gt;10% so với ${shortD(n2)}: ${warns.join(' · ')}</div>`;
 }
+// 5 bưu cục %GTC kém nhất — GTC theo ca (Ca1/Ca2/Tồn) + %Gán + %GTC
+function gtcdWorstBCHTML(base){
+ if(!base.length)return'';
+ const agg={};
+ base.forEach(r=>{const b=agg[r.bc]||(agg[r.bc]={bc:r.bc,am:r.am,vol:0,ngtc:0,ganW:0,ca:{}});b.vol+=r.vol;b.ngtc+=r.ngtc;b.ganW+=r.vol*r.gan;b.ca[r.loai]=(b.ca[r.loai]||0)+r.ngtc;});
+ const arr=Object.values(agg).filter(b=>b.vol>0).map(b=>({...b,gtc:b.ngtc/b.vol*100,gan:b.ganW/b.vol})).sort((a,b)=>a.gtc-b.gtc).slice(0,5);
+ if(!arr.length)return'';
+ const headers=['STT','Bưu Cục','%Gán','%GTC','GTC Ca 1','GTC Ca 2','GTC Tồn'];
+ const rows=arr.map((b,i)=>[String(i+1),b.bc,b.gan.toFixed(1)+'%',b.gtc.toFixed(1)+'%',fmt(b.ca['Hàng Mới Ca 1']||0),fmt(b.ca['Hàng Mới Ca 2']||0),fmt(b.ca['Hàng Tồn']||0)]);
+ return monoCopyBox('5 Bưu cục %GTC kém nhất — GTC theo ca',headers,rows);
+}
 function gtcdToggle(elm,type){
  elm.classList.toggle('active');
  const set=type==='loai'?window._GTCD.selLoai:window._GTCD.selKL;
@@ -1209,7 +1243,7 @@ function renderGTCDetail(){
  });
  const base=gtcdBaseRows();
  document.getElementById('gtcd_amTable').innerHTML=gtcdAggTable(Object.values(amAgg).sort((a,b)=>b.vol-a.vol),false)+gtcdSurgeWarnHTML(base,r=>r.am,'AM');
- document.getElementById('gtcd_bcTable').innerHTML=gtcdAggTable(Object.values(bcAgg).sort((a,b)=>b.vol-a.vol),true)+gtcdSurgeWarnHTML(base,r=>r.bc,'Bưu cục');
+ document.getElementById('gtcd_bcTable').innerHTML=gtcdAggTable(Object.values(bcAgg).sort((a,b)=>b.vol-a.vol),true)+gtcdWorstBCHTML(base);
  const volNote=document.getElementById('gtcd_volNote');if(volNote)volNote.innerHTML=gtcdChartVolNote(base);
  const gtcNote=document.getElementById('gtcd_gtcNote');if(gtcNote)gtcNote.innerHTML=gtcdChartGtcNote(base);
  const anaEl=document.getElementById('gtcd_analysis');if(anaEl)anaEl.innerHTML=gtcdAnalysisHTML(data);
@@ -2110,7 +2144,7 @@ Thêm cột Nhóm: 🟢 Tốt / 🟢 Khá / 🔵 TB / 🟡 Kém / 🔴 Tệ.
 - Luôn kết thúc bằng KHUYẾN NGHỊ CỐ VẤN (việc cần làm ngay) khi phù hợp.`;
 function md2html(text){
  let t=text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
- const blocks=[];t=t.replace(/(^|\n)((?:[^\n]+\|[^\n]+\n)(?:[-| :]+\n)(?:(?:[^\n]+\|[^\n]+\n?)+))/g,(m,pre,table)=>{const id='ait_'+blocks.length;const aligned=realignMarkdownTable(table);blocks.push(aligned);return pre+`<div class="mono-copy-wrap" style="margin:12px 0"><div class="mono-copy-head"><span>📋 Bảng kết quả</span><button type="button" class="mono-copy-btn" onclick="copyMonoText('${id}')">copy</button></div><div class="mono-copy-body"><pre class="mono-copy-pre" id="${id}">${aligned.replace(/</g,'&lt;')}</pre></div></div>`;});
+ let _ai=0;t=t.replace(/(^|\n)((?:[^\n]+\|[^\n]+\n)(?:[-| :]+\n)(?:(?:[^\n]+\|[^\n]+\n?)+))/g,(m,pre,table)=>{const p=parseMdTable(table);if(!p)return m;const id='ait_'+(_ai++);return pre+`<div class="mono-copy-wrap" style="margin:12px 0"><div class="mono-copy-head"><span>📋 Bảng kết quả</span><button type="button" class="mono-copy-btn" onclick="copyMonoText('${id}')">copy</button></div><div class="mono-copy-body">${buildCopyTableHTML(id,p.headers,p.rows)}</div></div>`;});
  return t.replace(/^### (.+)$/gm,'<h3>$1</h3>').replace(/^## (.+)$/gm,'<h2>$1</h2>').replace(/^# (.+)$/gm,'<h1>$1</h1>').replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\*(.+?)\*/g,'<em>$1</em>').replace(/`(.+?)`/g,'<code>$1</code>').replace(/^---$/gm,'<hr>').replace(/^> (.+)$/gm,'<blockquote>$1</blockquote>').replace(/^[\-\*] (.+)$/gm,'<li>$1</li>').replace(/(<li>.*<\/li>\n?)+/g,'<ul>$&</ul>').replace(/^\d+\. (.+)$/gm,'<li>$1</li>').replace(/\n\n/g,'</p><p>').replace(/^([^<\n].+)$/gm,'<p>$1</p>').replace(/<p><\/p>/g,'').replace(/🟢/g,'<span class="ai-tag-hl">🟢 HL</span>').replace(/🔴/g,'<span class="ai-tag-ll">🔴 LL</span>');
 }
 function saveGroqKey(){const k=(document.getElementById('groqKeyInput').value||'').trim();localStorage.setItem('claudeApiKey',k);document.getElementById('groqKeySaved').textContent=k?'✅ Đã lưu':'';}
