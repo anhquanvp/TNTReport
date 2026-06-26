@@ -274,9 +274,9 @@ tr.tot td{background:#F4F8FF;font-weight:700;border-top:2px solid var(--orange-m
 .mono-copy-head{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:#166534;color:#fff;font-size:11px;font-weight:700;letter-spacing:.4px}
 .mono-copy-btn{background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.35);color:#fff;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;transition:background .15s}
 .mono-copy-btn:hover{background:rgba(255,255,255,0.28)}
-.mono-copy-body{padding:14px 16px;overflow-x:auto}
+.mono-copy-body{padding:14px 16px;overflow-x:auto;-webkit-overflow-scrolling:touch}
 .mono-copy-title{font-family:var(--mono);font-size:12px;font-weight:700;color:#166534;margin-bottom:10px}
-.mono-copy-pre{font-family:var(--mono);font-size:12px;line-height:1.55;color:#14532D;white-space:pre;margin:0;tab-size:4}
+.mono-copy-pre{font-family:var(--mono);font-size:12px;line-height:1.55;color:#14532D;white-space:pre!important;word-break:normal!important;overflow-wrap:normal!important;margin:0;tab-size:4;display:inline-block;min-width:max-content}
 .mono-copy-note{font-size:11px;color:var(--text-sub);padding:0 16px 12px}
 .ai-saved-q{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .ai-saved-chip{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:8px;border:1px solid var(--border);background:#fff;font-size:11px;cursor:pointer;max-width:280px}
@@ -398,16 +398,30 @@ function parseCSV(text){return text.trim().split('\n').filter(l=>l.trim()).map(l
 function errPage(msg){return`<div class="error-box">⚠️ Không thể tải dữ liệu: ${msg}<br><small>Kiểm tra kết nối hoặc quyền truy cập Google Sheet.</small></div>`;}
 
 /* ===== MONO COPY TABLE (dán Sheet) ===== */
+// Độ rộng hiển thị: emoji (surrogate pair) tính 2 ô để canh cột chuẩn trong monospace
+function dispW(s){let w=0;for(const ch of String(s??'')){const c=ch.codePointAt(0);w+=(c>=0x1F000||(c>=0x2190&&c<=0x2BFF)||(c>=0x2600&&c<=0x27BF))?2:1;}return w;}
 function monoPad(s,w,align){
- const t=String(s??'');if(t.length>=w)return t;
- const p=' '.repeat(w-t.length);return align==='right'?p+t:t+p;
+ const t=String(s??'');const len=dispW(t);if(len>=w)return t;
+ const p=' '.repeat(w-len);return align==='right'?p+t:t+p;
 }
 function buildMonoTableText(headers,rows){
- const ws=headers.map((h,i)=>Math.max(h.length,...rows.map(r=>String(r[i]??'').length),3));
+ const ws=headers.map((h,i)=>Math.max(dispW(h),...rows.map(r=>dispW(r[i])),3));
  const top=headers.map((h,i)=>monoPad(h,ws[i])).join(' | ');
  const sep=ws.map(w=>'-'.repeat(w)).join('-|-');
  const body=rows.map(r=>r.map((c,i)=>monoPad(c,ws[i],i===0?'right':'left')).join(' | ')).join('\n');
  return top+'\n'+sep+'\n'+body;
+}
+// Canh lại bảng markdown pipe do AI sinh ra → cột đều, không lệch
+function realignMarkdownTable(raw){
+ const lines=String(raw||'').split('\n').map(l=>l.trim()).filter(Boolean);
+ const isSep=l=>/^[\s\-:|]+$/.test(l)&&l.includes('-');
+ const cells=l=>l.replace(/^\||\|$/g,'').split('|').map(c=>c.trim());
+ const dataLines=lines.filter(l=>!isSep(l));
+ if(dataLines.length<2)return raw.trim();
+ const headers=cells(dataLines[0]);
+ const nc=headers.length;
+ const body=dataLines.slice(1).map(cells).map(r=>{while(r.length<nc)r.push('');return r.slice(0,nc);});
+ return buildMonoTableText(headers,body);
 }
 let _monoId=0;
 function monoCopyBox(title,headers,rows,note){
@@ -1040,7 +1054,42 @@ function gtcDetailSkeleton(rows){
  <div class="chart-box"><h3>Xu hướng Volume theo Loại hàng</h3><div class="csub">Đường = loại hàng (+ Tổng đậm) · Cột = Volume theo 4 nhóm khối lượng/ngày.</div><div class="chart-canvas-wrap"><canvas id="gtcd_chartVol"></canvas></div></div>
  <div class="chart-box"><h3>Xu hướng %GTC theo Loại hàng</h3><div class="csub">Đường = %GTC loại hàng (+ Tổng nét đứt) · Cột = %GTC theo 4 nhóm khối lượng/ngày.</div><div class="chart-canvas-wrap"><canvas id="gtcd_chartGTC"></canvas></div></div>
  <div class="card"><div class="card-header"><div class="card-title"><div class="card-icon">👤</div>Theo AM</div><div class="card-info">Sắp xếp Volume cao → thấp · theo bộ lọc hiện tại</div></div><div id="gtcd_amTable"></div></div>
- <div class="card"><div class="card-header"><div class="card-title"><div class="card-icon">🏪</div>Theo Bưu Cục</div><div class="card-info">Đánh dấu ⚠ bưu cục bất ổn (nguồn: Baton)</div></div><div id="gtcd_bcTable"></div></div>`;
+ <div class="card"><div class="card-header"><div class="card-title"><div class="card-icon">🏪</div>Theo Bưu Cục</div><div class="card-info">Đánh dấu ⚠ bưu cục bất ổn (nguồn: Baton)</div></div><div id="gtcd_bcTable"></div></div>
+ <div id="gtcd_analysis"></div>`;
+}
+// Ghi chú phân tích GTC Bulky — N-1 vs N-2, bôi đỏ khi Vol Ca2 / cồng kềnh tăng
+function gtcdAnalysisHTML(data){
+ const G=window._GTCD;
+ const am=document.getElementById('gtcd_am')?.value||'',bc=document.getElementById('gtcd_bc')?.value||'';
+ const dts=[...new Set(data.map(r=>r.date))].sort();
+ if(!dts.length)return'';
+ const n1=dts[dts.length-1],n2=dts[dts.length-2]||'';
+ // Xếp hạng AM theo %GTC ngày N-1 (theo bộ lọc hiện tại)
+ const amN1={};data.filter(r=>r.date===n1).forEach(r=>{(amN1[r.am]=amN1[r.am]||{vol:0,ngtc:0});amN1[r.am].vol+=r.vol;amN1[r.am].ngtc+=r.ngtc;});
+ const amArr=Object.entries(amN1).map(([k,a])=>({k,gtc:a.vol?a.ngtc/a.vol*100:0,vol:a.vol})).filter(x=>x.vol>0).sort((a,b)=>b.gtc-a.gtc);
+ const tot=d=>{let v=0,g=0;data.filter(r=>r.date===d).forEach(r=>{v+=r.vol;g+=r.ngtc;});return{v,g};};
+ const t1=tot(n1),t2=n2?tot(n2):{v:0,g:0};
+ let ana='';
+ if(amArr.length){const best=amArr[0],worst=amArr[amArr.length-1];
+  ana+=`📊 Ngày ${shortD(n1)}: AM tốt nhất <strong>${best.k}</strong> (${best.gtc.toFixed(1)}%) · AM tệ nhất <strong>${worst.k}</strong> (${worst.gtc.toFixed(1)}%).`;}
+ if(n2){const dVol=t1.v-t2.v,dGTC=t1.g-t2.g;const vS=dVol>=0?'+':'',gS=dGTC>=0?'+':'';
+  const vC=dVol>=0?'var(--red)':'var(--green)',gC=dGTC>=0?'var(--green)':'var(--red)';
+  ana+=` So với ${shortD(n2)}: Vol <span style="color:${vC};font-weight:700">${vS}${fmt(dVol)}</span> · GTC <span style="color:${gC};font-weight:700">${gS}${fmt(dGTC)}</span>.`;
+  const av1={},av2={};data.filter(r=>r.date===n1).forEach(r=>av1[r.am]=(av1[r.am]||0)+r.vol);data.filter(r=>r.date===n2).forEach(r=>av2[r.am]=(av2[r.am]||0)+r.vol);
+  let mx=null,mxAM='';Object.keys(av1).forEach(a=>{const d=(av2[a]||0)-(av1[a]||0);if(d>0&&(mx===null||d>mx)){mx=d;mxAM=a;}});
+  if(mxAM)ana+=` AM giảm Vol nhiều nhất: <strong>${mxAM}</strong> (▼ ${fmt(mx)}).`;
+ }
+ // Cảnh báo Ca 2 & cồng kềnh (bỏ qua lọc loại/khối lượng để luôn hiện)
+ const base=G.rows.filter(r=>(!am||r.am===am)&&(!bc||r.bc===bc));
+ const sumBy=(d,fn)=>base.filter(r=>r.date===d&&fn(r)).reduce((s,r)=>s+r.vol,0);
+ const ca2_1=sumBy(n1,r=>r.loai==='Hàng Mới Ca 2'),ca2_2=n2?sumBy(n2,r=>r.loai==='Hàng Mới Ca 2'):0;
+ const hv1=sumBy(n1,r=>r.kl!=='1. <5Kg'),hv2=n2?sumBy(n2,r=>r.kl!=='1. <5Kg'):0;
+ const chip=(label,v1,v2)=>{const d=v1-v2;const up=d>0;const col=up?'var(--red)':d<0?'var(--green)':'var(--text-sub)';const arr=up?'▲':d<0?'▼':'—';const bg=up?'#FEE2E2':'transparent';
+  return`<span style="display:inline-block;background:${bg};border-radius:6px;padding:2px 8px;margin-right:8px;font-weight:700;color:${col}">${label}: ${fmt(v1)} (${arr} ${fmt(Math.abs(d))} vs ${shortD(n2)})</span>`;};
+ let warn='';
+ if(n2){warn=`<div style="margin-top:8px;font-size:12px">📦 Sản lượng ${chip('Hàng Mới Ca 2',ca2_1,ca2_2)}${chip('Hàng cồng kềnh (≥5kg)',hv1,hv2)}<span style="color:var(--text-sub);font-weight:500">— bôi đỏ nếu tăng so hôm trước</span></div>`;}
+ if(!ana&&!warn)return'';
+ return`<div class="analysis-box" style="margin:0 0 18px">${ana}${warn}</div>`;
 }
 function gtcdToggle(elm,type){
  elm.classList.toggle('active');
@@ -1107,6 +1156,7 @@ function renderGTCDetail(){
  });
  document.getElementById('gtcd_amTable').innerHTML=gtcdAggTable(Object.values(amAgg).sort((a,b)=>b.vol-a.vol),false);
  document.getElementById('gtcd_bcTable').innerHTML=gtcdAggTable(Object.values(bcAgg).sort((a,b)=>b.vol-a.vol),true);
+ const anaEl=document.getElementById('gtcd_analysis');if(anaEl)anaEl.innerHTML=gtcdAnalysisHTML(data);
 }
 function gtcdAggTable(rows,isBC){
  if(!rows.length)return'<p style="padding:16px;color:var(--text-sub)">Không có dữ liệu</p>';
@@ -2004,7 +2054,7 @@ Thêm cột Nhóm: 🟢 Tốt / 🟢 Khá / 🔵 TB / 🟡 Kém / 🔴 Tệ.
 - Luôn kết thúc bằng KHUYẾN NGHỊ CỐ VẤN (việc cần làm ngay) khi phù hợp.`;
 function md2html(text){
  let t=text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
- const blocks=[];t=t.replace(/(^|\n)((?:[^\n]+\|[^\n]+\n)(?:[-| :]+\n)(?:(?:[^\n]+\|[^\n]+\n?)+))/g,(m,pre,table)=>{const id='ait_'+blocks.length;blocks.push(table.trim());return pre+`<div class="mono-copy-wrap" style="margin:12px 0"><div class="mono-copy-head"><span>📋 Bảng kết quả</span><button type="button" class="mono-copy-btn" onclick="copyMonoText('${id}')">copy</button></div><div class="mono-copy-body"><pre class="mono-copy-pre" id="${id}">${blocks[blocks.length-1].replace(/</g,'&lt;')}</pre></div></div>`;});
+ const blocks=[];t=t.replace(/(^|\n)((?:[^\n]+\|[^\n]+\n)(?:[-| :]+\n)(?:(?:[^\n]+\|[^\n]+\n?)+))/g,(m,pre,table)=>{const id='ait_'+blocks.length;const aligned=realignMarkdownTable(table);blocks.push(aligned);return pre+`<div class="mono-copy-wrap" style="margin:12px 0"><div class="mono-copy-head"><span>📋 Bảng kết quả</span><button type="button" class="mono-copy-btn" onclick="copyMonoText('${id}')">copy</button></div><div class="mono-copy-body"><pre class="mono-copy-pre" id="${id}">${aligned.replace(/</g,'&lt;')}</pre></div></div>`;});
  return t.replace(/^### (.+)$/gm,'<h3>$1</h3>').replace(/^## (.+)$/gm,'<h2>$1</h2>').replace(/^# (.+)$/gm,'<h1>$1</h1>').replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\*(.+?)\*/g,'<em>$1</em>').replace(/`(.+?)`/g,'<code>$1</code>').replace(/^---$/gm,'<hr>').replace(/^> (.+)$/gm,'<blockquote>$1</blockquote>').replace(/^[\-\*] (.+)$/gm,'<li>$1</li>').replace(/(<li>.*<\/li>\n?)+/g,'<ul>$&</ul>').replace(/^\d+\. (.+)$/gm,'<li>$1</li>').replace(/\n\n/g,'</p><p>').replace(/^([^<\n].+)$/gm,'<p>$1</p>').replace(/<p><\/p>/g,'').replace(/🟢/g,'<span class="ai-tag-hl">🟢 HL</span>').replace(/🔴/g,'<span class="ai-tag-ll">🔴 LL</span>');
 }
 function saveGroqKey(){const k=(document.getElementById('groqKeyInput').value||'').trim();localStorage.setItem('claudeApiKey',k);document.getElementById('groqKeySaved').textContent=k?'✅ Đã lưu':'';}
