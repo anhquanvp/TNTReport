@@ -1345,8 +1345,7 @@ function buildOverviewPage(R,rotData){
   {ic:'🛰️',label:'ODR TTS — Giao đúng hạn',val:odr.pct.toFixed(1)+'%',tgt:'Mục tiêu 95%',c:'#16A34A',bg:'#DCFCE7'},
   {ic:'🚀',label:'OPR TTS — Lấy đúng hạn',val:opr.pct.toFixed(1)+'%',tgt:'Mục tiêu 95%',c:'#7C3AED',bg:'#FAF5FF'},
   {ic:'↩️',label:'FD - Tỷ lệ trả hàng',val:fdTotal.toFixed(2)+'%',tgt:'',c:'#DC2626',bg:'#FEE2E2',sub:[{l:'TTS',v:fdTTS.toFixed(2)+'%',c:fdC(fdTTS)},{l:'SME',v:fdSME.toFixed(2)+'%',c:fdC(fdSME)},{l:'Shopee',v:fdShopee.toFixed(2)+'%',c:fdC(fdShopee)}]},
-  {ic:'📉',label:'Rớt LC - Chưa LC trước 24h',val:fmt(rotTotal),tgt:'N-1 · '+ (rotLatest?agingFmtDate(rotLatest):''),c:'#B45309',bg:'#FEF3C7'},
-  {ic:'⚠️',label:'BC Bất Ổn (Baton)',val:String(getUnstableSet().size),tgt:'Theo sheet Baton cột D',c:'var(--red)',bg:'#FEE2E2'}
+  {ic:'📉',label:'Rớt LC - Chưa LC trước 24h',val:fmt(rotTotal),tgt:'N-1 · '+ (rotLatest?agingFmtDate(rotLatest):''),c:'#B45309',bg:'#FEF3C7'}
  ];
  // ===== Theo tỉnh (cột H = index 7) + Aging + Rớt LC =====
  const AG=window._AGING||{rows:[]};
@@ -1580,6 +1579,153 @@ function aiDetectFromQuestion(q){
  });
  return score>=2?best:null;
 }
+/* ===== REGISTRY SHEET NGUỒN — AI tự tìm sheet theo tên/từ khoá rồi TÍNH tỉ lệ ===== */
+// Danh sách sheet nguồn chính (dùng chung init + AI)
+const AI_SHEET_NAMES=[
+ 'GTC Total theo AM','GTC Total theo Bưu Cục',
+ 'GTC TTS theo AM','GTC TTS theo Bưu Cục',
+ 'FD Total theo AM','FD SME theo AM','FD TTS theo AM','FD Shopee theo AM',
+ 'FD Total theo Bưu Cục','FD SME theo Bưu Cục','FD TTS theo Bưu Cục','FD Shopee theo Bưu Cục',
+ 'ODR TTS - AM','ODR TTS - Bưu Cục',
+ 'OPR TTS - AM','OPR TTS - Bưu Cục'
+];
+// Tên sheet: có "AM" → theo AM · có "Bưu Cục" → theo Bưu Cục
+function aiSheetLevel(name){
+ if(/bưu\s*cục/i.test(name))return'bc';
+ if(/\bam\b/i.test(name)||/theo\s+am/i.test(name))return'am';
+ return'am';
+}
+function aiSheetMetric(name){
+ const n=(name||'').toLowerCase(),lv=aiSheetLevel(name);
+ if(n.includes('fd'))return'fd';
+ if(n.includes('gtc'))return lv==='bc'?'gtcBC':'gtcAM';
+ if(n.includes('odr')||n.includes('opr'))return lv==='bc'?'ontBC':'ontAM';
+ return null;
+}
+function aiSheetKeys(name){
+ const n=(name||'').toLowerCase(),keys=new Set();
+ if(n.includes('fd')){keys.add('fd');keys.add('%fd');keys.add('tỉ lệ trả');keys.add('tỷ lệ trả');keys.add('trả hàng');}
+ if(n.includes('gtc')){keys.add('gtc');keys.add('%gtc');keys.add('gán giao');}
+ if(n.includes('total')&&n.includes('fd'))keys.add('fd total');
+ if(n.includes('total')&&n.includes('gtc'))keys.add('gtc total');
+ if(n.includes('sme'))keys.add('sme');
+ if(n.includes('shopee'))keys.add('shopee');
+ if(n.includes('odr')){keys.add('odr');keys.add('giao đúng hạn');keys.add('ontime giao');}
+ if(n.includes('opr')){keys.add('opr');keys.add('lấy đúng hạn');keys.add('ontime lấy');}
+ if(n.includes('tts')&&n.includes('fd'))keys.add('fd tts');
+ else if(n.includes('tts')&&n.includes('gtc'))keys.add('gtc tts');
+ else if(n.includes('tts')&&n.includes('odr'))keys.add('odr tts');
+ else if(n.includes('tts')&&n.includes('opr'))keys.add('opr tts');
+ return[...keys];
+}
+function aiSheetLabel(name){
+ return(name||'').replace(/\s+theo\s+(AM|Bưu Cục)$/i,'').replace(/\s+-\s+(AM|Bưu Cục)$/i,'').trim();
+}
+function buildSheetRegistry(names){
+ return(names||[]).map(sheet=>{
+  const metric=aiSheetMetric(sheet);if(!metric)return null;
+  return{sheet,keys:aiSheetKeys(sheet),metric,level:aiSheetLevel(sheet),label:aiSheetLabel(sheet)};
+ }).filter(Boolean);
+}
+const SHEET_REGISTRY=buildSheetRegistry(AI_SHEET_NAMES);
+// Map sheet → cache trong window._D (đã fetch lúc init)
+const SHEET_DMAP={
+ 'GTC Total theo AM':'gtcTotalAM','GTC Total theo Bưu Cục':'gtcTotalBC',
+ 'GTC TTS theo AM':'gtcTTSAM','GTC TTS theo Bưu Cục':'gtcTTSBC',
+ 'FD Total theo AM':'fdTotalAM','FD Total theo Bưu Cục':'fdTotalBC',
+ 'FD SME theo AM':'fdSMEAM','FD SME theo Bưu Cục':'fdSMEBC',
+ 'FD TTS theo AM':'fdTTSAM','FD TTS theo Bưu Cục':'fdTTSBC',
+ 'FD Shopee theo AM':'fdShopeeAM','FD Shopee theo Bưu Cục':'fdShopeeBC',
+ 'ODR TTS - AM':'odrAM','ODR TTS - Bưu Cục':'odrBC',
+ 'OPR TTS - AM':'oprAM','OPR TTS - Bưu Cục':'oprBC'
+};
+window._SHEETCACHE=window._SHEETCACHE||{};
+async function aiFetchSheetCached(name){
+ if(window._SHEETCACHE[name])return window._SHEETCACHE[name];
+ const dk=SHEET_DMAP[name];
+ if(dk&&window._D&&window._D[dk]){window._SHEETCACHE[name]=window._D[dk];return window._D[dk];}
+ const r=await fetchSheet(name);window._SHEETCACHE[name]=r;return r;
+}
+// Nhận diện AM / Bưu Cục từ câu hỏi
+function aiDetectLevelFromQuestion(q){
+ const s=(q||'').toLowerCase();
+ if(/\b(bưu\s*cục|bc)\b/.test(s))return'bc';
+ if(/\bam\b/.test(s)&&!/\b(bưu\s*cục|bc)\b/.test(s))return'am';
+ return null;
+}
+// Tìm sheet nguồn liên quan câu hỏi — lọc đúng cấp AM hoặc Bưu Cục theo tên sheet
+function aiSearchSheets(q,subject){
+ const s=(q||'').toLowerCase();
+ const level=aiDetectLevelFromQuestion(q)||(subject==='bc'?'bc':'am');
+ const hits=[];
+ SHEET_REGISTRY.forEach(def=>{
+  if(def.level!==level)return; // chỉ sheet đúng cấp: AM hoặc Bưu Cục
+  let sc=0;
+  def.keys.forEach(k=>{if(s.includes(k))sc+=k.length>4?2:1;});
+  // Khớp thêm theo tên sheet (vd: "Shopee" trong tên sheet)
+  const sn=def.sheet.toLowerCase();
+  if(sn.includes('shopee')&&s.includes('shopee'))sc+=3;
+  if(sn.includes('sme')&&s.includes('sme'))sc+=3;
+  if(sn.includes('total')&&s.includes('total'))sc+=1;
+  if(sc>0)hits.push({def,sc});
+ });
+ // Nếu không khớp từ khoá cụ thể nhưng câu hỏi nhắc metric chung → lấy tất cả sheet cùng cấp + metric
+ if(!hits.length){
+  const wantFD=/\b(fd|%fd|trả|trả hàng)\b/.test(s);
+  const wantGTC=/\b(gtc|%gtc|gán)\b/.test(s);
+  const wantODR=/\bodr\b/.test(s);
+  const wantOPR=/\bopr\b/.test(s);
+  SHEET_REGISTRY.forEach(def=>{
+   if(def.level!==level)return;
+   if(wantFD&&def.metric==='fd')hits.push({def,sc:1});
+   else if(wantGTC&&def.metric.startsWith('gtc'))hits.push({def,sc:1});
+   else if(wantODR&&def.sheet.toLowerCase().includes('odr'))hits.push({def,sc:1});
+   else if(wantOPR&&def.sheet.toLowerCase().includes('opr'))hits.push({def,sc:1});
+  });
+ }
+ hits.sort((a,b)=>b.sc-a.sc);
+ return hits.slice(0,6).map(h=>h.def);
+}
+// Tính tỉ lệ trực tiếp từ sheet thô + so N-1 vs N-7
+function aiComputeFromSheet(def,raw,days){
+ if(!raw||raw.length<2)return'';
+ const rows=raw.slice(1);
+ const m=def.metric;
+ const ni=(m==='fd'||m==='gtcAM'||m==='ontAM')?0:1;
+ const di=(m==='fd')?1:(m==='gtcAM'||m==='ontAM')?1:2;
+ const flt=rows.filter(r=>(r[ni]||'').trim()&&!(r[ni]||'').toLowerCase().includes('grand total'));
+ const allD=[...new Set(flt.map(r=>isoD(r[di])).filter(Boolean))].sort();
+ const sel=allD.slice(-days);if(!sel.length)return'';
+ const dset=new Set(sel),n1=sel[sel.length-1],n7=sel[0];
+ const agg={};
+ flt.forEach(r=>{const d=isoD(r[di]);if(!dset.has(d))return;const k=(r[ni]||'').trim();
+  const a=(agg[k]=agg[k]||{a:0,b:0,n1:null,n7:null});
+  if(m==='fd'){a.a+=parsePct(r[4]);a.b+=parsePct(r[2]);if(d===n1)a.n1=parsePct(r[3]);if(d===n7)a.n7=parsePct(r[3]);}
+  else if(m==='gtcAM'){const v=Math.round(parseFloat(r[2])||0);a.b+=v;a.a+=Math.round(parseFloat(r[5])||0);if(d===n1)a.n1=(parseFloat(r[4])||0)*100;if(d===n7)a.n7=(parseFloat(r[4])||0)*100;}
+  else if(m==='gtcBC'){const v=Math.round(parseFloat(r[3])||0);a.b+=v;a.a+=Math.round(parseFloat(r[6])||0);if(d===n1)a.n1=(parseFloat(r[5])||0)*100;if(d===n7)a.n7=(parseFloat(r[5])||0)*100;}
+  else if(m==='ontAM'){const v=Math.round(parseFloat(r[2])||0);a.b+=v;a.a+=Math.round(parseFloat(r[4])||0);if(d===n1)a.n1=(parseFloat(r[3])||0)*100;if(d===n7)a.n7=(parseFloat(r[3])||0)*100;}
+  else if(m==='ontBC'){const v=Math.round(parseFloat(r[3])||0);a.b+=v;a.a+=Math.round(parseFloat(r[5])||0);if(d===n1)a.n1=(parseFloat(r[4])||0)*100;if(d===n7)a.n7=(parseFloat(r[4])||0)*100;}
+ });
+ const isFD=m==='fd';
+ const arr=Object.entries(agg).map(([k,a])=>({k,avg:a.b?a.a/a.b*100:0,n1:a.n1,n7:a.n7}))
+  .sort((x,y)=>isFD?y.avg-x.avg:x.avg-y.avg); // FD cao→tệ xếp trên; còn lại thấp→tệ xếp trên
+ const fld=isFD?'%FD':(m.startsWith('gtc')?'%GTC':'%Ontime');
+ const rule=isFD?'CÀNG CAO CÀNG TỆ':'CÀNG THẤP CÀNG TỆ';
+ let s=`\n### [SHEET NGUỒN: ${def.sheet}] ${def.label} ${fld} (${def.level==='bc'?'Bưu Cục':'AM'}) — tính trực tiếp\n[Mốc: N-7=${shortD(n7)} → N-1=${shortD(n1)}] · Quy tắc: ${fld} ${rule}\n`;
+ arr.forEach((x,i)=>{const u=def.level==='bc'&&getUnstableSet().has(x.k)?' [BẤT ỔN]':'';const n1t=x.n1==null?'—':x.n1.toFixed(2)+'%';const n7t=x.n7==null?'—':x.n7.toFixed(2)+'%';s+=`${i+1}. ${x.k}${u}: ${fld} bq=${x.avg.toFixed(2)}% (N-7=${n7t}→N-1=${n1t})\n`;});
+ return s;
+}
+// Tổng hợp ngữ cảnh từ các sheet AI tự tìm theo câu hỏi
+async function aiAutoSourceContext(userQ,subject,days){
+ const level=aiDetectLevelFromQuestion(userQ)||(subject==='bc'?'bc':'am');
+ const defs=aiSearchSheets(userQ,level);if(!defs.length)return null;
+ const parts=[];const used=[];
+ for(const def of defs){
+  try{const raw=await aiFetchSheetCached(def.sheet);const seg=aiComputeFromSheet(def,raw,days);if(seg){parts.push(seg);used.push(`${def.sheet} (${def.level==='bc'?'Bưu Cục':'AM'})`);}}catch(e){}
+ }
+ if(!parts.length)return null;
+ return{ctx:`NGUỒN DỮ LIỆU AI TỰ TÌM — cấp ${level==='bc'?'Bưu Cục':'AM'} (tỉ lệ TÍNH trực tiếp từ sheet thô):\n`+parts.join('\n'),used,level};
+}
 function setAIPrompt(key){document.getElementById('aiPromptArea').value=AI_PRESETS[key]||'';}
 /* ===== AI: chế độ Tổng quan toàn bộ & Custom ===== */
 function aiFillPrompt(t){const a=document.getElementById('aiPromptArea');a.value=t;a.focus();}
@@ -1648,13 +1794,33 @@ function aiGTC(label,sheetAM,sheetBC,days,subject){
  return s;
 }
 function aiFD(days,subject){
- const isBC=subject==='bc';const sh=isBC?window._D.fdTotalBC:window._D.fdTotalAM;if(!sh||sh.length<2)return'';
- const rows=sh.slice(1).filter(r=>(r[0]||'').trim()&&!(r[0]||'').toLowerCase().includes('grand total'));
- const ds=aiLastDateSet(rows,1,days),dl=[...ds].sort();if(!dl.length)return'';
- const agg={};rows.forEach(r=>{const d=isoD(r[1]);if(!ds.has(d))return;const k=(r[0]||'').trim();(agg[k]=agg[k]||{f:0,n:0});agg[k].f+=parsePct(r[3]);agg[k].n++;});
- const arr=Object.entries(agg).map(([k,a])=>({k,fd:a.n?a.f/a.n:0})).sort((a,b)=>b.fd-a.fd);
- let s=`\n### FD Total %Trả — ${dl[0]}→${dl[dl.length-1]} (theo ${isBC?'Bưu Cục':'AM'}, %FD bình quân ngày)${aiN1N7(sh,1)}\n`;
- arr.forEach((x,i)=>{const u=isBC&&getUnstableSet().has(x.k)?' [BẤT ỔN]':'';s+=`${i+1}. ${x.k}${u}: %FD=${x.fd.toFixed(2)}%\n`;});
+ const isBC=subject==='bc';const F=window._FD||{};
+ const channels=[
+  {label:'Total',sh:isBC?F.totalBC:F.totalAM},
+  {label:'SME',sh:isBC?F.smeBC:F.smeAM},
+  {label:'TTS',sh:isBC?F.ttsBC:F.ttsAM},
+  {label:'Shopee',sh:isBC?F.shopeeBC:F.shopeeAM}
+ ].filter(c=>c.sh&&c.sh.length>1);
+ if(!channels.length)return'';
+ const baseRows=channels[0].sh.slice(1).filter(r=>(r[0]||'').trim());
+ const allD=[...new Set(baseRows.map(r=>isoD(r[1])).filter(Boolean))].sort();
+ const sel=allD.slice(-days);if(!sel.length)return'';
+ const dset=new Set(sel),n1=sel[sel.length-1],n7=sel[0];
+ let s=`\n### FD — Tỷ lệ trả hàng (theo ${isBC?'Bưu Cục':'AM'}) · so N-1 vs N-7\n[Mốc: N-7=${shortD(n7)} → N-1=${shortD(n1)}] · Quy tắc: %FD CÀNG CAO CÀNG TỆ · %FD = Σ Trả Total / Σ %Vol\n`;
+ channels.forEach(ch=>{
+  const rows=ch.sh.slice(1).filter(r=>(r[0]||'').trim()&&!(r[0]||'').toLowerCase().includes('grand total'));
+  const agg={};let tTra=0,tVol=0,tN1=0,tN1v=0,tN7=0,tN7v=0;
+  rows.forEach(r=>{const d=isoD(r[1]);if(!dset.has(d))return;const k=(r[0]||'').trim();
+   const tra=parsePct(r[4]),vol=parsePct(r[2]);
+   const a=(agg[k]=agg[k]||{tra:0,vol:0,n1:null,n7:null});a.tra+=tra;a.vol+=vol;
+   if(d===n1){a.n1=parsePct(r[3]);tN1+=tra;tN1v+=vol;}
+   if(d===n7){a.n7=parsePct(r[3]);tN7+=tra;tN7v+=vol;}
+   tTra+=tra;tVol+=vol;});
+  const arr=Object.entries(agg).map(([k,a])=>({k,avg:a.vol?a.tra/a.vol*100:0,n1:a.n1,n7:a.n7})).sort((a,b)=>b.avg-a.avg);
+  const avgAll=tVol?tTra/tVol*100:0,fdN1=tN1v?tN1/tN1v*100:0,fdN7=tN7v?tN7/tN7v*100:0,dpp=fdN1-fdN7;
+  s+=`\n— Kênh ${ch.label}: TỔNG vùng %FD bq=${avgAll.toFixed(2)}% (N-7=${fdN7.toFixed(2)}% → N-1=${fdN1.toFixed(2)}%, Δ=${dpp>=0?'+':''}${dpp.toFixed(2)}pp)\n`;
+  arr.forEach((x,i)=>{const u=isBC&&getUnstableSet().has(x.k)?' [BẤT ỔN]':'';const n1t=x.n1==null?'—':x.n1.toFixed(2)+'%';const n7t=x.n7==null?'—':x.n7.toFixed(2)+'%';s+=`  ${i+1}. ${x.k}${u}: %FD bq=${x.avg.toFixed(2)}% (N-7=${n7t}→N-1=${n1t})\n`;});
+ });
  return s;
 }
 function aiOnt(which,days,subject){
@@ -1883,6 +2049,14 @@ async function runAIAnalysis(){
     ctx=gatherDashboardData();scopeNote='Phạm vi: dữ liệu nhanh (GTC, FD, ODR, Rớt LC, Baton) · N-1 vs N-7.';
    }
   }
+  // ===== AI tự tìm sheet nguồn theo từ khoá trong câu hỏi (vd: Shopee → FD Shopee theo AM) =====
+  try{
+   const subjForSearch=aiDetectLevelFromQuestion(userQ)||(document.getElementById('aiCustSubject')?.value==='bc'?'bc':'am');
+   const daysSearch=+(document.getElementById('aiCustDays')?.value||document.getElementById('aiAllDays')?.value)||7;
+   document.getElementById('aiStatus').textContent='🔎 Đang dò sheet nguồn liên quan câu hỏi...';
+   const auto=await aiAutoSourceContext(userQ,subjForSearch,daysSearch);
+   if(auto){ctx=auto.ctx+'\n\n'+ctx;scopeNote=(scopeNote||'')+` · Sheet (${auto.level==='bc'?'Bưu Cục':'AM'}): ${auto.used.join(', ')}.`;}
+  }catch(_){}
   document.getElementById('aiStatus').textContent='';
  }catch(_){ctx=gatherDashboardData();}
  try{
@@ -1900,21 +2074,19 @@ function copyAIResult(){if(window._lastAIResult)navigator.clipboard.writeText(wi
 /* ===== INIT ===== */
 async function init(){
  const btn=document.getElementById('refreshBtn');btn.classList.add('spinning');btn.disabled=true;
- const sheetNames=[
-  'GTC Total theo AM','GTC Total theo Bưu Cục',
-  'GTC TTS theo AM','GTC TTS theo Bưu Cục',
-  'FD Total theo AM','FD SME theo AM','FD TTS theo AM','FD Shopee theo AM',
-  'FD Total theo Bưu Cục','FD SME theo Bưu Cục','FD TTS theo Bưu Cục','FD Shopee theo Bưu Cục',
-  'ODR TTS - AM','ODR TTS - Bưu Cục',
-  'OPR TTS - AM','OPR TTS - Bưu Cục'
- ];
+ const sheetNames=AI_SHEET_NAMES;
  const R={};
  await Promise.all(sheetNames.map(async n=>{try{R[n]=await fetchSheet(n);}catch(e){R[n]=null;console.warn('Lỗi sheet',n,e.message);}}));
+ // Cache sheet cho AI (tránh fetch lại)
+ sheetNames.forEach(n=>{if(R[n])window._SHEETCACHE[n]=R[n];});
  // Save global cache for AI
  window._D={
   gtcTotalAM:R['GTC Total theo AM'],gtcTotalBC:R['GTC Total theo Bưu Cục'],
   gtcTTSAM:R['GTC TTS theo AM'],gtcTTSBC:R['GTC TTS theo Bưu Cục'],
-  fdTotalAM:R['FD Total theo AM'],fdTotalBC:R['FD Total theo Bưu Cục'],fdSMEAM:R['FD SME theo AM'],
+  fdTotalAM:R['FD Total theo AM'],fdTotalBC:R['FD Total theo Bưu Cục'],
+  fdSMEAM:R['FD SME theo AM'],fdSMEBC:R['FD SME theo Bưu Cục'],
+  fdTTSAM:R['FD TTS theo AM'],fdTTSBC:R['FD TTS theo Bưu Cục'],
+  fdShopeeAM:R['FD Shopee theo AM'],fdShopeeBC:R['FD Shopee theo Bưu Cục'],
   odrAM:R['ODR TTS - AM'],odrBC:R['ODR TTS - Bưu Cục'],
   oprAM:R['OPR TTS - AM'],oprBC:R['OPR TTS - Bưu Cục']
  };
