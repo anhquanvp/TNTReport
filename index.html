@@ -474,12 +474,12 @@ function ovUnstableBCAnalysis(gBC,gtcdRows){
   const dGtc=r.n1g-r.n7g;const dStr=dGtc===0?'—':`${dGtc>0?'▲':'▼'} ${Math.abs(dGtc)} (${fmt(r.n7g)}→${fmt(r.n1g)})`;
   return[String(i+1),r.bc,r.am,pct.toFixed(1)+'%',dStr,fmt(r.ton3),gtcGroupLabel(pct)];
  });
- let h=`<div class="card"><div class="card-header"><div class="card-title"><div class="card-icon" style="background:var(--red)">⚠️</div>Bưu Cục Bất Ổn — Phân tích 3 ngày</div><div class="card-info">${arr.length} BC · nguồn Baton cột D · so sánh N-1 vs N-7</div></div>`;
- h+=monoCopyBox('BƯU CỤC BẤT ỔN — TỔNG HỢP',headers,rows,`3 ngày: ${d3.map(shortD).join(', ')} · N-1: ${shortD(n1)} · N-7: ${shortD(n7)}`);
+ let h=`<div class="card"><div class="card-header"><div class="card-title"><div class="card-icon" style="background:var(--red)">⚠️</div>Bưu Cục Bất Ổn — Phân tích 3 ngày</div></div>`;
+ h+=monoCopyBox('BƯU CỤC BẤT ỔN — TỔNG HỢP',headers,rows,'');
  if(window._BATON?.rows?.length){
   const bh=['Bưu Cục','Tỉnh','BL LM','%LM >5N','Đơn GTC N-1','Đơn GTC L7D','Lý do'];
   const br=window._BATON.rows.map(r=>[r.bc,r.tinh,fmt(r.blLmTong),r.pctBlLmOver5.toFixed(1)+'%',fmt(r.donGtcN1),fmt(r.donGtcL7d),r.lyDo||'—']);
-  h+=monoCopyBox('BATON — Chi tiết sheet nguồn',bh,br,'Dữ liệu từ sheet Baton (cột D = tên BC bất ổn)');
+  h+=monoCopyBox('BATON — Chi tiết sheet nguồn',bh,br,'');
  }
  h+=`</div>`;return h;
 }
@@ -1344,15 +1344,17 @@ function buildOverviewPage(R,rotData){
   {ic:'🎯',label:'% GTC Tổng',val:gtcPct.toFixed(1)+'%',tgt:'Mục tiêu 80%',d:dlt(gtcPct,gtcP),c:'#0EA5E9',bg:'#E8F4FA'},
   {ic:'🛰️',label:'ODR TTS — Giao đúng hạn',val:odr.pct.toFixed(1)+'%',tgt:'Mục tiêu 95%',c:'#16A34A',bg:'#DCFCE7'},
   {ic:'🚀',label:'OPR TTS — Lấy đúng hạn',val:opr.pct.toFixed(1)+'%',tgt:'Mục tiêu 95%',c:'#7C3AED',bg:'#FAF5FF'},
-  {ic:'↩️',label:'FD — Tỉ lệ giao thất bại',val:fdTotal.toFixed(2)+'%',tgt:'Mục tiêu ≤5% · Σ Trả Total / Σ %Vol',c:'#DC2626',bg:'#FEE2E2',sub:[{l:'TTS',v:fdTTS.toFixed(2)+'%',c:fdC(fdTTS)},{l:'SME',v:fdSME.toFixed(2)+'%',c:fdC(fdSME)},{l:'Shopee',v:fdShopee.toFixed(2)+'%',c:fdC(fdShopee)}]},
-  {ic:'📉',label:'Rớt LC — Đơn lấy không thành công',val:fmt(rotTotal),tgt:'N-1 · '+ (rotLatest?agingFmtDate(rotLatest):''),c:'#B45309',bg:'#FEF3C7'},
+  {ic:'↩️',label:'FD - Tỷ lệ trả hàng',val:fdTotal.toFixed(2)+'%',tgt:'',c:'#DC2626',bg:'#FEE2E2',sub:[{l:'TTS',v:fdTTS.toFixed(2)+'%',c:fdC(fdTTS)},{l:'SME',v:fdSME.toFixed(2)+'%',c:fdC(fdSME)},{l:'Shopee',v:fdShopee.toFixed(2)+'%',c:fdC(fdShopee)}]},
+  {ic:'📉',label:'Rớt LC - Chưa LC trước 24h',val:fmt(rotTotal),tgt:'N-1 · '+ (rotLatest?agingFmtDate(rotLatest):''),c:'#B45309',bg:'#FEF3C7'},
   {ic:'⚠️',label:'BC Bất Ổn (Baton)',val:String(getUnstableSet().size),tgt:'Theo sheet Baton cột D',c:'var(--red)',bg:'#FEE2E2'}
  ];
  // ===== Theo tỉnh (cột H = index 7) + Aging + Rớt LC =====
  const AG=window._AGING||{rows:[]};
  const agDates=[...new Set(AG.rows.map(r=>r.date))].sort();const agLatest=agDates[agDates.length-1]||'';
  const bc2tinh={};(gBC||[]).slice(1).forEach(r=>{const bc=(r[1]||'').trim(),t=(r[7]||'').trim();if(bc&&t)bc2tinh[bc]=t;});
- const tinhAgg={};TNT_TINH.forEach(t=>tinhAgg[t]={tinh:t,vol:0,ngtc:0,ganW:0,rot:0,aging:0});
+ const tinhAgg={};TNT_TINH.forEach(t=>tinhAgg[t]={tinh:t,vol:0,ngtc:0,ganW:0,rot:0,aging:0,unstable:0});
+ const _unstSet=getUnstableSet();
+ _unstSet.forEach(bc=>{const t=bc2tinh[bc]||(window._BATON?.byBC?.[bc]?.tinh||'');if(t&&tinhAgg[t])tinhAgg[t].unstable++;});
  (gBC||[]).slice(1).forEach(r=>{
   if(!(r[1]||'').trim()||(r[1]||'').toLowerCase().includes('grand total')||isoD(r[2])!==latest)return;
   const t=(r[7]||'').trim();if(!tinhAgg[t])return;
@@ -1376,6 +1378,7 @@ function buildOverviewPage(R,rotData){
     ${row('% GTC Tổng',gtc.toFixed(1)+'%',gtc>=70?'var(--green)':gtc>=55?'var(--yellow)':'var(--red)')}
     ${row('Aging > 5 ngày',fmt(a.aging)+' đơn',a.aging>0?'var(--yellow)':'var(--text-sub)')}
     ${row('Rớt LC',fmt(a.rot)+' đơn',a.rot>0?'var(--red)':'var(--text-sub)')}
+    ${row('Bc bất ổn',fmt(a.unstable),a.unstable>0?'var(--red)':'var(--text-sub)')}
    </div></div>`;
  }).join('');
  // ===== KIẾN NGHỊ / CẢNH BÁO theo AM → bưu cục =====
@@ -1409,10 +1412,10 @@ function buildOverviewPage(R,rotData){
  // ===== Render =====
  let h=`<div class="page-header"><div class="page-title">Tổng Quan Vận Hành TNT</div><div class="page-meta"><span class="tag tag-orange">🗺️ N-1: ${shortD(latest)} · So sánh N-7: ${shortD(ovDatesDesc(gAM,1)[6]||'')}</span><span>${TNT_TINH.join(' · ')}</span></div></div>`;
  h+=`<div class="kpi-grid">${kAttr.map(k=>`<div class="kpi-card" style="border-top:none"><div class="kpi-ico" style="background:${k.bg}">${k.ic}</div><div class="kpi-label">${k.label}</div><div class="kpi-val" style="color:${k.c}">${k.val}</div><div style="font-size:10.5px;color:var(--text-sub);margin-top:4px">${k.tgt}</div>${k.d?`<div style="font-size:11px;font-weight:700;color:${k.d.col};margin-top:3px">${k.d.txt}</div>`:''}${k.sub?`<div style="display:flex;gap:6px;margin-top:8px">${k.sub.map(s=>`<div style="flex:1;background:#F8FAFC;border-radius:7px;padding:5px 4px;text-align:center"><div style="font-size:9px;font-weight:700;color:var(--text-sub)">${s.l}</div><div style="font-size:12px;font-weight:800;color:${s.c}">${s.v}</div></div>`).join('')}</div>`:''}</div>`).join('')}</div>`;
- h+=`<div class="card" style="background:${hasRec?'#FFF8F0':'#F0FDF4'};border-color:${hasRec?'#FED7AA':'#BBF7D0'}"><div class="card-header" style="background:transparent;border-bottom:1px solid ${hasRec?'#FED7AA':'#BBF7D0'}"><div class="card-title"><div class="card-icon" style="background:${hasRec?'#EA580C':'#16A34A'}">${hasRec?'🔔':'✅'}</div>Kiến nghị &amp; Cảnh báo — AM dưới ngưỡng (kèm bưu cục)</div></div><div style="padding:14px 18px;color:var(--text-main)">${recHTML}</div></div>`;
  h+=`<div style="display:flex;align-items:center;justify-content:space-between;margin:18px 0 12px"><div style="font-size:15px;font-weight:800">📍 6 tỉnh Vùng TNT</div><div style="font-size:11.5px;color:var(--text-sub)">Bấm tab phía trên để xem phân tích chi tiết từng chỉ số</div></div>`;
  h+=`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px">${tinhCards}</div>`;
  h+=ovUnstableBCAnalysis(gBC,window._GTCD?.rows||[]);
+ h+=`<div class="card" style="margin-top:18px;background:${hasRec?'#FFF8F0':'#F0FDF4'};border-color:${hasRec?'#FED7AA':'#BBF7D0'}"><div class="card-header" style="background:transparent;border-bottom:1px solid ${hasRec?'#FED7AA':'#BBF7D0'}"><div class="card-title"><div class="card-icon" style="background:${hasRec?'#EA580C':'#16A34A'}">${hasRec?'🔔':'✅'}</div>Kiến nghị &amp; Cảnh báo — AM dưới ngưỡng (kèm bưu cục)</div></div><div style="padding:14px 18px;color:var(--text-main)">${recHTML}</div></div>`;
  el.innerHTML=h;
 }
 
@@ -1526,7 +1529,7 @@ function buildAIPage(){
 }
 const AI_Q_KEY='tnt_ai_saved_questions';
 const AI_PRESETS={
- 'tong-quan':'Phân tích tổng quan hiệu suất vận hành GHN Vùng TNT. Nêu rõ: (1) Tình hình GTC Total và GTC TTS; (2) Top AM/BC làm tốt nhất; (3) AM/BC cần cải thiện; (4) Tỉ lệ trả, Ontime, Rớt LC và BC bất ổn. So sánh N-1 vs N-7. Nhận xét tổng thể.',
+ 'tong-quan':'Với vai trò chuyên gia cố vấn vận hành, hãy viết phân tích tổng quan dạng LỜI VĂN (không liệt kê khô khan), lồng số liệu vào câu. Ví dụ: "Ngày 25/06 GTC đạt 870 đơn, tăng 30 so với 24/06 nhưng giảm 13 so với 23/06...". Bao quát: GTC, Ontime (ODR/OPR), %FD, Aging, Rớt LC và BC bất ổn — luôn so N-1 vs N-7. Kết bằng khuyến nghị hành động.',
  'hl-ll':'Liệt kê Highlight (điểm sáng) và Lowlight (điểm yếu):\n- HIGHLIGHT 🟢: Ai làm tốt, chỉ số nào ấn tượng?\n- LOWLIGHT 🔴: Ai tụt hậu, vấn đề gì nổi bật?\n- Gợi ý hành động cụ thể. So sánh N-1 vs N-7.',
  'so-sanh-am':'So sánh hiệu suất từng AM: xếp hạng theo %GTC, tỉ lệ trả, ontime, aging và rớt LC. Ai đang cải thiện? Ai đang giảm? Phân tích nguyên nhân. So sánh N-1 vs N-7.',
  'tra-hang':'Phân tích sâu tỉ lệ trả hàng (%FD) từ nguồn FD: (1) AM/BC nào cao/thấp nhất; (2) Xu hướng N-1 vs N-7; (3) So sánh FD Total vs SME vs TTS vs Shopee; (4) Đề xuất giảm FD.',
@@ -1815,7 +1818,24 @@ function gatherDashboardData(){
  if(window._BATON?.rows?.length)lines.push(`\nBưu Cục Bất Ổn (Baton): ${window._BATON.rows.length} BC — ${window._BATON.rows.map(r=>r.bc).join(', ')}`);
  return lines.join('\n')||'(Dữ liệu chưa được tải)';
 }
-const AI_SYSTEM_PROMPT='Bạn là chuyên gia phân tích vận hành logistics GHN Vùng TNT. CHỈ phân tích dựa trên đúng phần DỮ LIỆU được cung cấp; nếu thiếu số liệu, nói rõ KHÔNG bịa. Trả lời tiếng Việt. Khi trình bày xếp hạng/bảng số liệu, dùng format monospace pipe-separated để copy vào Sheet:\nRANK | Tên | Chỉ số | ...\n-----|-----|--------\n1 | ... | ...\nThêm cột Nhóm: 🟢 Tốt / 🟢 Khá / 🔵 TB / 🟡 Kém / 🔴 Tệ. Luôn so sánh N-1 (hôm qua) với N-7 khi có dữ liệu.';
+const AI_SYSTEM_PROMPT=`Bạn đóng vai trò là CHUYÊN GIA CỐ VẤN VẬN HÀNH LOGISTICS Vùng TNT (GHN). Nhiệm vụ: đọc dữ liệu, đưa ra nhận định chuyên sâu, cảnh báo rủi ro và khuyến nghị hành động cụ thể. CHỈ phân tích dựa trên đúng phần DỮ LIỆU được cung cấp; nếu thiếu số liệu, nói rõ KHÔNG bịa. Trả lời tiếng Việt.
+
+QUY TẮC ĐÁNH GIÁ TỐT/XẤU (TUYỆT ĐỐI KHÔNG ĐƯỢC HIỂU NGƯỢC):
+- %GTC: CÀNG THẤP CÀNG TỆ (cao = tốt).
+- %Ontime (ODR/OPR): CÀNG THẤP CÀNG TỆ (cao = tốt).
+- %FD (tỷ lệ trả hàng): CÀNG CAO CÀNG TỆ (thấp = tốt).
+- Aging >5 ngày: CÀNG CAO CÀNG TỆ (thấp = tốt).
+- Rớt LC: CÀNG CAO CÀNG TỆ (thấp = tốt).
+Khi xếp hạng "tốt nhất / tệ nhất", phải áp dụng đúng chiều trên. Bưu cục/AM TỆ là nơi %GTC thấp, Ontime thấp, %FD cao, Aging cao, Rớt LC cao.
+
+CÁCH TRÌNH BÀY:
+- Phần TỔNG QUAN: viết thành LỜI VĂN (narrative), lồng số liệu vào câu thay vì liệt kê khô khan. Ví dụ: "Ngày 25/06/2026 GTC đạt 870 đơn, tăng 30 đơn so với 24/06 nhưng giảm 13 đơn so với 23/06...". So sánh N-1 (hôm qua) với N-7 ngay trong câu.
+- Khi trình bày XẾP HẠNG/BẢNG số liệu, dùng format monospace pipe-separated để copy vào Sheet:
+RANK | Tên | Chỉ số | ...
+-----|-----|--------
+1 | ... | ...
+Thêm cột Nhóm: 🟢 Tốt / 🟢 Khá / 🔵 TB / 🟡 Kém / 🔴 Tệ.
+- Luôn kết thúc bằng KHUYẾN NGHỊ CỐ VẤN (việc cần làm ngay) khi phù hợp.`;
 function md2html(text){
  let t=text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
  const blocks=[];t=t.replace(/(^|\n)((?:[^\n]+\|[^\n]+\n)(?:[-| :]+\n)(?:(?:[^\n]+\|[^\n]+\n?)+))/g,(m,pre,table)=>{const id='ait_'+blocks.length;blocks.push(table.trim());return pre+`<div class="mono-copy-wrap" style="margin:12px 0"><div class="mono-copy-head"><span>📋 Bảng kết quả</span><button type="button" class="mono-copy-btn" onclick="copyMonoText('${id}')">copy</button></div><div class="mono-copy-body"><pre class="mono-copy-pre" id="${id}">${blocks[blocks.length-1].replace(/</g,'&lt;')}</pre></div></div>`;});
