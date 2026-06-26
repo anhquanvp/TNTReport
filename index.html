@@ -269,6 +269,20 @@ tr.tot td{background:#F4F8FF;font-weight:700;border-top:2px solid var(--orange-m
 *::-webkit-scrollbar-thumb{background:#CBD5E1;border-radius:7px;border:3px solid var(--bg)}
 *::-webkit-scrollbar-thumb:hover{background:var(--orange)}
 @media(max-width:760px){.topbar{padding:0 14px}.tb-sub{display:none}.main{padding:18px 14px 40px}.sc-title{font-size:32px}}
+/* ---- Mono copy table (paste-friendly cho Sheet) ---- */
+.mono-copy-wrap{margin:12px 16px 16px;border-radius:12px;overflow:hidden;border:1px solid #86EFAC;background:#F0FDF4}
+.mono-copy-head{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:#166534;color:#fff;font-size:11px;font-weight:700;letter-spacing:.4px}
+.mono-copy-btn{background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.35);color:#fff;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;transition:background .15s}
+.mono-copy-btn:hover{background:rgba(255,255,255,0.28)}
+.mono-copy-body{padding:14px 16px;overflow-x:auto}
+.mono-copy-title{font-family:var(--mono);font-size:12px;font-weight:700;color:#166534;margin-bottom:10px}
+.mono-copy-pre{font-family:var(--mono);font-size:12px;line-height:1.55;color:#14532D;white-space:pre;margin:0;tab-size:4}
+.mono-copy-note{font-size:11px;color:var(--text-sub);padding:0 16px 12px}
+.ai-saved-q{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.ai-saved-chip{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:8px;border:1px solid var(--border);background:#fff;font-size:11px;cursor:pointer;max-width:280px}
+.ai-saved-chip:hover{border-color:var(--accent3);color:var(--accent3)}
+.ai-saved-chip .del{color:#94A3B8;font-size:13px;padding:0 2px}
+.ai-saved-chip .del:hover{color:var(--red)}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
@@ -382,6 +396,93 @@ function shortD(iso){const p=(iso||'').split('-');return p.length===3?`${p[2]}/$
 function parsePct(v){const s=(v||'').toString().trim();if(s.endsWith('%'))return parseFloat(s);return(parseFloat(s)||0)*100;}
 function parseCSV(text){return text.trim().split('\n').filter(l=>l.trim()).map(line=>{const cols=[];let cur='',inQ=false;for(const c of line){if(c==='"')inQ=!inQ;else if(c===','&&!inQ){cols.push(cur.trim());cur='';}else cur+=c;}cols.push(cur.trim());return cols;});}
 function errPage(msg){return`<div class="error-box">⚠️ Không thể tải dữ liệu: ${msg}<br><small>Kiểm tra kết nối hoặc quyền truy cập Google Sheet.</small></div>`;}
+
+/* ===== MONO COPY TABLE (dán Sheet) ===== */
+function monoPad(s,w,align){
+ const t=String(s??'');if(t.length>=w)return t;
+ const p=' '.repeat(w-t.length);return align==='right'?p+t:t+p;
+}
+function buildMonoTableText(headers,rows){
+ const ws=headers.map((h,i)=>Math.max(h.length,...rows.map(r=>String(r[i]??'').length),3));
+ const top=headers.map((h,i)=>monoPad(h,ws[i])).join(' | ');
+ const sep=ws.map(w=>'-'.repeat(w)).join('-|-');
+ const body=rows.map(r=>r.map((c,i)=>monoPad(c,ws[i],i===0?'right':'left')).join(' | ')).join('\n');
+ return top+'\n'+sep+'\n'+body;
+}
+let _monoId=0;
+function monoCopyBox(title,headers,rows,note){
+ const id='mono_'+(_monoId++);const text=buildMonoTableText(headers,rows);
+ return`<div class="mono-copy-wrap"><div class="mono-copy-head"><span>📋 ${title}</span><button type="button" class="mono-copy-btn" onclick="copyMonoText('${id}')">copy</button></div><div class="mono-copy-body"><pre class="mono-copy-pre" id="${id}">${text.replace(/</g,'&lt;')}</pre></div>${note?`<div class="mono-copy-note">${note}</div>`:''}</div>`;
+}
+function copyMonoText(id){
+ const el=document.getElementById(id);if(!el)return;
+ navigator.clipboard.writeText(el.textContent).then(()=>{const s=document.getElementById('aiStatus');if(s){s.textContent='✅ Đã copy bảng!';setTimeout(()=>s.textContent='',2000);}});
+}
+
+/* ===== BATON / BƯU CỤC BẤT ỔN ===== */
+window._BATON={rows:[],unstable:new Set(),byBC:{}};
+function parseBatonSheet(raw){
+ const rows=(raw||[]).slice(1).filter(r=>(r[3]||'').trim()).map(r=>({
+  vung:(r[0]||'').trim(),tinh:(r[1]||'').trim(),id:(r[2]||'').trim(),bc:(r[3]||'').trim(),
+  blLmTong:parseNum(r[4]),blLmOver5:parseNum(r[5]),pctBlLmOver5:parseNum((r[6]||'').toString().replace('%','')),
+  blKtcTong:parseNum(r[7]),blKtcCungTinh:parseNum(r[8]),pctBlKtc:parseNum((r[9]||'').toString().replace('%','')),
+  donTaoN1:parseNum(r[10]),donTaoL7d:parseNum(r[11]),donGtcN1:parseNum(r[12]),
+  donGtcL7d:parseNum(r[13]),donGtcMaxL7d:parseNum(r[14]),duKienClear:parseNum(r[15]),lyDo:(r[16]||'').trim()
+ }));
+ const unstable=new Set(rows.map(r=>r.bc));
+ const byBC={};rows.forEach(r=>{byBC[r.bc]=r;});
+ return{rows,unstable,byBC};
+}
+function parseNum(v){const s=(v||'').toString().replace(/\./g,'').replace(',','.').replace(/[^\d.\-]/g,'');return parseFloat(s)||0;}
+function getUnstableSet(){
+ if(window._BATON?.unstable?.size)return window._BATON.unstable;
+ if(window._AGING?.unstable?.size)return window._AGING.unstable;
+ if(window._GTCD?.unstable?.size)return window._GTCD.unstable;
+ return new Set();
+}
+function bcUnstableBadge(bc){return getUnstableSet().has(bc)?'<span style="display:inline-block;background:#FEE2E2;color:var(--red);border:1px solid #FECACA;border-radius:4px;font-size:9px;font-weight:700;padding:1px 5px;margin-left:5px">⚠ bất ổn</span>':'';}
+function gtcGroupLabel(pct){if(pct>=70)return'🟢 Tốt';if(pct>=60)return'🟢 Khá';if(pct>=50)return'🔵 TB';if(pct>=40)return'🟡 Kém';return'🔴 Tệ';}
+function deltaTxt(cur,prev,unit,suffix){
+ const d=cur-prev;if(!prev&&prev!==0)return'—';
+ const arrow=d>0?'▲':d<0?'▼':'—';const col=d>0?'var(--red)':d<0?'var(--green)':'var(--text-sub)';
+ return`<span style="color:${col};font-weight:700">${arrow} ${Math.abs(d).toLocaleString('vi-VN')}${suffix||''}</span> <span style="color:var(--text-sub);font-size:10px">(${fmt(prev)}→${fmt(cur)})</span>`;
+}
+function ovUnstableBCAnalysis(gBC,gtcdRows){
+ const unstable=getUnstableSet();if(!unstable.size)return'';
+ const allD=ovDatesDesc(gBC,2);const d3=allD.slice(0,3),n1=allD[0]||'',n7=allD[6]||allD[allD.length-1]||'';
+ const bcPivot={};
+ (gBC||[]).slice(1).forEach(r=>{
+  if(!(r[1]||'').trim()||(r[1]||'').toLowerCase().includes('grand total'))return;
+  const bc=(r[1]||'').trim(),d=isoD(r[2]);if(!unstable.has(bc))return;
+  if(!bcPivot[bc])bcPivot[bc]={bc,am:(r[0]||'').trim(),vol:0,ngtc:0,d3v:0,d3g:0,n1g:0,n7g:0,ton3:0};
+  const v=Math.round(parseFloat(r[3])||0),g=Math.round(parseFloat(r[6])||0);
+  if(d3.includes(d)){bcPivot[bc].d3v+=v;bcPivot[bc].d3g+=g;}
+  if(d===n1)bcPivot[bc].n1g=g;
+  if(d===n7)bcPivot[bc].n7g=g;
+ });
+ if(gtcdRows&&gtcdRows.length){
+  const dset=new Set(d3);
+  gtcdRows.filter(r=>unstable.has(r.bc)&&r.loai==='Hàng Tồn'&&dset.has(r.date)).forEach(r=>{
+   if(!bcPivot[r.bc])bcPivot[r.bc]={bc:r.bc,am:r.am,vol:0,ngtc:0,d3v:0,d3g:0,n1g:0,n7g:0,ton3:0};
+   bcPivot[r.bc].ton3+=r.vol-r.ngtc-r.ntra;
+  });
+ }
+ const arr=Object.values(bcPivot).sort((a,b)=>(b.d3v?b.d3g/b.d3v:0)-(a.d3v?a.d3g/a.d3v:0));
+ const headers=['#','Bưu Cục','AM','%GTC 3N','Δ GTC đơn N-1↔N-7','Hàng Tồn 3N','Nhóm'];
+ const rows=arr.map((r,i)=>{
+  const pct=r.d3v?r.d3g/r.d3v*100:0;
+  const dGtc=r.n1g-r.n7g;const dStr=dGtc===0?'—':`${dGtc>0?'▲':'▼'} ${Math.abs(dGtc)} (${fmt(r.n7g)}→${fmt(r.n1g)})`;
+  return[String(i+1),r.bc,r.am,pct.toFixed(1)+'%',dStr,fmt(r.ton3),gtcGroupLabel(pct)];
+ });
+ let h=`<div class="card"><div class="card-header"><div class="card-title"><div class="card-icon" style="background:var(--red)">⚠️</div>Bưu Cục Bất Ổn — Phân tích 3 ngày</div><div class="card-info">${arr.length} BC · nguồn Baton cột D · so sánh N-1 vs N-7</div></div>`;
+ h+=monoCopyBox('BƯU CỤC BẤT ỔN — TỔNG HỢP',headers,rows,`3 ngày: ${d3.map(shortD).join(', ')} · N-1: ${shortD(n1)} · N-7: ${shortD(n7)}`);
+ if(window._BATON?.rows?.length){
+  const bh=['Bưu Cục','Tỉnh','BL LM','%LM >5N','Đơn GTC N-1','Đơn GTC L7D','Lý do'];
+  const br=window._BATON.rows.map(r=>[r.bc,r.tinh,fmt(r.blLmTong),r.pctBlLmOver5.toFixed(1)+'%',fmt(r.donGtcN1),fmt(r.donGtcL7d),r.lyDo||'—']);
+  h+=monoCopyBox('BATON — Chi tiết sheet nguồn',bh,br,'Dữ liệu từ sheet Baton (cột D = tên BC bất ổn)');
+ }
+ h+=`</div>`;return h;
+}
 
 /* ===== FETCH ===== */
 const SID='1CGUY5pxLZG5zoljPoVWv3Xnyn2XaLJdjEnOeYbCCJ0s';
@@ -500,7 +601,7 @@ function renderGTCBcTable(rows,dates,last5D){
  </thead><tbody>`;
  displayNames.forEach((name,i)=>{
   const row=pivot[name];
-  h+=`<tr><td style="${cs}text-align:center;color:var(--text-sub);font-size:11px;position:sticky;left:0;background:#fff;z-index:2">${i+1}</td><td style="${cs}white-space:nowrap;font-weight:700;position:sticky;left:30px;background:#fff;z-index:2">${name}</td><td style="${cs}color:var(--text-sub);font-size:11px;position:sticky;left:170px;background:#fff;z-index:2">${row.am||''}</td>`;
+  h+=`<tr><td style="${cs}text-align:center;color:var(--text-sub);font-size:11px;position:sticky;left:0;background:#fff;z-index:2">${i+1}</td><td style="${cs}white-space:nowrap;font-weight:700;position:sticky;left:30px;background:#fff;z-index:2">${name}${bcUnstableBadge(name)}</td><td style="${cs}color:var(--text-sub);font-size:11px;position:sticky;left:170px;background:#fff;z-index:2">${row.am||''}</td>`;
   dates.forEach(d=>{const c=row[d];if(c){const gc=c.gtc>=65?'g':c.gtc>=50?'m':'b';h+=`<td style="${cs}text-align:right;border-left:2px solid #F3F4F6">${fmt(c.vol)}</td><td style="${cs}text-align:center">${c.gan.toFixed(1)}%</td><td style="${cs}text-align:center"><span class="pct ${gc}">${c.gtc.toFixed(1)}%</span></td><td style="${cs}text-align:right;color:var(--green);font-weight:600">${fmt(c.nGTC)}</td>`;}else{h+=`<td colspan="4" style="${cs}text-align:center;border-left:2px solid #F3F4F6;color:var(--text-sub)">—</td>`;}});
   h+='</tr>';
  });
@@ -512,6 +613,8 @@ function renderGTCBcTable(rows,dates,last5D){
  h+='</tbody></table></div>';
  const hid=sortedNames.length-displayNames.length;
  if(hid>0)h+=`<div style="padding:8px 16px;font-size:11px;color:var(--text-sub)">... và ${hid} bưu cục khác (đã ẩn)</div>`;
+ const unstN=displayNames.filter(n=>getUnstableSet().has(n)).length;
+ if(unstN>0)h+=`<div class="analysis-box">⚠️ Có <strong>${unstN}</strong> bưu cục bất ổn trong danh sách (nguồn: sheet Baton cột D).</div>`;
  const lg=gPivot[latest];
  if(lg)h+=`<div class="analysis-box">🏪 <strong>BC ngày ${shortD(latest)}:</strong> Hiển thị ${displayNames.length} BC (${activeNames.length} active trong 5 ngày gần nhất) · Grand Total Vol <strong>${fmt(lg.vol)}</strong> · GTC <strong>${fmt(lg.nGTC)}</strong> đơn (<span style="color:${lg.gtc>=65?'var(--green)':lg.gtc>=50?'var(--yellow)':'var(--red)'};font-weight:700">${lg.gtc.toFixed(1)}%</span>).</div>`;
  return h;
@@ -548,7 +651,7 @@ function buildGTCPage(rowsAM,rowsBC,title,pid){
   <select id="${pid}_dTo" onchange="renderGTC('${pid}')">${mkOpts(dTo)}</select>
  </div>
  <div class="card"><div class="card-header"><div class="card-title"><div class="card-icon">👤</div>A. Theo AM</div><div class="card-info">Sắp xếp: %GTC cao → thấp · Cố định cột tên</div></div><div id="${pid}_amTable"></div></div>
- <div class="card"><div class="card-header"><div class="card-title"><div class="card-icon">🏪</div>B. Theo Bưu Cục</div><div class="card-info">Top 30 BC · Grand Total cố định cuối</div></div><div id="${pid}_bcTable"></div></div>`;
+ <div class="card"><div class="card-header"><div class="card-title"><div class="card-icon">🏪</div>B. Theo Bưu Cục</div><div class="card-info">Top 30 BC · ⚠ đánh dấu BC bất ổn (Baton)</div></div><div id="${pid}_bcTable"></div></div>`;
 }
 
 /* ===== DASHBOARD 3: FD NGÀY ===== */
@@ -573,7 +676,7 @@ function buildFDDayPage(fd){
   <select id="fdDay_dTo" onchange="renderFDDay()">${mkOpts(dTo)}</select>
  </div>
  <div class="card"><div class="card-header"><div class="card-title"><div class="card-icon">📅</div>A. Theo AM</div></div><div id="fdDayAMTable"></div></div>
- <div class="card"><div class="card-header"><div class="card-title"><div class="card-icon">🏪</div>B. Theo Bưu Cục</div></div><div id="fdDayBCTable"></div></div>`;
+ <div class="card"><div class="card-header"><div class="card-title"><div class="card-icon">🏪</div>B. Theo Bưu Cục</div><div class="card-info">⚠ BC bất ổn (Baton cột D)</div></div><div id="fdDayBCTable"></div></div>`;
 }
 function renderFDDay(){
  const fd=window._FD;if(!fd.totalAM)return;
@@ -612,7 +715,7 @@ function buildFDDayTable(sheetArr,labels,dates,nameLabel){
  h+='</tr></thead><tbody>';
  names.forEach((name,i)=>{
   const isG=isGrand(name);
-  h+=`<tr${isG?' class="tot"':''}><td style="${cs}text-align:center;color:var(--text-sub);font-size:11px;position:sticky;left:0;background:${isG?'#F8F9FA':'#fff'};z-index:2">${isG?'':i+1}</td><td style="${cs}font-weight:${isG?800:600};white-space:nowrap;position:sticky;left:32px;background:${isG?'#F8F9FA':'#fff'};z-index:2">${name}</td>`;
+  h+=`<tr${isG?' class="tot"':''}><td style="${cs}text-align:center;color:var(--text-sub);font-size:11px;position:sticky;left:0;background:${isG?'#F8F9FA':'#fff'};z-index:2">${isG?'':i+1}</td><td style="${cs}font-weight:${isG?800:600};white-space:nowrap;position:sticky;left:32px;background:${isG?'#F8F9FA':'#fff'};z-index:2">${name}${isBC&&!isG?bcUnstableBadge(name):''}</td>`;
   dates.forEach((d,di)=>{
    const bg=DC[di%DC.length];
    labels.forEach((_,si)=>{
@@ -717,7 +820,7 @@ function buildFDWeekTable(sheetArr,labels,isBC,selWeeks){
  h+='</tr></thead><tbody>';
  names.forEach((name,i)=>{
   const isG=isGrand(name);
-  h+=`<tr${isG?' class="tot"':''}><td style="${cs}text-align:center;color:var(--text-sub);font-size:11px">${isG?'':i+1}</td><td style="${cs}font-weight:${isG?800:600};white-space:nowrap">${name}</td>`;
+  h+=`<tr${isG?' class="tot"':''}><td style="${cs}text-align:center;color:var(--text-sub);font-size:11px">${isG?'':i+1}</td><td style="${cs}font-weight:${isG?800:600};white-space:nowrap">${name}${isBC&&!isG?bcUnstableBadge(name):''}</td>`;
   selWeeks.forEach((w,wi)=>{
    const bg=WC[wi%WC.length];
    labels.forEach((_,si)=>{
@@ -854,7 +957,7 @@ function buildOntimePage(rowsAM,rowsBC,title,volLabel,countLabel,greenThr,yellow
   </thead><tbody>`;
   names.forEach((name,i)=>{
    const row=pivot[name];
-   h+=`<tr><td style="${cs}text-align:center;color:var(--text-sub);font-size:11px;position:sticky;left:0;background:#fff;z-index:2">${i+1}</td><td style="${cs}font-weight:700;white-space:nowrap;position:sticky;left:30px;background:#fff;z-index:2">${name}</td><td style="${cs}color:var(--text-sub);font-size:11px;position:sticky;left:170px;background:#fff;z-index:2">${row.am||''}</td>`;
+   h+=`<tr><td style="${cs}text-align:center;color:var(--text-sub);font-size:11px;position:sticky;left:0;background:#fff;z-index:2">${i+1}</td><td style="${cs}font-weight:700;white-space:nowrap;position:sticky;left:30px;background:#fff;z-index:2">${name}${bcUnstableBadge(name)}</td><td style="${cs}color:var(--text-sub);font-size:11px;position:sticky;left:170px;background:#fff;z-index:2">${row.am||''}</td>`;
    dates.forEach(d=>{const c=row[d];if(c){const gc=c.pct>=greenThr?'g':c.pct>=yellowThr?'m':'b';h+=`<td style="${cs}text-align:right;border-left:2px solid #F3F4F6">${fmt(c.vol)}</td><td style="${cs}text-align:center"><span class="pct ${gc}">${c.pct.toFixed(1)}%</span></td>`;}else{h+=`<td style="${cs}text-align:right;border-left:2px solid #F3F4F6;color:var(--text-sub)">—</td><td>—</td>`;}});
    h+='</tr>';
   });
@@ -873,7 +976,7 @@ function buildOntimePage(rowsAM,rowsBC,title,volLabel,countLabel,greenThr,yellow
   <div class="page-meta"><span class="tag tag-orange">⏱️ 7 ngày gần nhất · ONTIME SLA TTS</span><span>%Ontime: Xanh ≥${greenThr}% · Vàng ≥${yellowThr}% · Đỏ &lt;${yellowThr}%</span></div>
  </div>
  <div class="card"><div class="card-header"><div class="card-title"><div class="card-icon">👤</div>A. Theo AM</div><div class="card-info">Sắp xếp: %Ontime thấp → cao</div></div>${amTbl(rowsAM)}</div>
- <div class="card"><div class="card-header"><div class="card-title"><div class="card-icon">🏪</div>B. Theo Bưu Cục</div><div class="card-info">Sắp xếp: %Ontime thấp → cao</div></div>${bcTbl(rowsBC)}</div>`;
+ <div class="card"><div class="card-header"><div class="card-title"><div class="card-icon">🏪</div>B. Theo Bưu Cục</div><div class="card-info">Sắp xếp: %Ontime thấp → cao · ⚠ BC bất ổn (Baton)</div></div>${bcTbl(rowsBC)}</div>`;
 }
 
 /* ===== SPLASH ===== */
@@ -905,7 +1008,7 @@ function buildGTCDetailPage(){
    ngtc:Math.round(parseFloat(r[10])||0),ntra:Math.round(parseFloat(r[11])||0)
   })).filter(r=>r.date&&r.loai);
   window._GTCD.rows=rows;
-  window._GTCD.unstable=new Set((baton||[]).slice(1).map(r=>(r[3]||'').trim()).filter(Boolean));
+  window._GTCD.unstable=getUnstableSet().size?getUnstableSet():new Set((baton||[]).slice(1).map(r=>(r[3]||'').trim()).filter(Boolean));
   el.innerHTML=gtcDetailSkeleton(rows);
   window._GTCD.selLoai=new Set(GTCD_LOAI);
   window._GTCD.selKL=new Set(GTCD_KL.map(k=>k.id));
@@ -1022,7 +1125,7 @@ function gtcdAggTable(rows,isBC){
  </tr></thead><tbody>`;
  rows.forEach((r,i)=>{
   const pGTC=r.vol?r.ngtc/r.vol*100:0,pGan=r.vol?r.ganW/r.vol:0,pHeavy=r.vol?r.heavy/r.vol*100:0,ton=r.vol-r.ngtc-r.ntra;
-  const unst=isBC&&window._GTCD.unstable.has(r.name);
+  const unst=isBC&&getUnstableSet().has(r.name);
   const badge=unst?'<span style="display:inline-block;background:#FEE2E2;color:var(--red);border:1px solid #FECACA;border-radius:4px;font-size:9px;font-weight:700;padding:1px 5px;margin-left:5px">⚠ bất ổn</span>':'';
   h+=`<tr><td style="${cs}text-align:center;color:var(--text-sub);font-size:11px">${i+1}</td>
    <td style="${cs}font-weight:700;white-space:nowrap">${r.name}${badge}</td>
@@ -1035,7 +1138,7 @@ function gtcdAggTable(rows,isBC){
    <td style="${cs}text-align:center">${pHeavy.toFixed(1)}%</td></tr>`;
  });
  h+='</tbody></table></div>';
- if(isBC){const n=rows.filter(r=>window._GTCD.unstable.has(r.name)).length;if(n>0)h+=`<div class="analysis-box">⚠️ Có <strong>${n}</strong> bưu cục bất ổn trong danh sách (theo sheet Baton).</div>`;}
+ if(isBC){const n=rows.filter(r=>getUnstableSet().has(r.name)).length;if(n>0)h+=`<div class="analysis-box">⚠️ Có <strong>${n}</strong> bưu cục bất ổn trong danh sách (theo sheet Baton cột D).</div>`;}
  return h;
 }
 function gtcdDrawChart(canvasId,key,labels,datasets,isPct){
@@ -1120,8 +1223,9 @@ async function buildAgingPage(){
    fetchSheetById(AGING_SID,'Baton')
   ]);
   const rows=(backupSheet||[]).slice(1);
-  const unstableBCSet=new Set((batonSheet||[]).slice(1).map(r=>(r[3]||'').trim()).filter(Boolean));
-  window._AGING={rows:normalizeAgingRows(rows),unstable:unstableBCSet};
+  const unstableBCSet=getUnstableSet().size?getUnstableSet():new Set((batonSheet||[]).slice(1).map(r=>(r[3]||'').trim()).filter(Boolean));
+  if(batonSheet)window._BATON=parseBatonSheet(batonSheet);
+  window._AGING={rows:normalizeAgingRows(rows),unstable:window._BATON.unstable.size?window._BATON.unstable:unstableBCSet};
   el.innerHTML=buildAgingHTML(rows,unstableBCSet);
  }catch(e){el.innerHTML=errPage(`Aging sheet: ${e.message}`);}
 }
@@ -1171,7 +1275,7 @@ function buildRotLCHTML(data){
   last7.forEach((d,i)=>{const isL=i===last7.length-1;t+=`<th style="text-align:right;white-space:nowrap${isL?';background:#FFE0CC;color:var(--orange-dark)':''}">${agingFmtDate(d)}</th>`;});
   t+=`<th style="text-align:right">Trend</th></tr></thead><tbody>`;
   arr.forEach((row,idx)=>{
-   t+=`<tr><td style="text-align:center;color:var(--text-sub);font-size:11px">${idx+1}</td><td style="font-weight:700;white-space:nowrap">${row.name}</td>`;
+   t+=`<tr><td style="text-align:center;color:var(--text-sub);font-size:11px">${idx+1}</td><td style="font-weight:700;white-space:nowrap">${row.name}${field==='bc'?bcUnstableBadge(row.name):''}</td>`;
    last7.forEach((d,i)=>{const v=row[d]||0;const isL=i===last7.length-1;if(isL){const bw=maxV>0?Math.round(v/maxV*46):0;t+=`<td style="text-align:right;background:#FFF0EB"><div style="display:flex;align-items:center;justify-content:flex-end;gap:5px"><div style="height:5px;border-radius:3px;background:var(--orange);width:${bw}px;min-width:${v>0?2:0}px"></div><span style="font-weight:800;color:var(--orange-dark)">${v>0?fmt(v):'—'}</span></div></td>`;}else t+=`<td style="text-align:right;color:${v>0?'var(--text-main)':'#D7E1E8'}">${v>0?fmt(v):'—'}</td>`;});
    const c=row[latest]||0,p=row[prev]||0;const tc=c<p?'var(--green)':c>p?'var(--red)':'var(--text-sub)';const tt=c<p?`▼ ${p-c}`:c>p?`▲ ${c-p}`:'—';
    t+=`<td style="text-align:right;color:${tc};font-weight:700;white-space:nowrap">${tt}</td></tr>`;
@@ -1241,7 +1345,8 @@ function buildOverviewPage(R,rotData){
   {ic:'🛰️',label:'ODR TTS — Giao đúng hạn',val:odr.pct.toFixed(1)+'%',tgt:'Mục tiêu 95%',c:'#16A34A',bg:'#DCFCE7'},
   {ic:'🚀',label:'OPR TTS — Lấy đúng hạn',val:opr.pct.toFixed(1)+'%',tgt:'Mục tiêu 95%',c:'#7C3AED',bg:'#FAF5FF'},
   {ic:'↩️',label:'FD — Tỉ lệ giao thất bại',val:fdTotal.toFixed(2)+'%',tgt:'Mục tiêu ≤5% · Σ Trả Total / Σ %Vol',c:'#DC2626',bg:'#FEE2E2',sub:[{l:'TTS',v:fdTTS.toFixed(2)+'%',c:fdC(fdTTS)},{l:'SME',v:fdSME.toFixed(2)+'%',c:fdC(fdSME)},{l:'Shopee',v:fdShopee.toFixed(2)+'%',c:fdC(fdShopee)}]},
-  {ic:'📉',label:'Rớt LC — Đơn lấy không thành công',val:fmt(rotTotal),tgt:'Tổng vùng '+(rotLatest?agingFmtDate(rotLatest):''),c:'#B45309',bg:'#FEF3C7'}
+  {ic:'📉',label:'Rớt LC — Đơn lấy không thành công',val:fmt(rotTotal),tgt:'N-1 · '+ (rotLatest?agingFmtDate(rotLatest):''),c:'#B45309',bg:'#FEF3C7'},
+  {ic:'⚠️',label:'BC Bất Ổn (Baton)',val:String(getUnstableSet().size),tgt:'Theo sheet Baton cột D',c:'var(--red)',bg:'#FEE2E2'}
  ];
  // ===== Theo tỉnh (cột H = index 7) + Aging + Rớt LC =====
  const AG=window._AGING||{rows:[]};
@@ -1302,11 +1407,12 @@ function buildOverviewPage(R,rotData){
  const hasRec=recSections.length>0;
  const recHTML=hasRec?recSections.map(s=>`<div style="margin-bottom:12px"><div style="font-size:12px;font-weight:800;color:${s.c};margin-bottom:5px">${s.ic} ${s.t} <span style="color:var(--text-sub);font-weight:600">(${s.items.length} AM)</span></div>${s.items.map(it=>`<div style="font-size:12px;line-height:1.55;padding:5px 10px;background:#fff;border:1px solid var(--border);border-radius:8px;margin-bottom:5px">• ${it}</div>`).join('')}</div>`).join(''):'✅ Không có AM nào dưới ngưỡng cảnh báo trong ngày.';
  // ===== Render =====
- let h=`<div class="page-header"><div class="page-title">Tổng Quan Vận Hành TNT</div><div class="page-meta"><span class="tag tag-orange">🗺️ Dữ liệu ngày ${shortD(latest)} · Vùng Tây Nam Thủ Đô</span><span>${TNT_TINH.join(' · ')}</span></div></div>`;
+ let h=`<div class="page-header"><div class="page-title">Tổng Quan Vận Hành TNT</div><div class="page-meta"><span class="tag tag-orange">🗺️ N-1: ${shortD(latest)} · So sánh N-7: ${shortD(ovDatesDesc(gAM,1)[6]||'')}</span><span>${TNT_TINH.join(' · ')}</span></div></div>`;
  h+=`<div class="kpi-grid">${kAttr.map(k=>`<div class="kpi-card" style="border-top:none"><div class="kpi-ico" style="background:${k.bg}">${k.ic}</div><div class="kpi-label">${k.label}</div><div class="kpi-val" style="color:${k.c}">${k.val}</div><div style="font-size:10.5px;color:var(--text-sub);margin-top:4px">${k.tgt}</div>${k.d?`<div style="font-size:11px;font-weight:700;color:${k.d.col};margin-top:3px">${k.d.txt}</div>`:''}${k.sub?`<div style="display:flex;gap:6px;margin-top:8px">${k.sub.map(s=>`<div style="flex:1;background:#F8FAFC;border-radius:7px;padding:5px 4px;text-align:center"><div style="font-size:9px;font-weight:700;color:var(--text-sub)">${s.l}</div><div style="font-size:12px;font-weight:800;color:${s.c}">${s.v}</div></div>`).join('')}</div>`:''}</div>`).join('')}</div>`;
  h+=`<div class="card" style="background:${hasRec?'#FFF8F0':'#F0FDF4'};border-color:${hasRec?'#FED7AA':'#BBF7D0'}"><div class="card-header" style="background:transparent;border-bottom:1px solid ${hasRec?'#FED7AA':'#BBF7D0'}"><div class="card-title"><div class="card-icon" style="background:${hasRec?'#EA580C':'#16A34A'}">${hasRec?'🔔':'✅'}</div>Kiến nghị &amp; Cảnh báo — AM dưới ngưỡng (kèm bưu cục)</div></div><div style="padding:14px 18px;color:var(--text-main)">${recHTML}</div></div>`;
  h+=`<div style="display:flex;align-items:center;justify-content:space-between;margin:18px 0 12px"><div style="font-size:15px;font-weight:800">📍 6 tỉnh Vùng TNT</div><div style="font-size:11.5px;color:var(--text-sub)">Bấm tab phía trên để xem phân tích chi tiết từng chỉ số</div></div>`;
  h+=`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px">${tinhCards}</div>`;
+ h+=ovUnstableBCAnalysis(gBC,window._GTCD?.rows||[]);
  el.innerHTML=h;
 }
 
@@ -1360,6 +1466,9 @@ function buildAIPage(){
     <button class="ai-preset-btn" onclick="setAIPrompt('hl-ll')">🏆 Highlight / Lowlight</button>
     <button class="ai-preset-btn" onclick="setAIPrompt('so-sanh-am')">👤 So sánh AM</button>
     <button class="ai-preset-btn" onclick="setAIPrompt('tra-hang')">🔄 Phân tích tỉ lệ trả</button>
+    <button class="ai-preset-btn" onclick="setAIPrompt('rot-lc')">📉 Phân tích Rớt LC</button>
+    <button class="ai-preset-btn" onclick="setAIPrompt('bat-unstable')">⚠️ Bưu Cục Bất Ổn</button>
+    <button class="ai-preset-btn" onclick="setAIPrompt('so-sanh-n1-n7')">📅 So sánh N-1 vs N-7</button>
     <button class="ai-preset-btn" onclick="setAIPrompt('kien-nghi')">💡 Kiến nghị cải thiện</button>
    </div>
   </div>
@@ -1368,7 +1477,7 @@ function buildAIPage(){
     <div class="ai-cust-field"><label style="display:block;margin-bottom:3px">Khoảng thời gian</label>
      <select id="aiAllDays"><option value="3">3 ngày gần nhất</option><option value="7" selected>7 ngày gần nhất</option><option value="14">14 ngày gần nhất</option><option value="30">30 ngày gần nhất</option></select></div>
    </div>
-   <div style="font-size:11px;color:var(--text-sub);background:#FFF7ED;border-left:3px solid var(--orange);padding:8px 12px;border-radius:6px;margin-bottom:10px">Sẽ gửi cho AI: GTC Total · GTC TTS · GTC chi tiết (cân nặng) · FD · ODR · OPR · Aging — tổng hợp theo AM (Aging theo Bưu Cục).</div>
+   <div style="font-size:11px;color:var(--text-sub);background:#FFF7ED;border-left:3px solid var(--orange);padding:8px 12px;border-radius:6px;margin-bottom:10px">Sẽ gửi cho AI: GTC Total · GTC TTS · GTC chi tiết · FD · ODR · OPR · Aging · Rớt LC · Baton (BC bất ổn) — so sánh N-1 vs N-7.</div>
    <div style="font-size:12px;color:var(--text-sub);margin-bottom:6px">Gợi ý câu hỏi:</div>
    <div class="ai-preset-row" id="aiAllSuggest"></div>
   </div>
@@ -1382,7 +1491,9 @@ function buildAIPage(){
       <option value="fd">Tỉ lệ trả (FD)</option>
       <option value="odr">ODR TTS (Ontime)</option>
       <option value="opr">OPR TTS (Ontime)</option>
-      <option value="aging">Aging &gt; 5 ngày</option></select></div>
+      <option value="aging">Aging &gt; 5 ngày</option>
+      <option value="rotLC">Rớt LC</option>
+      <option value="baton">Bưu Cục Bất Ổn (Baton)</option></select></div>
     <div class="ai-cust-field"><label style="display:block;margin-bottom:3px">Khoảng thời gian</label>
      <select id="aiCustDays"><option value="1">Ngày mới nhất</option><option value="3">3 ngày</option><option value="7" selected>7 ngày</option><option value="14">14 ngày</option><option value="30">30 ngày</option></select></div>
     <div class="ai-cust-field"><label style="display:block;margin-bottom:3px">Phân tích theo</label>
@@ -1391,6 +1502,14 @@ function buildAIPage(){
    <div id="aiCustHint" style="font-size:11px;color:var(--text-sub);background:#FFF7ED;border-left:3px solid var(--orange);padding:8px 12px;border-radius:6px;margin-bottom:10px"></div>
    <div style="font-size:12px;color:var(--text-sub);margin-bottom:6px">Gợi ý câu hỏi:</div>
    <div class="ai-preset-row" id="aiCustSuggest"></div>
+   <div style="margin-top:14px;padding-top:12px;border-top:1px dashed var(--border)">
+    <div style="font-size:12px;font-weight:600;color:var(--text-sub);margin-bottom:6px">🏷️ Custom câu hỏi (đã lưu):</div>
+    <div class="ai-saved-q" id="aiSavedList"></div>
+    <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+     <button class="ai-preset-btn" onclick="aiSaveCurrentQuestion()">💾 Lưu câu hỏi hiện tại</button>
+     <button class="ai-preset-btn" onclick="aiExportSavedQuestions()">📤 Export JSON (cho API)</button>
+    </div>
+   </div>
   </div>
   <textarea class="ai-textarea" id="aiPromptArea" placeholder="Nhập câu hỏi / yêu cầu phân tích..." style="margin-top:12px"></textarea>
   <div style="display:flex;align-items:center;gap:12px;margin-top:12px;flex-wrap:wrap">
@@ -1403,24 +1522,74 @@ function buildAIPage(){
   <button onclick="copyAIResult()" style="background:none;border:1px solid var(--border);padding:5px 12px;border-radius:6px;color:var(--text-sub);font-size:11px;cursor:pointer">📋 Copy</button></div>
   <div class="ai-result" id="aiResultArea" style="padding:16px"></div>
  </div>`;
+ aiRenderSavedQuestions();
 }
+const AI_Q_KEY='tnt_ai_saved_questions';
 const AI_PRESETS={
- 'tong-quan':'Phân tích tổng quan hiệu suất vận hành GHN Vùng TNT. Nêu rõ: (1) Tình hình GTC Total và GTC TTS; (2) Top AM/BC làm tốt nhất; (3) AM/BC cần cải thiện; (4) Tỉ lệ trả và Ontime. Nhận xét tổng thể.',
- 'hl-ll':'Liệt kê Highlight (điểm sáng) và Lowlight (điểm yếu):\n- HIGHLIGHT 🟢: Ai làm tốt, chỉ số nào ấn tượng?\n- LOWLIGHT 🔴: Ai tụt hậu, vấn đề gì nổi bật?\n- Gợi ý hành động cụ thể.',
- 'so-sanh-am':'So sánh hiệu suất từng AM: xếp hạng theo %GTC, tỉ lệ trả, và ontime. Ai đang cải thiện? Ai đang giảm? Phân tích nguyên nhân có thể.',
- 'tra-hang':'Phân tích sâu tỉ lệ trả hàng (%FD): (1) AM/BC nào cao/thấp nhất; (2) Xu hướng theo tuần; (3) So sánh FD Total vs SME vs TTS vs Shopee; (4) Đề xuất giảm FD.',
- 'kien-nghi':'Dựa trên toàn bộ dữ liệu, đưa ra 5-7 kiến nghị cải thiện cụ thể. Mỗi kiến nghị: vấn đề → giải pháp → kỳ vọng kết quả.'
+ 'tong-quan':'Phân tích tổng quan hiệu suất vận hành GHN Vùng TNT. Nêu rõ: (1) Tình hình GTC Total và GTC TTS; (2) Top AM/BC làm tốt nhất; (3) AM/BC cần cải thiện; (4) Tỉ lệ trả, Ontime, Rớt LC và BC bất ổn. So sánh N-1 vs N-7. Nhận xét tổng thể.',
+ 'hl-ll':'Liệt kê Highlight (điểm sáng) và Lowlight (điểm yếu):\n- HIGHLIGHT 🟢: Ai làm tốt, chỉ số nào ấn tượng?\n- LOWLIGHT 🔴: Ai tụt hậu, vấn đề gì nổi bật?\n- Gợi ý hành động cụ thể. So sánh N-1 vs N-7.',
+ 'so-sanh-am':'So sánh hiệu suất từng AM: xếp hạng theo %GTC, tỉ lệ trả, ontime, aging và rớt LC. Ai đang cải thiện? Ai đang giảm? Phân tích nguyên nhân. So sánh N-1 vs N-7.',
+ 'tra-hang':'Phân tích sâu tỉ lệ trả hàng (%FD) từ nguồn FD: (1) AM/BC nào cao/thấp nhất; (2) Xu hướng N-1 vs N-7; (3) So sánh FD Total vs SME vs TTS vs Shopee; (4) Đề xuất giảm FD.',
+ 'rot-lc':'Phân tích Rớt LC (nguồn Rot_LC_Raw): (1) Tổng đơn rớt LC hôm qua (N-1) vs 7 ngày trước (N-7); (2) AM/BC/Loại KH nào phát sinh nhiều nhất; (3) Xu hướng 7 ngày; (4) Kiến nghị xử lý.',
+ 'bat-unstable':'Phân tích tất cả Bưu Cục Bất Ổn (nguồn Baton cột D): (1) Tỷ lệ %GTC 3 ngày; (2) Số đơn GTC tăng/giảm N-1 vs N-7; (3) Số Hàng Tồn còn lại 3 ngày; (4) Đối chiếu Aging và Rớt LC tại các BC này; (5) Ưu tiên can thiệp.',
+ 'so-sanh-n1-n7':'So sánh toàn diện ngày N-1 (hôm qua) với N-7 trên tất cả chỉ số: %GTC, %FD, Ontime ODR/OPR, Aging, Rớt LC. Chỉ ra AM/BC biến động mạnh nhất và nguyên nhân có thể.',
+ 'kien-nghi':'Dựa trên toàn bộ dữ liệu, đưa ra 5-7 kiến nghị cải thiện cụ thể. Mỗi kiến nghị: vấn đề → giải pháp → kỳ vọng kết quả. Ưu tiên BC bất ổn và chỉ số xấu nhất N-1.'
 };
+const AI_DATA_REGISTRY={
+ gtcTotal:{tag:'GTC Total',aliases:['gtc total','%gtc total','tổng gtc'],fields:['Vol','%GTC','%Gán','Số đơn GTC']},
+ gtcTTS:{tag:'GTC TTS',aliases:['gtc tts','tts gtc','%gtc tts'],fields:['Vol','%GTC','%Gán']},
+ canNang:{tag:'GTC chi tiết cân nặng',aliases:['cân nặng','cồng kềnh','bulky','khối lượng','hàng tồn','loại hàng'],fields:['Vol','%GTC','Tồn','%Cồng kềnh']},
+ fd:{tag:'FD',aliases:['fd','%fd','tỉ lệ trả','trả hàng','failed delivery'],fields:['%Vol','%FD','Trả Total']},
+ odr:{tag:'ODR TTS',aliases:['odr','giao đúng hạn','ontime giao'],fields:['Vol GTC','%Ontime']},
+ opr:{tag:'OPR TTS',aliases:['opr','lấy đúng hạn','ontime lấy'],fields:['Vol LTC','%Ontime']},
+ aging:{tag:'Aging',aliases:['aging','>5 ngày','tồn đọng','backupall'],fields:['Số đơn Aging']},
+ rotLC:{tag:'Rớt LC',aliases:['rớt lc','rot lc','lấy không thành công','rot_lc'],fields:['Số đơn Rớt LC','Loại KH','Loại hàng']},
+ baton:{tag:'Bưu Cục Bất Ổn',aliases:['bất ổn','baton','bc bất ổn','bưu cục bất ổn'],fields:['BL LM','%LM >5N','Đơn GTC','Lý do']}
+};
+function aiLoadSaved(){try{return JSON.parse(localStorage.getItem(AI_Q_KEY)||'[]');}catch(_){return[];}}
+function aiRenderSavedQuestions(){
+ const el=document.getElementById('aiSavedList');if(!el)return;
+ const list=aiLoadSaved();
+ if(!list.length){el.innerHTML='<span style="font-size:11px;color:var(--text-sub)">Chưa có câu hỏi lưu — bấm Lưu sau khi nhập.</span>';return;}
+ el.innerHTML=list.map((q,i)=>`<span class="ai-saved-chip" onclick="aiFillPrompt(this.dataset.q)" data-q="${(q.text||'').replace(/"/g,'&quot;')}"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${q.text.slice(0,48)}${q.text.length>48?'…':''}</span><span class="del" onclick="event.stopPropagation();aiDeleteSaved(${i})">×</span></span>`).join('');
+}
+function aiSaveCurrentQuestion(){
+ const text=(document.getElementById('aiPromptArea')?.value||'').trim();if(!text)return;
+ const ds=document.getElementById('aiCustDataset')?.value||'';
+ const list=aiLoadSaved().filter(q=>q.text!==text);
+ list.unshift({text,dataset:ds,ts:Date.now()});
+ localStorage.setItem(AI_Q_KEY,JSON.stringify(list.slice(0,50)));
+ aiRenderSavedQuestions();document.getElementById('aiStatus').textContent='✅ Đã lưu câu hỏi';
+ setTimeout(()=>{const s=document.getElementById('aiStatus');if(s)s.textContent='';},2000);
+}
+function aiDeleteSaved(i){const list=aiLoadSaved();list.splice(i,1);localStorage.setItem(AI_Q_KEY,JSON.stringify(list));aiRenderSavedQuestions();}
+function aiExportSavedQuestions(){
+ const data=JSON.stringify({saved_at:new Date().toISOString(),questions:aiLoadSaved(),frequent:aiLoadSaved().slice(0,10)},null,2);
+ const blob=new Blob([data],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='tnt-ai-questions.json';a.click();
+}
+function aiDetectFromQuestion(q){
+ const s=(q||'').toLowerCase();let best=null,score=0;
+ Object.entries(AI_DATA_REGISTRY).forEach(([id,meta])=>{
+  let sc=0;if(s.includes(meta.tag.toLowerCase()))sc+=3;
+  meta.aliases.forEach(a=>{if(s.includes(a))sc+=2;});
+  meta.fields.forEach(f=>{if(s.includes(f.toLowerCase()))sc+=1;});
+  if(sc>score){score=sc;best=id;}
+ });
+ return score>=2?best:null;
+}
 function setAIPrompt(key){document.getElementById('aiPromptArea').value=AI_PRESETS[key]||'';}
 /* ===== AI: chế độ Tổng quan toàn bộ & Custom ===== */
 function aiFillPrompt(t){const a=document.getElementById('aiPromptArea');a.value=t;a.focus();}
 function aiChips(list){return list.map(t=>`<button class="ai-preset-btn" onclick="aiFillPrompt(this.dataset.q)" data-q="${t.replace(/"/g,'&quot;')}">${t}</button>`).join('');}
 const AI_ALL_SUGGEST=[
- 'Tổng quan toàn cảnh vận hành Vùng TNT: nêu 3 điểm sáng (highlight) và 3 điểm yếu (lowlight) quan trọng nhất, kèm số liệu minh chứng.',
- 'AM nào đang là điểm nghẽn của Vùng? Đối chiếu chéo %GTC, %FD, Ontime (ODR/OPR) và Aging để chỉ ra AM cần ưu tiên xử lý.',
- 'Đánh giá sức khỏe chất lượng giao - trả: %FD và Aging có tương quan với %GTC/Ontime ở AM nào không? Cảnh báo rủi ro.',
- 'Tóm tắt điều hành (executive summary) cho lãnh đạo Vùng: tình hình chung, 3 việc cần làm ngay tuần tới.',
- 'So sánh hiệu suất giữa các AM trên tất cả chỉ số, xếp hạng tổng hợp và chỉ ra ai vượt/dưới mặt bằng chung của Vùng.'
+ 'Tổng quan toàn cảnh vận hành Vùng TNT: nêu 3 điểm sáng (highlight) và 3 điểm yếu (lowlight) quan trọng nhất, kèm số liệu minh chứng. So sánh N-1 vs N-7.',
+ 'AM nào đang là điểm nghẽn của Vùng? Đối chiếu chéo %GTC, %FD, Ontime (ODR/OPR), Aging và Rớt LC để chỉ ra AM cần ưu tiên.',
+ 'Phân tích %FD Total trong nguồn dữ liệu FD: AM/BC nào cao nhất? Xu hướng N-1 vs N-7?',
+ 'Phân tích Rớt LC: BC/AM nào phát sinh nhiều đơn rớt nhất? So sánh N-1 vs N-7 và đề xuất xử lý.',
+ 'Phân tích tất cả Bưu Cục Bất Ổn (Baton): %GTC 3 ngày, biến động đơn GTC, Hàng Tồn còn lại — BC nào cần can thiệp ngay?',
+ 'Đánh giá sức khỏe chất lượng giao - trả: %FD và Aging có tương quan với %GTC/Ontime ở AM nào không?',
+ 'Tóm tắt điều hành (executive summary) cho lãnh đạo Vùng: tình hình N-1, 3 việc cần làm ngay tuần tới.',
+ 'So sánh hiệu suất giữa các AM trên tất cả chỉ số, xếp hạng tổng hợp dạng bảng RANK | AM | %GTC | %FD | Nhóm.'
 ];
 function aiSubjLabel(s){return s==='bc'?'bưu cục':s==='loai'?'loại hàng':'AM';}
 function aiCustSuggest(ds,subject){
@@ -1432,7 +1601,9 @@ function aiCustSuggest(ds,subject){
   fd:[`${S} nào có %FD (tỉ lệ trả) cao nhất? Phân tích mức độ nghiêm trọng và rủi ro.`,`Xu hướng %FD theo ${S} có đáng báo động không? Top cần can thiệp ngay.`,`Đề xuất giải pháp giảm %FD cho nhóm ${S} có tỉ lệ trả cao.`],
   odr:[`${S} nào có %Ontime ODR thấp nhất? Phân tích nguyên nhân và rủi ro vận hành.`,`Xếp hạng ${S} theo %Ontime ODR, chỉ ra nhóm dưới chuẩn.`,`${S} sản lượng lớn nhưng Ontime thấp: ưu tiên xử lý ai trước?`],
   opr:[`${S} nào có %Ontime OPR thấp nhất? Phân tích điểm nghẽn lấy hàng.`,`Xếp hạng ${S} theo %Ontime OPR và chỉ ra nhóm cần cải thiện.`,`So sánh %Ontime OPR giữa các ${S}, ai bất thường?`],
-  aging:[`${S} nào có nhiều đơn Aging >5 ngày nhất? Mức độ tồn đọng có nghiêm trọng không?`,`Bưu cục bất ổn có phải là nơi phát sinh nhiều đơn Aging? Đối chiếu và cảnh báo.`,`Xu hướng số đơn Aging theo ${S}, đề xuất phương án giải phóng tồn.`]
+  aging:[`${S} nào có nhiều đơn Aging >5 ngày nhất? Mức độ tồn đọng có nghiêm trọng không?`,`Bưu cục bất ổn có phải là nơi phát sinh nhiều đơn Aging? Đối chiếu và cảnh báo.`,`Xu hướng số đơn Aging theo ${S} N-1 vs N-7, đề xuất phương án giải phóng tồn.`],
+  rotLC:[`Phân tích số đơn Rớt LC theo ${S}: ai phát sinh nhiều nhất N-1? So sánh với N-7.`,`Xu hướng Rớt LC 7 ngày theo ${S} — có điểm bùng phát không?`,`${S} nào Rớt LC cao đồng thời %GTC thấp? Đề xuất ưu tiên xử lý.`],
+  baton:[`Liệt kê tất cả BC bất ổn: %GTC 3 ngày, biến động đơn GTC N-1 vs N-7, Hàng Tồn 3 ngày.`,`BC bất ổn nào có BL LM >5 ngày cao nhất? Lý do và hành động đề xuất.`,`Đối chiếu BC bất ổn với Aging và Rớt LC — BC nào rủi ro nhất?`]
  };
  return m[ds]||[];
 }
@@ -1450,11 +1621,18 @@ function aiCustDatasetChange(){
  const subj=document.getElementById('aiCustSubject');
  const loaiOpt=subj?.querySelector('option[value="loai"]');
  if(loaiOpt){const ok=ds==='canNang';loaiOpt.disabled=!ok;if(!ok&&subj.value==='loai')subj.value='am';}
+ if(subj){const bcOnly=ds==='aging'||ds==='rotLC'||ds==='baton';subj.querySelectorAll('option').forEach(o=>{if(o.value==='loai')o.disabled=ds!=='canNang';if(o.value==='am'||o.value==='bc')o.disabled=ds==='baton'&&o.value==='am';});if(ds==='baton'&&subj.value==='am')subj.value='bc';}
  const hint=document.getElementById('aiCustHint');
- if(hint){const map={gtcTotal:'GTC Total (Vol, %GTC, %Gán)',gtcTTS:'GTC TTS (Vol, %GTC, %Gán)',canNang:'GTC chi tiết theo cân nặng (Vol, %GTC, Tồn, %Cồng kềnh, phân bố khối lượng)',fd:'Tỉ lệ trả %FD',odr:'ODR Ontime',opr:'OPR Ontime',aging:'Số đơn Aging >5 ngày'};hint.textContent='Sẽ gửi: '+(map[ds]||'')+(ds==='aging'?' · chủ thể Loại hàng không áp dụng':'')+'.';}
+ if(hint){const map={gtcTotal:'GTC Total (Vol, %GTC, %Gán)',gtcTTS:'GTC TTS (Vol, %GTC, %Gán)',canNang:'GTC chi tiết theo cân nặng (Vol, %GTC, Tồn, %Cồng kềnh)',fd:'Tỉ lệ trả %FD — header: %Vol, %FD, Trả Total',odr:'ODR Ontime',opr:'OPR Ontime',aging:'Số đơn Aging >5 ngày',rotLC:'Rớt LC — số đơn lấy không thành công',baton:'Bưu Cục Bất Ổn — sheet Baton cột D (BL LM, Đơn GTC, Lý do)'};hint.textContent='Sẽ gửi: '+(map[ds]||'')+' · so sánh N-1 vs N-7.';}
  const sug=document.getElementById('aiCustSuggest');if(sug)sug.innerHTML=aiChips(aiCustSuggest(ds,subj?subj.value:'am'));
 }
 function aiLastDateSet(rows,dateIdx,days){const s=[...new Set(rows.map(r=>isoD(r[dateIdx])).filter(Boolean))].sort();return new Set(s.slice(-days));}
+function aiN1N7(sheet,dateIdx){
+ if(!sheet||sheet.length<2)return'';
+ const ds=[...new Set(sheet.slice(1).map(r=>isoD(r[dateIdx])).filter(Boolean))].sort((a,b)=>b.localeCompare(a));
+ const n1=ds[0]||'',n7=ds[6]||ds[ds.length-1]||'';
+ return n1&&n7?`\n[Mốc so sánh: N-1=${n1} (${shortD(n1)}), N-7=${n7} (${shortD(n7)})]`:'';
+}
 function aiGTC(label,sheetAM,sheetBC,days,subject){
  const isBC=subject==='bc';const sh=isBC?sheetBC:sheetAM;if(!sh||sh.length<2)return'';
  const ni=isBC?1:0,di=isBC?2:1,vi=isBC?3:2,gi=isBC?4:3,ci=isBC?6:5;
@@ -1462,8 +1640,8 @@ function aiGTC(label,sheetAM,sheetBC,days,subject){
  const ds=aiLastDateSet(rows,di,days),dl=[...ds].sort();if(!dl.length)return'';
  const agg={};rows.forEach(r=>{const d=isoD(r[di]);if(!ds.has(d))return;const k=(r[ni]||'').trim();const v=Math.round(parseFloat(r[vi])||0);(agg[k]=agg[k]||{vol:0,cnt:0,gw:0});agg[k].vol+=v;agg[k].cnt+=Math.round(parseFloat(r[ci])||0);agg[k].gw+=v*((parseFloat(r[gi])||0)*100);});
  let tv=0,tc=0;const arr=Object.entries(agg).map(([k,a])=>{tv+=a.vol;tc+=a.cnt;return{k,vol:a.vol,cnt:a.cnt,gtc:a.vol?a.cnt/a.vol*100:0,gan:a.vol?a.gw/a.vol:0};}).sort((a,b)=>b.gtc-a.gtc);
- let s=`\n### ${label} — ${dl[0]}→${dl[dl.length-1]} (theo ${isBC?'Bưu Cục':'AM'})\nTổng: Vol=${tv}, GTC=${tc} (${tv?(tc/tv*100).toFixed(1):0}%)\n`;
- arr.forEach((x,i)=>s+=`${i+1}. ${x.k}: Vol=${x.vol}, %GTC=${x.gtc.toFixed(1)}%, %Gán=${x.gan.toFixed(1)}%\n`);
+ let s=`\n### ${label} — ${dl[0]}→${dl[dl.length-1]} (theo ${isBC?'Bưu Cục':'AM'})${aiN1N7(sh,di)}\nTổng: Vol=${tv}, GTC=${tc} (${tv?(tc/tv*100).toFixed(1):0}%)\n`;
+ arr.forEach((x,i)=>{const u=isBC&&getUnstableSet().has(x.k)?' [BẤT ỔN]':'';s+=`${i+1}. ${x.k}${u}: Vol=${x.vol}, %GTC=${x.gtc.toFixed(1)}%, %Gán=${x.gan.toFixed(1)}%\n`;});
  return s;
 }
 function aiFD(days,subject){
@@ -1472,8 +1650,8 @@ function aiFD(days,subject){
  const ds=aiLastDateSet(rows,1,days),dl=[...ds].sort();if(!dl.length)return'';
  const agg={};rows.forEach(r=>{const d=isoD(r[1]);if(!ds.has(d))return;const k=(r[0]||'').trim();(agg[k]=agg[k]||{f:0,n:0});agg[k].f+=parsePct(r[3]);agg[k].n++;});
  const arr=Object.entries(agg).map(([k,a])=>({k,fd:a.n?a.f/a.n:0})).sort((a,b)=>b.fd-a.fd);
- let s=`\n### FD Total %Trả — ${dl[0]}→${dl[dl.length-1]} (theo ${isBC?'Bưu Cục':'AM'}, %FD bình quân ngày)\n`;
- arr.forEach((x,i)=>s+=`${i+1}. ${x.k}: %FD=${x.fd.toFixed(2)}%\n`);
+ let s=`\n### FD Total %Trả — ${dl[0]}→${dl[dl.length-1]} (theo ${isBC?'Bưu Cục':'AM'}, %FD bình quân ngày)${aiN1N7(sh,1)}\n`;
+ arr.forEach((x,i)=>{const u=isBC&&getUnstableSet().has(x.k)?' [BẤT ỔN]':'';s+=`${i+1}. ${x.k}${u}: %FD=${x.fd.toFixed(2)}%\n`;});
  return s;
 }
 function aiOnt(which,days,subject){
@@ -1497,7 +1675,7 @@ function aiCanNang(days,subject){
  const kl={};f.forEach(r=>{(kl[r.kl]=kl[r.kl]||{vol:0,ngtc:0});kl[r.kl].vol+=r.vol;kl[r.kl].ngtc+=r.ngtc;});
  let s=`\n### GTC chi tiết theo cân nặng — ${ds[0]}→${ds[ds.length-1]} (theo ${subject==='bc'?'Bưu Cục':subject==='loai'?'Loại hàng':'AM'})\n`;
  s+='Phân bố khối lượng: '+GTCD_KL.map(k=>`${k.label}: Vol=${kl[k.id]?kl[k.id].vol:0}, %GTC=${kl[k.id]&&kl[k.id].vol?(kl[k.id].ngtc/kl[k.id].vol*100).toFixed(1):0}%`).join(' | ')+'\n';
- arr.forEach((x,i)=>{const u=subject==='bc'&&window._GTCD.unstable.has(x.k)?' [BẤT ỔN]':'';s+=`${i+1}. ${x.k}${u}: Vol=${x.vol}, %GTC=${x.gtc.toFixed(1)}%, Tồn=${x.ton}, %Cồng kềnh=${x.heavyP.toFixed(1)}%\n`;});
+ arr.forEach((x,i)=>{const u=subject==='bc'&&getUnstableSet().has(x.k)?' [BẤT ỔN]':'';s+=`${i+1}. ${x.k}${u}: Vol=${x.vol}, %GTC=${x.gtc.toFixed(1)}%, Tồn=${x.ton}, %Cồng kềnh=${x.heavyP.toFixed(1)}%\n`;});
  return s;
 }
 function aiAging(days,subject){
@@ -1511,6 +1689,41 @@ function aiAging(days,subject){
  arr.forEach((x,i)=>{const u=key==='bc'&&A.unstable.has(x.k)?' [BẤT ỔN]':'';s+=`${i+1}. ${x.k}${u}: ${x.v} đơn\n`;});
  return s;
 }
+function aiRotLC(days,subject){
+ const data=window._ROTLC||[];if(!data.length)return'';
+ const allD=[...new Set(data.map(r=>r.date))].sort((a,b)=>b.localeCompare(a));
+ const n1=allD[0]||'',n7=allD[6]||allD[allD.length-1]||'';
+ const dset=new Set(allD.slice(0,days));
+ const key=subject==='bc'?'bc':subject==='loaihang'?'loaihang':subject==='loaikh'?'loaikh':'am';
+ const agg={};data.filter(r=>dset.has(r.date)).forEach(r=>{const k=r[key]||'(trống)';agg[k]=(agg[k]||0)+1;});
+ const n1a={},n7a={};data.filter(r=>r.date===n1).forEach(r=>{const k=r[key]||'(trống)';n1a[k]=(n1a[k]||0)+1;});data.filter(r=>r.date===n7).forEach(r=>{const k=r[key]||'(trống)';n7a[k]=(n7a[k]||0)+1;});
+ const arr=Object.entries(agg).map(([k,v])=>({k,v,n1:n1a[k]||0,n7:n7a[k]||0})).sort((a,b)=>b.v-a.v);
+ let s=`\n### Rớt LC — ${allD[days-1]||allD[allD.length-1]}→${n1} (theo ${key})\n[Mốc: N-1=${shortD(n1)}, N-7=${shortD(n7)}] · Tổng ${days}N: ${data.filter(r=>dset.has(r.date)).length} đơn\n`;
+ arr.slice(0,40).forEach((x,i)=>{const u=key==='bc'&&getUnstableSet().has(x.k)?' [BẤT ỔN]':'';s+=`${i+1}. ${x.k}${u}: ${x.v} đơn (N-1=${x.n1}, N-7=${x.n7})\n`;});
+ return s;
+}
+function aiBaton(days,subject){
+ const B=window._BATON;if(!B||!B.rows?.length)return'';
+ const gBC=window._D?.gtcTotalBC;const allD=gBC?ovDatesDesc(gBC,2):[];
+ const d3=allD.slice(0,3),n1=allD[0]||'',n7=allD[6]||allD[allD.length-1]||'';
+ let s=`\n### Bưu Cục Bất Ổn (Baton cột D) — ${B.rows.length} BC\n[Mốc GTC: N-1=${shortD(n1)}, N-7=${shortD(n7)}, 3N=${d3.map(shortD).join(',')}]\n`;
+ B.rows.forEach((r,i)=>{
+  let pct3='—',dGtc='—',ton3='—';
+  if(gBC){
+   let v3=0,g3=0,n1g=0,n7g=0;
+   gBC.slice(1).forEach(row=>{
+    if((row[1]||'').trim()!==r.bc)return;const d=isoD(row[2]);
+    const v=Math.round(parseFloat(row[3])||0),g=Math.round(parseFloat(row[6])||0);
+    if(d3.includes(d)){v3+=v;g3+=g;}if(d===n1)n1g=g;if(d===n7)n7g=g;
+   });
+   pct3=v3?(g3/v3*100).toFixed(1)+'%':'—';dGtc=`${n7g}→${n1g} (${n1g-n7g>=0?'+':''}${n1g-n7g})`;
+  }
+  const gtcd=(window._GTCD?.rows||[]).filter(x=>x.bc===r.bc&&x.loai==='Hàng Tồn'&&d3.includes(x.date));
+  if(gtcd.length)ton3=String(gtcd.reduce((a,x)=>a+x.vol-x.ngtc-x.ntra,0));
+  s+=`${i+1}. ${r.bc} (${r.tinh}): BL_LM=${fmt(r.blLmTong)}, %LM>5N=${r.pctBlLmOver5.toFixed(1)}%, %GTC_3N=${pct3}, ΔGTC_N1_N7=${dGtc}, HàngTồn_3N=${ton3}, Lý_do=${r.lyDo||'—'}\n`;
+ });
+ return s;
+}
 function aiCtxAll(days){
  days=days||7;
  let s=`TỔNG QUAN TOÀN BỘ DỮ LIỆU — ${days} ngày gần nhất (tổng hợp theo AM, Aging theo Bưu Cục):`;
@@ -1521,6 +1734,8 @@ function aiCtxAll(days){
  s+=aiOnt('odr',days,'am');
  s+=aiOnt('opr',days,'am');
  s+=aiAging(days,'bc');
+ s+=aiRotLC(days,'am');
+ s+=aiBaton(days,'bc');
  return s||'(Dữ liệu chưa được tải)';
 }
 function aiCtxCustom(dataset,days,subject){
@@ -1532,21 +1747,30 @@ function aiCtxCustom(dataset,days,subject){
  else if(dataset==='odr')s=aiOnt('odr',days,subject);
  else if(dataset==='opr')s=aiOnt('opr',days,subject);
  else if(dataset==='aging')s=aiAging(days,subject==='loai'?'bc':subject);
+ else if(dataset==='rotLC')s=aiRotLC(days,subject==='loai'?'am':subject);
+ else if(dataset==='baton')s=aiBaton(days,'bc');
  return s||'(Dữ liệu chưa được tải hoặc không có)';
 }
-async function aiEnsureData(needCanNang,needAging){
+async function aiEnsureData(needCanNang,needAging,needRotLC,needBaton){
  const jobs=[];
  if(needCanNang&&!((window._GTCD&&window._GTCD.rows&&window._GTCD.rows.length))){
   jobs.push((async()=>{try{const[raw,baton]=await Promise.all([fetchSheetByGid(GTCD_GID),fetchSheetById(AGING_SID,'Baton').catch(()=>null)]);
    window._GTCD=window._GTCD||{charts:{}};
    window._GTCD.rows=(raw||[]).slice(1).filter(r=>r.length>10&&(r[0]||'').trim()).map(r=>({am:(r[0]||'').trim(),bc:(r[1]||'').trim(),loai:gtcdLoaiKey(r[2]),kl:(r[3]||'').trim(),date:isoD(r[4]),vol:Math.round(parseFloat(r[5])||0),gan:(parseFloat(r[6])||0)*100,gtc:(parseFloat(r[7])||0)*100,ngtc:Math.round(parseFloat(r[10])||0),ntra:Math.round(parseFloat(r[11])||0)})).filter(r=>r.date&&r.loai);
-   if(!window._GTCD.unstable||!window._GTCD.unstable.size)window._GTCD.unstable=new Set((baton||[]).slice(1).map(r=>(r[3]||'').trim()).filter(Boolean));
+   if(!window._GTCD.unstable||!window._GTCD.unstable.size)window._GTCD.unstable=getUnstableSet().size?getUnstableSet():new Set((baton||[]).slice(1).map(r=>(r[3]||'').trim()).filter(Boolean));
   }catch(e){}})());
  }
  if(needAging&&!((window._AGING&&window._AGING.rows&&window._AGING.rows.length))){
   jobs.push((async()=>{try{const[bk,baton]=await Promise.all([fetchSheetById(AGING_SID,'Backupall'),fetchSheetById(AGING_SID,'Baton').catch(()=>null)]);
-   window._AGING={rows:normalizeAgingRows((bk||[]).slice(1)),unstable:new Set((baton||[]).slice(1).map(r=>(r[3]||'').trim()).filter(Boolean))};
+   if(baton)window._BATON=parseBatonSheet(baton);
+   window._AGING={rows:normalizeAgingRows((bk||[]).slice(1)),unstable:window._BATON?.unstable?.size?window._BATON.unstable:new Set((baton||[]).slice(1).map(r=>(r[3]||'').trim()).filter(Boolean))};
   }catch(e){}})());
+ }
+ if(needRotLC&&(!window._ROTLC||!window._ROTLC.length)){
+  jobs.push((async()=>{try{const raw=await fetchSheetById(ROTLC_SID,'Rot_LC_Raw');window._ROTLC=normalizeRotLC((raw||[]).slice(1));}catch(e){}})());
+ }
+ if(needBaton&&(!window._BATON?.rows?.length)){
+  jobs.push((async()=>{try{const baton=await fetchSheetById(AGING_SID,'Baton');window._BATON=parseBatonSheet(baton);}catch(e){}})());
  }
  if(jobs.length)await Promise.all(jobs);
 }
@@ -1555,33 +1779,48 @@ function gatherDashboardData(){
  function isoDate(d){return(d||'').match(/\d{4}-\d{2}-\d{2}/)?.[0]||'';}
  if(D.gtcTotalAM&&D.gtcTotalAM.length>1){
   const rows=D.gtcTotalAM.slice(1).filter(r=>(r[0]||'').trim());
-  const dates=[...new Set(rows.map(r=>isoD(r[1])).filter(d=>d))].sort((a,b)=>b.localeCompare(a)).slice(0,7);
-  const latest=dates[dates.length-1];
-  const grand=rows.filter(r=>(r[0]||'').toLowerCase().includes('grand total')&&isoD(r[1])===latest);
-  if(grand[0])lines.push(`GTC Total (${latest}): Vol=${Math.round(parseFloat(grand[0][2])||0)}, %Gán=${((parseFloat(grand[0][3])||0)*100).toFixed(1)}%, %GTC=${((parseFloat(grand[0][4])||0)*100).toFixed(1)}%, GTC=${Math.round(parseFloat(grand[0][5])||0)}`);
-  const ams=rows.filter(r=>!(r[0]||'').toLowerCase().includes('grand total')&&isoD(r[1])===latest);
-  lines.push('GTC Total theo AM ngày mới nhất:');
+  const dates=[...new Set(rows.map(r=>isoD(r[1])).filter(d=>d))].sort((a,b)=>b.localeCompare(a));
+  const n1=dates[0]||'',n7=dates[6]||dates[dates.length-1]||'';
+  lines.push(`[Mốc: N-1=${shortD(n1)}, N-7=${shortD(n7)}]`);
+  [n1,n7].forEach(dt=>{
+   const grand=rows.filter(r=>(r[0]||'').toLowerCase().includes('grand total')&&isoD(r[1])===dt);
+   if(grand[0])lines.push(`GTC Total (${shortD(dt)}): Vol=${Math.round(parseFloat(grand[0][2])||0)}, %Gán=${((parseFloat(grand[0][3])||0)*100).toFixed(1)}%, %GTC=${((parseFloat(grand[0][4])||0)*100).toFixed(1)}%`);
+  });
+  const ams=rows.filter(r=>!(r[0]||'').toLowerCase().includes('grand total')&&isoD(r[1])===n1);
+  lines.push('GTC Total theo AM (N-1):');
   ams.forEach(r=>lines.push(`  ${(r[0]||'').trim()}: Vol=${Math.round(parseFloat(r[2])||0)}, %GTC=${((parseFloat(r[4])||0)*100).toFixed(1)}%`));
  }
  if(D.fdTotalAM&&D.fdTotalAM.length>1){
   const rows=D.fdTotalAM.slice(1).filter(r=>(r[0]||'').trim());
-  const dates=[...new Set(rows.map(r=>isoD(r[1])).filter(d=>d))].sort((a,b)=>b.localeCompare(a)).slice(0,1);
-  const latest=dates[0]||'';
-  const dRows=rows.filter(r=>isoD(r[1])===latest);
-  lines.push(`\nFD Total Ngày (${shortD(latest)}):`);
-  dRows.forEach(r=>lines.push(`  ${(r[0]||'').trim()}: %Vol=${parsePct(r[2]).toFixed(2)}%, %FD=${parsePct(r[3]).toFixed(2)}%`));
+  const dates=[...new Set(rows.map(r=>isoD(r[1])).filter(d=>d))].sort((a,b)=>b.localeCompare(a));
+  const n1=dates[0]||'',n7=dates[6]||'';
+  [n1,n7].filter(Boolean).forEach(dt=>{
+   lines.push(`\nFD Total (${shortD(dt)}):`);
+   rows.filter(r=>isoD(r[1])===dt).forEach(r=>lines.push(`  ${(r[0]||'').trim()}: %Vol=${parsePct(r[2]).toFixed(2)}%, %FD=${parsePct(r[3]).toFixed(2)}%`));
+  });
  }
  if(D.odrAM&&D.odrAM.length>1){
   const rows=D.odrAM.slice(1).filter(r=>(r[0]||'').trim());
-  const dates=[...new Set(rows.map(r=>isoD(r[1])).filter(d=>d))].sort((a,b)=>b.localeCompare(a)).slice(0,1);
-  const latest=dates[0]||'';
-  const dRows=rows.filter(r=>isoD(r[1])===latest);
+  const dates=[...new Set(rows.map(r=>isoD(r[1])).filter(d=>d))].sort((a,b)=>b.localeCompare(a));
+  const n1=dates[0]||'';
+  const dRows=rows.filter(r=>isoD(r[1])===n1);
   let tv=0,tc=0;dRows.forEach(r=>{tv+=Math.round(parseFloat(r[2])||0);tc+=Math.round(parseFloat(r[4])||0);});
-  if(tv>0)lines.push(`\nODR TTS (${shortD(latest)}): Tổng Vol GTC=${tv}, Ontime=${tc} (${(tc/tv*100).toFixed(1)}%)`);
+  if(tv>0)lines.push(`\nODR TTS N-1 (${shortD(n1)}): Vol=${tv}, Ontime=${tc} (${(tc/tv*100).toFixed(1)}%)`);
  }
+ if(window._ROTLC&&window._ROTLC.length){
+  const dates=[...new Set(window._ROTLC.map(r=>r.date))].sort((a,b)=>b.localeCompare(a));
+  const n1=dates[0]||'',n7=dates[6]||'';
+  lines.push(`\nRớt LC: N-1=${window._ROTLC.filter(r=>r.date===n1).length} đơn, N-7=${n7?window._ROTLC.filter(r=>r.date===n7).length:0} đơn`);
+ }
+ if(window._BATON?.rows?.length)lines.push(`\nBưu Cục Bất Ổn (Baton): ${window._BATON.rows.length} BC — ${window._BATON.rows.map(r=>r.bc).join(', ')}`);
  return lines.join('\n')||'(Dữ liệu chưa được tải)';
 }
-function md2html(text){return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/^### (.+)$/gm,'<h3>$1</h3>').replace(/^## (.+)$/gm,'<h2>$1</h2>').replace(/^# (.+)$/gm,'<h1>$1</h1>').replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\*(.+?)\*/g,'<em>$1</em>').replace(/`(.+?)`/g,'<code>$1</code>').replace(/^---$/gm,'<hr>').replace(/^> (.+)$/gm,'<blockquote>$1</blockquote>').replace(/^[\-\*] (.+)$/gm,'<li>$1</li>').replace(/(<li>.*<\/li>\n?)+/g,'<ul>$&</ul>').replace(/^\d+\. (.+)$/gm,'<li>$1</li>').replace(/\n\n/g,'</p><p>').replace(/^([^<\n].+)$/gm,'<p>$1</p>').replace(/<p><\/p>/g,'').replace(/🟢/g,'<span class="ai-tag-hl">🟢 HL</span>').replace(/🔴/g,'<span class="ai-tag-ll">🔴 LL</span>');}
+const AI_SYSTEM_PROMPT='Bạn là chuyên gia phân tích vận hành logistics GHN Vùng TNT. CHỈ phân tích dựa trên đúng phần DỮ LIỆU được cung cấp; nếu thiếu số liệu, nói rõ KHÔNG bịa. Trả lời tiếng Việt. Khi trình bày xếp hạng/bảng số liệu, dùng format monospace pipe-separated để copy vào Sheet:\nRANK | Tên | Chỉ số | ...\n-----|-----|--------\n1 | ... | ...\nThêm cột Nhóm: 🟢 Tốt / 🟢 Khá / 🔵 TB / 🟡 Kém / 🔴 Tệ. Luôn so sánh N-1 (hôm qua) với N-7 khi có dữ liệu.';
+function md2html(text){
+ let t=text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+ const blocks=[];t=t.replace(/(^|\n)((?:[^\n]+\|[^\n]+\n)(?:[-| :]+\n)(?:(?:[^\n]+\|[^\n]+\n?)+))/g,(m,pre,table)=>{const id='ait_'+blocks.length;blocks.push(table.trim());return pre+`<div class="mono-copy-wrap" style="margin:12px 0"><div class="mono-copy-head"><span>📋 Bảng kết quả</span><button type="button" class="mono-copy-btn" onclick="copyMonoText('${id}')">copy</button></div><div class="mono-copy-body"><pre class="mono-copy-pre" id="${id}">${blocks[blocks.length-1].replace(/</g,'&lt;')}</pre></div></div>`;});
+ return t.replace(/^### (.+)$/gm,'<h3>$1</h3>').replace(/^## (.+)$/gm,'<h2>$1</h2>').replace(/^# (.+)$/gm,'<h1>$1</h1>').replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\*(.+?)\*/g,'<em>$1</em>').replace(/`(.+?)`/g,'<code>$1</code>').replace(/^---$/gm,'<hr>').replace(/^> (.+)$/gm,'<blockquote>$1</blockquote>').replace(/^[\-\*] (.+)$/gm,'<li>$1</li>').replace(/(<li>.*<\/li>\n?)+/g,'<ul>$&</ul>').replace(/^\d+\. (.+)$/gm,'<li>$1</li>').replace(/\n\n/g,'</p><p>').replace(/^([^<\n].+)$/gm,'<p>$1</p>').replace(/<p><\/p>/g,'').replace(/🟢/g,'<span class="ai-tag-hl">🟢 HL</span>').replace(/🔴/g,'<span class="ai-tag-ll">🔴 LL</span>');
+}
 function saveGroqKey(){const k=(document.getElementById('groqKeyInput').value||'').trim();localStorage.setItem('claudeApiKey',k);document.getElementById('groqKeySaved').textContent=k?'✅ Đã lưu':'';}
 async function runAIAnalysis(){
  const key=localStorage.getItem('claudeApiKey')||'';
@@ -1597,29 +1836,41 @@ async function runAIAnalysis(){
  try{
   if(mode==='all'){
    document.getElementById('aiStatus').textContent='⏳ Đang nạp toàn bộ dữ liệu...';
-   await aiEnsureData(true,true);
+   await aiEnsureData(true,true,true,true);
    const days=+(document.getElementById('aiAllDays')?.value)||7;
-   ctx=aiCtxAll(days);scopeNote=`Phạm vi: TOÀN BỘ dữ liệu, ${days} ngày gần nhất.`;
+   ctx=aiCtxAll(days);scopeNote=`Phạm vi: TOÀN BỘ dữ liệu, ${days} ngày gần nhất. So sánh N-1 vs N-7.`;
   }else if(mode==='custom'){
-   const dataset=document.getElementById('aiCustDataset')?.value||'gtcTotal';
+   let dataset=document.getElementById('aiCustDataset')?.value||'gtcTotal';
    const days=+(document.getElementById('aiCustDays')?.value)||7;
-   const subject=document.getElementById('aiCustSubject')?.value||'am';
+   let subject=document.getElementById('aiCustSubject')?.value||'am';
+   const detected=aiDetectFromQuestion(userQ);
+   if(detected){dataset=detected;const sel=document.getElementById('aiCustDataset');if(sel)sel.value=detected;scopeNote=`[Tự nhận diện nguồn: ${AI_DATA_REGISTRY[detected]?.tag||detected}] `;}
    document.getElementById('aiStatus').textContent='⏳ Đang nạp dữ liệu...';
-   await aiEnsureData(dataset==='canNang',dataset==='aging');
+   await aiEnsureData(dataset==='canNang'||dataset==='baton',dataset==='aging',dataset==='rotLC',dataset==='baton');
    ctx=aiCtxCustom(dataset,days,subject);
-   const dmap={gtcTotal:'GTC Total',gtcTTS:'GTC TTS',canNang:'GTC chi tiết cân nặng',fd:'Tỉ lệ trả FD',odr:'ODR Ontime',opr:'OPR Ontime',aging:'Aging >5 ngày'};
+   const dmap={gtcTotal:'GTC Total',gtcTTS:'GTC TTS',canNang:'GTC chi tiết cân nặng',fd:'Tỉ lệ trả FD',odr:'ODR Ontime',opr:'OPR Ontime',aging:'Aging >5 ngày',rotLC:'Rớt LC',baton:'Bưu Cục Bất Ổn (Baton)'};
    const smap={am:'AM',bc:'Bưu cục',loai:'Loại hàng'};
-   scopeNote=`Phạm vi: ${dmap[dataset]} · ${days} ngày · theo ${smap[subject]}.`;
+   scopeNote=(scopeNote||'')+`Phạm vi: ${dmap[dataset]} · ${days} ngày · theo ${smap[subject]||'BC'}. So sánh N-1 vs N-7.`;
   }else{
-   ctx=gatherDashboardData();scopeNote='Phạm vi: dữ liệu nhanh (GTC Total 7 ngày, FD/ODR ngày mới nhất).';
+   const detected=aiDetectFromQuestion(userQ);
+   if(detected){
+    document.getElementById('aiStatus').textContent='⏳ Tự nhận diện nguồn: '+AI_DATA_REGISTRY[detected].tag+'...';
+    await aiEnsureData(detected==='canNang'||detected==='baton',detected==='aging',detected==='rotLC',detected==='baton');
+    ctx=aiCtxCustom(detected,7,detected==='baton'||detected==='aging'||detected==='rotLC'?'bc':'am');
+    scopeNote=`[Tự nhận diện] ${AI_DATA_REGISTRY[detected].tag} · N-1 vs N-7.`;
+   }else{
+    await aiEnsureData(false,false,true,false);
+    ctx=gatherDashboardData();scopeNote='Phạm vi: dữ liệu nhanh (GTC, FD, ODR, Rớt LC, Baton) · N-1 vs N-7.';
+   }
   }
   document.getElementById('aiStatus').textContent='';
  }catch(_){ctx=gatherDashboardData();}
  try{
-  const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:4096,system:'Bạn là chuyên gia phân tích vận hành logistics GHN Vùng TNT. CHỈ phân tích dựa trên đúng phần DỮ LIỆU được cung cấp và đúng PHẠM VI nêu ở đầu; nếu dữ liệu không có thông tin cần thiết, nói rõ là thiếu, KHÔNG bịa số. Dùng số liệu thực tế trong dữ liệu, trả lời tiếng Việt, format rõ ràng.',messages:[{role:'user',content:`${scopeNote}\n\nDỮ LIỆU:\n${ctx}\n\nYÊU CẦU:\n${userQ}`}]})});
+  const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:4096,system:AI_SYSTEM_PROMPT,messages:[{role:'user',content:`${scopeNote}\n\nDỮ LIỆU:\n${ctx}\n\nYÊU CẦU:\n${userQ}`}]})});
   if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||`HTTP ${res.status}`);}
   const data=await res.json();const text=(data.content&&data.content[0]&&data.content[0].text)||'(Không có phản hồi)';
   document.getElementById('aiResultArea').innerHTML=md2html(text);window._lastAIResult=text;
+  try{const hist=aiLoadSaved();if(!hist.some(q=>q.text===userQ))localStorage.setItem(AI_Q_KEY,JSON.stringify([{text:userQ,ts:Date.now()},...hist].slice(0,50)));aiRenderSavedQuestions();}catch(_){}
   card.scrollIntoView({behavior:'smooth',block:'start'});
  }catch(e){document.getElementById('aiResultArea').innerHTML=`<div style="color:#f87171;padding:12px;background:rgba(248,113,113,0.08);border-radius:8px">❌ ${e.message}</div>`;}
  btn.disabled=false;btn.innerHTML='<span>✨</span><span>Phân tích ngay</span>';
@@ -1685,8 +1936,19 @@ async function init(){
  if(R['OPR TTS - AM']&&R['OPR TTS - Bưu Cục'])
   p6el.innerHTML=buildOntimePage(R['OPR TTS - AM'],R['OPR TTS - Bưu Cục'],'Tổng quan OPR TTS','Vol LTC','LTC đúng Ontime',90,80);
  else p6el.innerHTML=errPage('Không thể tải OPR TTS. Kiểm tra sheet "OPR TTS - AM" / "OPR TTS - Bưu Cục".');
- // p7 — Aging
+ // p7 — Aging (tải Baton → _BATON + _AGING.unstable)
  await buildAgingPage();
+ // GTCD cho Hàng Tồn 3N trên Tổng quan BC bất ổn
+ try{
+  const[raw]=await Promise.all([fetchSheetByGid(GTCD_GID)]);
+  window._GTCD=window._GTCD||{charts:{}};
+  window._GTCD.rows=(raw||[]).slice(1).filter(r=>r.length>10&&(r[0]||'').trim()).map(r=>({
+   am:(r[0]||'').trim(),bc:(r[1]||'').trim(),loai:gtcdLoaiKey(r[2]),kl:(r[3]||'').trim(),
+   date:isoD(r[4]),vol:Math.round(parseFloat(r[5])||0),gan:(parseFloat(r[6])||0)*100,
+   gtc:(parseFloat(r[7])||0)*100,ngtc:Math.round(parseFloat(r[10])||0),ntra:Math.round(parseFloat(r[11])||0)
+  })).filter(r=>r.date&&r.loai);
+  if(window._BATON?.unstable?.size)window._GTCD.unstable=window._BATON.unstable;
+ }catch(e){console.warn('GTCD overview lỗi',e.message);}
  // Rớt LC raw (dùng cho Tổng quan + tab Rớt LC)
  let rotData=[];
  try{const rotRaw=await fetchSheetById(ROTLC_SID,'Rot_LC_Raw');rotData=normalizeRotLC((rotRaw||[]).slice(1));window._ROTLC=rotData;}catch(e){console.warn('Rot LC lỗi',e.message);}
@@ -1710,7 +1972,7 @@ async function init(){
 
 loadAll=async function(){
  const btn=document.getElementById('refreshBtn');btn.classList.add('spinning');btn.disabled=true;
- window._ROTLC=null;
+ window._ROTLC=null;window._BATON={rows:[],unstable:new Set(),byBC:{}};
  ['p0','p1','p2','p3','p4','p5','p6','p7','p8','p9'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML='<div class="loading"><div class="spinner"></div><div class="loading-text">Đang tải dữ liệu mới...</div></div>';});
  await init();
 };
