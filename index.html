@@ -1051,8 +1051,8 @@ function gtcDetailSkeleton(rows){
   <div class="chip-row"><span class="chip-label">Khối lượng</span>${GTCD_KL.map(k=>`<span class="chip active" data-kl="${k.id}" onclick="gtcdToggle(this,'kl')">${k.label}</span>`).join('')}</div>
  </div>
  <div class="kpi-grid" id="gtcd_kpi"></div>
- <div class="chart-box"><h3>Xu hướng Volume theo Loại hàng</h3><div class="csub">Đường = loại hàng (+ Tổng đậm) · Cột = Volume theo 4 nhóm khối lượng/ngày.</div><div class="chart-canvas-wrap"><canvas id="gtcd_chartVol"></canvas></div></div>
- <div class="chart-box"><h3>Xu hướng %GTC theo Loại hàng</h3><div class="csub">Đường = %GTC loại hàng (+ Tổng nét đứt) · Cột = %GTC theo 4 nhóm khối lượng/ngày.</div><div class="chart-canvas-wrap"><canvas id="gtcd_chartGTC"></canvas></div></div>
+ <div class="chart-box"><h3>Xu hướng Volume theo Loại hàng</h3><div class="csub">Đường = loại hàng (+ Tổng đậm) · Cột = Volume theo 4 nhóm khối lượng/ngày.</div><div class="chart-canvas-wrap"><canvas id="gtcd_chartVol"></canvas></div><div id="gtcd_volNote"></div></div>
+ <div class="chart-box"><h3>Xu hướng %GTC theo Loại hàng</h3><div class="csub">Đường = %GTC loại hàng (+ Tổng nét đứt) · Cột = %GTC theo 4 nhóm khối lượng/ngày.</div><div class="chart-canvas-wrap"><canvas id="gtcd_chartGTC"></canvas></div><div id="gtcd_gtcNote"></div></div>
  <div class="card"><div class="card-header"><div class="card-title"><div class="card-icon">👤</div>Theo AM</div><div class="card-info">Sắp xếp Volume cao → thấp · theo bộ lọc hiện tại</div></div><div id="gtcd_amTable"></div></div>
  <div class="card"><div class="card-header"><div class="card-title"><div class="card-icon">🏪</div>Theo Bưu Cục</div><div class="card-info">Đánh dấu ⚠ bưu cục bất ổn (nguồn: Baton)</div></div><div id="gtcd_bcTable"></div></div>
  <div id="gtcd_analysis"></div>`;
@@ -1090,6 +1090,59 @@ function gtcdAnalysisHTML(data){
  if(n2){warn=`<div style="margin-top:8px;font-size:12px">📦 Sản lượng ${chip('Hàng Mới Ca 2',ca2_1,ca2_2)}${chip('Hàng cồng kềnh (≥5kg)',hv1,hv2)}<span style="color:var(--text-sub);font-weight:500">— bôi đỏ nếu tăng so hôm trước</span></div>`;}
  if(!ana&&!warn)return'';
  return`<div class="analysis-box" style="margin:0 0 18px">${ana}${warn}</div>`;
+}
+function gtcdBaseRows(){
+ const G=window._GTCD;
+ const from=document.getElementById('gtcd_from')?.value||'',to=document.getElementById('gtcd_to')?.value||'';
+ const lo=from<=to?from:to,hi=from<=to?to:from;
+ const am=document.getElementById('gtcd_am')?.value||'',bc=document.getElementById('gtcd_bc')?.value||'';
+ return G.rows.filter(r=>r.date>=lo&&r.date<=hi&&(!am||r.am===am)&&(!bc||r.bc===bc));
+}
+function gtcdN1Date(data){const dts=[...new Set(data.map(r=>r.date))].sort();return dts[dts.length-1]||'';}
+function gtcdNoteChip(color,label,val,isPct){
+ const v=isPct?`${(+val).toFixed(1)}%`:fmt(val);
+ return`<span style="display:inline-flex;align-items:center;gap:4px;margin:3px 14px 3px 0;white-space:nowrap"><span style="display:inline-block;width:10px;height:10px;background:${color};border-radius:2px;flex-shrink:0"></span><span>${label}: <strong>${v}</strong></span></span>`;
+}
+function gtcdChartVolNote(data){
+ const d=gtcdN1Date(data);if(!d)return'';
+ const rows=data.filter(r=>r.date===d);
+ let tot=0,byLoai={},byKL={};
+ GTCD_LOAI.forEach(l=>byLoai[l]=0);GTCD_KL.forEach(k=>byKL[k.id]=0);
+ rows.forEach(r=>{tot+=r.vol;if(byLoai[r.loai]!==undefined)byLoai[r.loai]+=r.vol;if(byKL[r.kl]!==undefined)byKL[r.kl]+=r.vol;});
+ let h=`<div class="analysis-box" style="margin-top:10px;font-size:12px;line-height:1.8">📅 <strong>${shortD(d)}</strong> — `;
+ h+=gtcdNoteChip(GTCD_COLORS['Tổng'],'Tổng',tot,false);
+ GTCD_LOAI.forEach(l=>h+=gtcdNoteChip(GTCD_COLORS[l],l,byLoai[l],false));
+ GTCD_KL.forEach(k=>h+=gtcdNoteChip(GTCD_KLC[k.id],'KL '+k.label,byKL[k.id],false));
+ return h+'</div>';
+}
+function gtcdChartGtcNote(data){
+ const d=gtcdN1Date(data);if(!d)return'';
+ const rows=data.filter(r=>r.date===d);
+ let tN=0,tV=0,byLoai={},byKL={};
+ GTCD_LOAI.forEach(l=>byLoai[l]={n:0,v:0});GTCD_KL.forEach(k=>byKL[k.id]={n:0,v:0});
+ rows.forEach(r=>{tN+=r.ngtc;tV+=r.vol;if(byLoai[r.loai]){byLoai[r.loai].n+=r.ngtc;byLoai[r.loai].v+=r.vol;}if(byKL[r.kl]){byKL[r.kl].n+=r.ngtc;byKL[r.kl].v+=r.vol;}});
+ const pct=(n,v)=>v?n/v*100:0;
+ let h=`<div class="analysis-box" style="margin-top:10px;font-size:12px;line-height:1.8">📅 <strong>${shortD(d)}</strong> — `;
+ h+=gtcdNoteChip(GTCD_COLORS['Tổng'],'Tổng',pct(tN,tV),true);
+ GTCD_LOAI.forEach(l=>h+=gtcdNoteChip(GTCD_COLORS[l],l,pct(byLoai[l].n,byLoai[l].v),true));
+ GTCD_KL.forEach(k=>h+=gtcdNoteChip(GTCD_KLC[k.id],'KL '+k.label,pct(byKL[k.id].n,byKL[k.id].v),true));
+ return h+'</div>';
+}
+function gtcdSurgeWarnHTML(base,keyFn,label){
+ const dts=[...new Set(base.map(r=>r.date))].sort();
+ const n1=dts[dts.length-1],n2=dts[dts.length-2];
+ if(!n1||!n2)return'';
+ const cur={},prev={};
+ const bump=(map,d,r)=>{const k=keyFn(r);if(!k)return;if(!map[k])map[k]={ca2:0,ton:0};if(r.loai==='Hàng Mới Ca 2')map[k].ca2+=r.vol;else if(r.loai==='Hàng Tồn')map[k].ton+=r.vol;};
+ base.filter(r=>r.date===n1).forEach(r=>bump(cur,n1,r));
+ base.filter(r=>r.date===n2).forEach(r=>bump(prev,n2,r));
+ const warns=[];
+ Object.keys(cur).forEach(k=>{const c=cur[k],p=prev[k]||{ca2:0,ton:0};
+  if(p.ca2>0&&(c.ca2-p.ca2)/p.ca2>0.1)warns.push(`<strong>${k}</strong> — Hàng Ca2 <span style="color:var(--red);font-weight:700">+${((c.ca2-p.ca2)/p.ca2*100).toFixed(0)}%</span> (${fmt(p.ca2)}→${fmt(c.ca2)})`);
+  if(p.ton>0&&(c.ton-p.ton)/p.ton>0.1)warns.push(`<strong>${k}</strong> — Hàng tồn <span style="color:var(--red);font-weight:700">+${((c.ton-p.ton)/p.ton*100).toFixed(0)}%</span> (${fmt(p.ton)}→${fmt(c.ton)})`);
+ });
+ if(!warns.length)return'';
+ return`<div class="analysis-box" style="margin-top:8px;font-size:12px">⚠️ ${label} tăng &gt;10% so với ${shortD(n2)}: ${warns.join(' · ')}</div>`;
 }
 function gtcdToggle(elm,type){
  elm.classList.toggle('active');
@@ -1154,8 +1207,11 @@ function renderGTCDetail(){
   if(!bcAgg[r.bc])bcAgg[r.bc]={name:r.bc,am:r.am,vol:0,ngtc:0,ntra:0,ganW:0,heavy:0};
   const b=bcAgg[r.bc];b.vol+=r.vol;b.ngtc+=r.ngtc;b.ntra+=r.ntra;b.ganW+=r.vol*r.gan;if(r.kl!=='1. <5Kg')b.heavy+=r.vol;
  });
- document.getElementById('gtcd_amTable').innerHTML=gtcdAggTable(Object.values(amAgg).sort((a,b)=>b.vol-a.vol),false);
- document.getElementById('gtcd_bcTable').innerHTML=gtcdAggTable(Object.values(bcAgg).sort((a,b)=>b.vol-a.vol),true);
+ const base=gtcdBaseRows();
+ document.getElementById('gtcd_amTable').innerHTML=gtcdAggTable(Object.values(amAgg).sort((a,b)=>b.vol-a.vol),false)+gtcdSurgeWarnHTML(base,r=>r.am,'AM');
+ document.getElementById('gtcd_bcTable').innerHTML=gtcdAggTable(Object.values(bcAgg).sort((a,b)=>b.vol-a.vol),true)+gtcdSurgeWarnHTML(base,r=>r.bc,'Bưu cục');
+ const volNote=document.getElementById('gtcd_volNote');if(volNote)volNote.innerHTML=gtcdChartVolNote(base);
+ const gtcNote=document.getElementById('gtcd_gtcNote');if(gtcNote)gtcNote.innerHTML=gtcdChartGtcNote(base);
  const anaEl=document.getElementById('gtcd_analysis');if(anaEl)anaEl.innerHTML=gtcdAnalysisHTML(data);
 }
 function gtcdAggTable(rows,isBC){
