@@ -1662,13 +1662,13 @@ function hronTrendTable(arr,keyField,title,icon,badge,last7,latest,prev,unstable
   const rankColor=idx<3?'color:var(--orange);font-weight:800;font-size:14px':'color:var(--text-sub);font-weight:600';
   t+=`<tr style="border-bottom:1px solid var(--border)"><td style="padding:9px 14px;${rankColor}">${idx+1}</td><td style="padding:9px 14px;font-weight:600;font-size:13px">${name}${isUnstable?'<span style="display:inline-block;background:#FEE2E2;color:var(--red);border:1px solid #FECACA;border-radius:4px;font-size:9px;font-weight:700;padding:1px 5px;margin-left:5px">⚠ bất ổn</span>':''}</td>`;
   last7.forEach((d,i)=>{const v=row[d]||0;const isLatest=i===last7.length-1;const barW=isLatest&&maxV>0?Math.round((v/maxV)*50):0;if(isLatest){t+=`<td style="padding:9px 14px;text-align:right;background:#FFF0EB"><div style="display:flex;align-items:center;justify-content:flex-end;gap:5px"><div style="height:5px;border-radius:3px;background:var(--orange);width:${barW}px;min-width:${v>0?2:0}px"></div><span style="font-weight:800;font-size:14px;color:var(--orange-dark,#C8461A)">${v>0?fmt(v):'—'}</span></div></td>`;}else{t+=`<td style="padding:9px 14px;text-align:right;font-weight:500;color:${v>0?'var(--text-main)':'var(--border)'}">${v>0?fmt(v):'—'}</td>`;}});
-  const curr=row[latest]||0,prevRow=row[prev]||0;const trendColor=curr<prevRow?'var(--green)':curr>prevRow?'var(--red)':'var(--text-sub)';const trendTxt=curr<prevRow?`▼ ${prevRow-curr}`:curr>prevRow?`▲ ${curr-prevRow}`:'—';
+  const curr=row[latest]||0,prevRow=row[prev]||0;const trendColor=curr<prevRow?'var(--red)':curr>prevRow?'var(--green)':'var(--text-sub)';const trendTxt=curr<prevRow?`▼ ${prevRow-curr}`:curr>prevRow?`▲ ${curr-prevRow}`:'—';
   t+=`<td style="padding:9px 14px;text-align:right;color:${trendColor};font-weight:700;font-size:13px;white-space:nowrap">${trendTxt}</td></tr>`;
  });
  t+=`<tfoot><tr style="background:var(--orange-light,#FFF0EB);border-top:2px solid var(--orange)"><td style="padding:9px 12px;font-weight:800;color:var(--orange)"></td><td style="padding:9px 12px;font-weight:800;color:var(--orange)">TỔNG CỘNG</td>`;
  last7.forEach((d,i)=>{const sum=arr.reduce((s,r)=>s+(r[d]||0),0);const isLatest=i===last7.length-1;t+=`<td style="padding:9px 12px;text-align:right;font-weight:800;${isLatest?'color:var(--orange-dark,#C8461A);background:#FFE0CC':'color:var(--text-main)'}">${fmt(sum)}</td>`;});
  const sC=arr.reduce((s,r)=>s+(r[latest]||0),0),sP=arr.reduce((s,r)=>s+(r[prev]||0),0),sD=sC-sP;
- t+=`<td style="padding:9px 12px;text-align:right;color:${sD<0?'var(--green)':sD>0?'var(--red)':'var(--text-sub)'};font-weight:800;white-space:nowrap">${sD<0?`▼ ${sP-sC}`:sD>0?`▲ ${sC-sP}`:'—'}</td></tr></tfoot></table></div></div>`;
+ t+=`<td style="padding:9px 12px;text-align:right;color:${sD<0?'var(--red)':sD>0?'var(--green)':'var(--text-sub)'};font-weight:800;white-space:nowrap">${sD<0?`▼ ${sP-sC}`:sD>0?`▲ ${sC-sP}`:'—'}</td></tr></tfoot></table></div></div>`;
  return t;
 }
 function renderHRON(){
@@ -1683,7 +1683,7 @@ function renderHRON(){
  const byDate={};recent.forEach(r=>{byDate[r.date]=(byDate[r.date]||0)+r.count;});
  const latestTotal=byDate[latest]||0,prevTotal=byDate[prev]||0,delta=latestTotal-prevTotal;
  const unstableLatest=recent.filter(r=>r.date===latest&&bcMatchUnstable(r.bc)).reduce((s,r)=>s+r.count,0);
- const deltaSign=delta>0?'+':'';const deltaIcon=delta<0?'▼':delta>0?'▲':'—';const deltaColor=delta<0?'var(--green)':delta>0?'var(--red)':'var(--text-sub)';
+ const deltaSign=delta>0?'+':'';const deltaIcon=delta<0?'▼':delta>0?'▲':'—';const deltaColor=delta<0?'var(--red)':delta>0?'var(--green)':'var(--text-sub)';
  let kpi=`<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px">`;
  [{icon:'👥',label:'Nhân sự hôm nay',val:fmt(latestTotal),sub:shortD(latest),color:'var(--orange)'},
   {icon:'📅',label:'Nhân sự N-1',val:fmt(prevTotal),sub:shortD(prev),color:'#3182CE'},
@@ -2236,10 +2236,18 @@ function aiComputeFromSheet(def,raw,days){
  arr.forEach((x,i)=>{const u=def.level==='bc'&&getUnstableSet().has(x.k)?' [BẤT ỔN]':'';const n1t=x.n1==null?'—':x.n1.toFixed(2)+'%';const n7t=x.n7==null?'—':x.n7.toFixed(2)+'%';s+=`${i+1}. ${x.k}${u}: ${fld} bq=${x.avg.toFixed(2)}% (N-7=${n7t}→N-1=${n1t})\n`;});
  return s;
 }
+// Lấy các sheet nguồn ứng với dataset đã chọn (dùng khi câu hỏi không khớp từ khoá nhưng vẫn cần đọc file)
+function aiDefsForDataset(dataset,level){
+ const pat={gtcTotal:/gtc total/i,gtcTTS:/gtc tts/i,fd:/^fd total/i,odr:/odr/i,opr:/opr/i};
+ const re=pat[dataset];if(!re)return[];
+ return SHEET_REGISTRY.filter(d=>d.level===level&&re.test(d.sheet));
+}
 // Tổng hợp ngữ cảnh từ các sheet AI tự tìm theo câu hỏi
-async function aiAutoSourceContext(userQ,subject,days){
+async function aiAutoSourceContext(userQ,subject,days,forceDataset){
  const level=aiDetectLevelFromQuestion(userQ)||(subject==='bc'?'bc':'am');
- const defs=aiSearchSheets(userQ,level);if(!defs.length)return null;
+ let defs=aiSearchSheets(userQ,level);
+ if(!defs.length&&forceDataset)defs=aiDefsForDataset(forceDataset,level);
+ if(!defs.length)return null;
  const parts=[];const used=[];
  for(const def of defs){
   try{const raw=await aiFetchSheetCached(def.sheet);const seg=aiComputeFromSheet(def,raw,days);if(seg){parts.push(seg);used.push(`${def.sheet} (${def.level==='bc'?'Bưu Cục':'AM'})`);}}catch(e){}
@@ -2595,6 +2603,8 @@ function gatherDashboardData(){
  return lines.join('\n')||'(Dữ liệu chưa được tải)';
 }
 const AI_SYSTEM_PROMPT=`Bạn đóng vai trò là CHUYÊN GIA CỐ VẤN VẬN HÀNH LOGISTICS Vùng TNT (GHN). Nhiệm vụ: đọc dữ liệu, đưa ra nhận định chuyên sâu, cảnh báo rủi ro và khuyến nghị hành động cụ thể. CHỈ phân tích dựa trên đúng phần DỮ LIỆU được cung cấp; nếu thiếu số liệu, nói rõ KHÔNG bịa. Trả lời tiếng Việt.
+LƯU Ý: Phần "NGUỒN DỮ LIỆU AI TỰ TÌM/ĐỌC" được TÍNH TRỰC TIẾP từ sheet thô — ưu tiên dùng các con số này, đọc kỹ để hiểu ngữ cảnh từng AM/Bưu Cục trước khi nhận định, không suy diễn ngoài dữ liệu.
+ĐẶC BIỆT về NHÂN SỰ (Định biên/HRON): số nhân sự GIẢM là TÍN HIỆU XẤU (rủi ro thiếu người, ảnh hưởng năng suất/giao hàng) — đánh dấu cảnh báo; số nhân sự TĂNG là tín hiệu tốt. Khi BC bất ổn đi kèm nhân sự giảm, mức rủi ro càng cao.
 
 QUY TẮC ĐÁNH GIÁ TỐT/XẤU (TUYỆT ĐỐI KHÔNG ĐƯỢC HIỂU NGƯỢC):
 - %GTC: CÀNG THẤP CÀNG TỆ (cao = tốt).
@@ -2638,7 +2648,7 @@ async function runAIAnalysis(){
  const card=document.getElementById('aiResultCard');card.style.display='block';
  document.getElementById('aiResultArea').innerHTML='<div class="ai-thinking"><div class="ai-thinking-dot"></div><div class="ai-thinking-dot"></div><div class="ai-thinking-dot"></div><span style="margin-left:8px">AI đang phân tích...</span></div>';
  const mode=window._aiMode||'preset';
- let ctx,scopeNote='';
+ let ctx,scopeNote='',forceDS='';
  try{
   if(mode==='all'){
    document.getElementById('aiStatus').textContent='⏳ Đang nạp toàn bộ dữ liệu...';
@@ -2651,7 +2661,8 @@ async function runAIAnalysis(){
    let subject=document.getElementById('aiCustSubject')?.value||'am';
    const detected=aiDetectFromQuestion(userQ);
    if(detected){dataset=detected;const sel=document.getElementById('aiCustDataset');if(sel)sel.value=detected;scopeNote=`[Tự nhận diện nguồn: ${AI_DATA_REGISTRY[detected]?.tag||detected}] `;}
-   document.getElementById('aiStatus').textContent='⏳ Đang nạp dữ liệu...';
+   forceDS=dataset;
+   document.getElementById('aiStatus').textContent='⏳ Đang đọc sheet nguồn để tính toán...';
    const f=aiEnsureFlags(dataset);
    const needHR=/nhân sự|năng suất|hron|thu nhập|định biên|nâng.*thu nhập|300\.?000/i.test(userQ);
    await aiEnsureData(f.canNang,f.aging,f.rotLC,f.baton,f.hron||needHR,f.ns||needHR);
@@ -2659,7 +2670,7 @@ async function runAIAnalysis(){
    if(needHR&&dataset!=='hron'&&dataset!=='nangSuat'&&dataset!=='baton')ctx+=aiHron(days,'am')+aiNangSuat(days,'am');
    const dmap={gtcTotal:'GTC Total',gtcTTS:'GTC TTS',canNang:'GTC chi tiết cân nặng',fd:'Tỉ lệ trả FD',odr:'ODR Ontime',opr:'OPR Ontime',aging:'Aging >5 ngày',rotLC:'Rớt LC',hron:'Định biên nhân sự (HRON)',nangSuat:'Năng suất nhân viên',baton:'BC Bất Ổn + Năng suất/Thu nhập'};
    const smap={am:'AM',bc:'Bưu cục',loai:'Loại hàng'};
-   scopeNote=(scopeNote||'')+(dataset==='baton'?`[CHUYÊN GIA NHÂN SỰ] `:'')+`Phạm vi: ${dmap[dataset]} · ${days} ngày · theo ${smap[subject]||'BC'}. So sánh N-1 vs N-7.`;
+   scopeNote=(scopeNote||'')+(dataset==='baton'?`[CHUYÊN GIA NHÂN SỰ] `:'')+`Phạm vi: ${dmap[dataset]} · ${days} ngày · theo ${smap[subject]||'BC'} · ĐỌC SHEET NGUỒN tính trực tiếp. So sánh N-1 vs N-7.`;
    }else{
     const detected=aiDetectFromQuestion(userQ);
     if(detected){
@@ -2678,13 +2689,13 @@ async function runAIAnalysis(){
     scopeNote='Phạm vi: dữ liệu nhanh (GTC, FD, ODR, Rớt LC, Baton'+(needHR?', Nhân sự':'')+') · N-1 vs N-7.';
    }
   }
-  // ===== AI tự tìm sheet nguồn theo từ khoá trong câu hỏi (vd: Shopee → FD Shopee theo AM) =====
+  // ===== AI tự tìm/đọc sheet nguồn để TÍNH trực tiếp (custom: luôn đọc file dù không khớp từ khoá) =====
   try{
    const subjForSearch=aiDetectLevelFromQuestion(userQ)||(document.getElementById('aiCustSubject')?.value==='bc'?'bc':'am');
    const daysSearch=+(document.getElementById('aiCustDays')?.value||document.getElementById('aiAllDays')?.value)||7;
-   document.getElementById('aiStatus').textContent='🔎 Đang dò sheet nguồn liên quan câu hỏi...';
-   const auto=await aiAutoSourceContext(userQ,subjForSearch,daysSearch);
-   if(auto){ctx=auto.ctx+'\n\n'+ctx;scopeNote=(scopeNote||'')+` · Sheet (${auto.level==='bc'?'Bưu Cục':'AM'}): ${auto.used.join(', ')}.`;}
+   document.getElementById('aiStatus').textContent='🔎 Đang đọc sheet nguồn để tính toán & hiểu ngữ cảnh...';
+   const auto=await aiAutoSourceContext(userQ,subjForSearch,daysSearch,mode==='custom'?forceDS:'');
+   if(auto){ctx=auto.ctx+'\n\n'+ctx;scopeNote=(scopeNote||'')+` · Sheet đã đọc (${auto.level==='bc'?'Bưu Cục':'AM'}): ${auto.used.join(', ')}.`;}
   }catch(_){}
   document.getElementById('aiStatus').textContent='';
  }catch(_){ctx=gatherDashboardData();}
