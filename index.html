@@ -407,6 +407,16 @@ function parseSheetDate(d){
  if(m)return`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
  return isoD(s);
 }
+// Parse số từ sheet: hỗ trợ VN (1.234.567,89) và decimal (546319.54)
+function parseSheetNum(v){
+ const s=String(v??'').trim().replace(/[^\d.,\-]/g,'');
+ if(!s)return 0;
+ if(s.includes(',')&&s.includes('.'))return parseFloat(s.replace(/\./g,'').replace(',','.'))||0;
+ if(s.includes(','))return parseFloat(s.replace(',','.'))||0;
+ const parts=s.split('.');
+ if(parts.length>2)return parseFloat(parts.join(''))||0;
+ return parseFloat(s)||0;
+}
 function shortD(iso){const p=(iso||'').split('-');return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:iso;}
 function bcMatchUnstable(bc){
  const u=getUnstableSet();if(!bc||!u.size)return false;
@@ -1723,23 +1733,27 @@ function hronDrawChart(canvasId,labels,data){
 }
 
 /* ===== NHÂN SỰ — NĂNG SUẤT (p11) Data_Năng_Suất ===== */
-// cols: Ngày thống kê(0), Nhân viên(1), Bưu cục(2), …, Số đơn gán Giao(6), Đơn giao tính lương(8), Số ngày đi làm(12), Tổng lương(14)
-window._NS={rows:[],charts:{},bc2am:{}};
+// cols: Ngày(0), NV(1), BC(2), …, Gán Giao(6), GTC lương(8), Ngày đi làm(12), Tổng lương(14), AM(18/cột S)
+const NS_LOW_INCOME=300000;
+window._NS={rows:[],charts:{}};
+function nsThuNhapRow(r){return r.ngayLam>0?r.luong/r.ngayLam:0;}
 function normalizeNSRows(raw){
- return(raw||[]).slice(1).map(r=>({
-  date:parseSheetDate(r[0]),nv:(r[1]||'').trim(),bc:(r[2]||'').trim(),
-  ganGiao:parseFloat(String(r[6]||'').replace(/\./g,'').replace(',','.'))||0,
-  gtc:parseFloat(String(r[8]||'').replace(/\./g,'').replace(',','.'))||0,
-  ngayLam:parseFloat(String(r[12]||'').replace(/\./g,'').replace(',','.'))||0,
-  luong:parseFloat(String(r[14]||'').replace(/\./g,'').replace(',','.'))||0
- })).filter(r=>r.date&&(r.ganGiao>0||r.gtc>0||r.luong>0||r.ngayLam>0));
+ const bc2am=buildBc2AmMap();
+ return(raw||[]).slice(1).map(r=>{
+  const bc=(r[2]||'').trim();
+  const am=(r[18]||'').trim()||bc2am[bc]||'';
+  return{
+   date:parseSheetDate(r[0]),nv:(r[1]||'').trim(),bc,am,
+   ganGiao:parseSheetNum(r[6]),gtc:parseSheetNum(r[8]),
+   ngayLam:parseSheetNum(r[12]),luong:parseSheetNum(r[14])
+  };
+ }).filter(r=>r.date&&(r.ganGiao>0||r.gtc>0||r.luong>0||r.ngayLam>0));
 }
 async function loadNSData(){
  if(window._NS?.rows?.length)return window._NS.rows;
  const raw=await fetchSheet('Data_Năng_Suất');
  window._NS=window._NS||{charts:{}};
  window._NS.rows=normalizeNSRows(raw);
- window._NS.bc2am=buildBc2AmMap();
  return window._NS.rows;
 }
 function nsComputeMetrics(rows){
@@ -1750,21 +1764,19 @@ function nsComputeMetrics(rows){
 function buildNSPage(){
  const el=document.getElementById('p11');
  loadNSData().then(rows=>{
-  window._NS.bc2am=buildBc2AmMap();
   el.innerHTML=nsSkeleton(rows);
   setTimeout(()=>renderNS(),0);
  }).catch(e=>{el.innerHTML=errPage(`Năng suất nhân viên: ${e.message}`);});
 }
 function nsSkeleton(rows){
  const allD=[...new Set(rows.map(r=>r.date))].sort((a,b)=>b.localeCompare(a));
- const bc2am=buildBc2AmMap();
- const ams=[...new Set(rows.map(r=>bc2am[r.bc]).filter(Boolean))].sort();
+ const ams=[...new Set(rows.map(r=>r.am).filter(Boolean))].sort();
  const bcs=[...new Set(rows.map(r=>r.bc).filter(Boolean))].sort();
  const dTo=allD[0]||'',dFrom=allD[Math.min(9,allD.length-1)]||'';
  const mkOpt=(arr,sv)=>arr.map(d=>`<option value="${d}"${d===sv?' selected':''}>${shortDDow(d)}</option>`).join('');
  return`<div class="page-header">
   <div class="page-title">Năng suất nhân viên</div>
-  <div class="page-meta"><span class="tag tag-orange">📈 Nguồn: Data_Năng_Suất · TB trong khoảng thời gian chọn</span><span>Ngày mới nhất: ${shortD(dTo)}</span></div>
+  <div class="page-meta"><span class="tag tag-orange">📈 Nguồn: Data_Năng_Suất · Thu nhập TB = Tổng lương ÷ Số ngày đi làm · AM cột S</span><span>Ngày mới nhất: ${shortD(dTo)}</span></div>
  </div>
  <div class="date-filter-bar" style="flex-wrap:wrap;gap:14px">
   <div><label style="display:block;margin-bottom:3px">Từ ngày</label><select id="ns_from" onchange="renderNS()">${mkOpt(allD,dFrom)}</select></div>
@@ -1773,7 +1785,8 @@ function nsSkeleton(rows){
   <div><label style="display:block;margin-bottom:3px">Bưu cục</label><select id="ns_bc" onchange="renderNS()"><option value="">Tất cả BC</option>${bcs.map(b=>`<option value="${b.replace(/"/g,'&quot;')}">${b}</option>`).join('')}</select></div>
  </div>
  <div class="kpi-grid" id="ns_kpi"></div>
- <div class="chart-box"><h3>Xu hướng năng suất theo ngày</h3><div class="csub">Đường = NS Gán Giao TB · NS GTC · Thu nhập TB (đơn/ngày hoặc đ/ngày)</div><div class="chart-canvas-wrap"><canvas id="ns_chart"></canvas></div><div id="ns_chartNote"></div></div>
+ <div class="chart-box"><h3>Xu hướng năng suất theo ngày</h3><div class="csub">Đường = NS Gán Giao TB · NS GTC · Thu nhập TB (Tổng lương ÷ Ngày đi làm)</div><div class="chart-canvas-wrap"><canvas id="ns_chart"></canvas></div><div id="ns_chartNote"></div></div>
+ <div class="card" id="ns_warnCard"><div class="card-header"><div class="card-title"><div class="card-icon" style="background:var(--red)">⚠️</div>Cảnh báo thu nhập thấp</div><div class="card-info">BC có NV thu nhập &lt; ${(NS_LOW_INCOME/1000).toFixed(0)}kđ/ngày (Tổng lương ÷ Ngày đi làm)</div></div><div id="ns_warnTable"></div></div>
  <div class="card"><div class="card-header"><div class="card-title"><div class="card-icon">👤</div>Thống kê AM</div><div class="card-info">NS Gán Giao TB · NS GTC · Thu nhập TB trong bộ lọc</div></div><div id="ns_amTable"></div></div>
  <div class="card"><div class="card-header"><div class="card-title"><div class="card-icon">🏪</div>Thống kê Bưu Cục</div><div class="card-info">Đánh dấu ⚠ bưu cục bất ổn (nguồn: Baton)</div></div><div id="ns_bcTable"></div></div>
  <div id="ns_analysis"></div>`;
@@ -1783,17 +1796,69 @@ function nsFiltered(){
  const from=document.getElementById('ns_from')?.value||'',to=document.getElementById('ns_to')?.value||'';
  const lo=from<=to?from:to,hi=from<=to?to:from;
  const am=document.getElementById('ns_am')?.value||'',bc=document.getElementById('ns_bc')?.value||'';
- const bc2am=N.bc2am||buildBc2AmMap();
  return N.rows.filter(r=>{
   if(r.date<lo||r.date>hi)return false;
   if(bc&&r.bc!==bc)return false;
-  if(am&&(bc2am[r.bc]||'')!==am)return false;
+  if(am&&r.am!==am)return false;
   return true;
  });
 }
+function nsLowIncomeWarnHTML(data){
+ const byBC={};
+ data.forEach(r=>{
+  if(!r.bc||!r.nv||r.ngayLam<=0)return;
+  const thu=nsThuNhapRow(r);
+  if(thu<=0||thu>=NS_LOW_INCOME)return;
+  if(!byBC[r.bc])byBC[r.bc]={bc:r.bc,am:r.am||'',nv:new Set(),minThu:thu};
+  byBC[r.bc].nv.add(r.nv);
+  if(thu<byBC[r.bc].minThu)byBC[r.bc].minThu=thu;
+ });
+ const arr=Object.values(byBC).map(x=>({bc:x.bc,am:x.am,count:x.nv.size,minThu:x.minThu})).sort((a,b)=>b.count-a.count);
+ if(!arr.length)return'<p style="padding:16px;color:var(--green);font-size:13px">✅ Không có bưu cục nào có nhân viên thu nhập dưới ngưỡng trong bộ lọc hiện tại.</p>';
+ const cs='padding:6px 10px;';
+ let h=`<div class="analysis-box" style="margin:10px 16px 0">⚠️ Có <strong>${arr.length}</strong> bưu cục với <strong>${arr.reduce((s,x)=>s+x.count,0)}</strong> lượt nhân viên (theo ngày thống kê) có thu nhập &lt; ${NS_LOW_INCOME.toLocaleString('vi-VN')}đ/ngày.</div>`;
+ h+=`<div class="table-wrap" style="overflow-x:auto;max-height:480px"><table style="font-size:12px"><thead style="position:sticky;top:0;z-index:3;background:#FEE2E2"><tr>
+  <th style="${cs}text-align:center;width:34px">STT</th>
+  <th style="${cs}min-width:180px">Bưu Cục</th>
+  <th style="${cs}min-width:110px">AM</th>
+  <th style="${cs}text-align:center">Số NV &lt;300k</th>
+  <th style="${cs}text-align:right">Thu nhập thấp nhất</th>
+ </tr></thead><tbody>`;
+ arr.forEach((r,i)=>{
+  const unst=bcMatchUnstable(r.bc);
+  const badge=unst?'<span style="display:inline-block;background:#FEE2E2;color:var(--red);border:1px solid #FECACA;border-radius:4px;font-size:9px;font-weight:700;padding:1px 5px;margin-left:5px">⚠ bất ổn</span>':'';
+  h+=`<tr><td style="${cs}text-align:center;color:var(--text-sub)">${i+1}</td>
+   <td style="${cs}font-weight:700;white-space:nowrap">${r.bc}${badge}</td>
+   <td style="${cs}color:var(--text-sub);font-size:11px">${r.am||'—'}</td>
+   <td style="${cs}text-align:center;font-weight:800;color:var(--red)">${r.count}</td>
+   <td style="${cs}text-align:right;color:var(--red);font-weight:700">${Math.round(r.minThu).toLocaleString('vi-VN')}đ</td></tr>`;
+ });
+ h+='</tbody></table></div>';
+ const headers=['STT','Bưu Cục','AM','Số NV <300k','Thu nhập thấp nhất'];
+ const mrows=arr.map((r,i)=>[String(i+1),r.bc,r.am||'',String(r.count),Math.round(r.minThu).toLocaleString('vi-VN')+'đ']);
+ h+=monoCopyBox('BC có NV thu nhập <300kđ/ngày',headers,mrows,'');
+ return h;
+}
+function nsLowIncomeForAI(data,days){
+ const dset=new Set([...new Set(data.map(r=>r.date))].sort().slice(-days));
+ const f=data.filter(r=>dset.has(r.date));
+ const byBC={};
+ f.forEach(r=>{
+  if(!r.bc||!r.nv||r.ngayLam<=0)return;
+  const thu=nsThuNhapRow(r);
+  if(thu<=0||thu>=NS_LOW_INCOME)return;
+  if(!byBC[r.bc])byBC[r.bc]={bc:r.bc,am:r.am,nv:new Set(),minThu:thu};
+  byBC[r.bc].nv.add(r.nv);
+  if(thu<byBC[r.bc].minThu)byBC[r.bc].minThu=thu;
+ });
+ const arr=Object.values(byBC).map(x=>({bc:x.bc,am:x.am,count:x.nv.size,minThu:x.minThu})).sort((a,b)=>b.count-a.count);
+ if(!arr.length)return'';
+ let s=`\n### Cảnh báo thu nhập < ${NS_LOW_INCOME.toLocaleString('vi-VN')}đ/ngày (Tổng lương ÷ Ngày đi làm)\nTổng: ${arr.length} BC, ${arr.reduce((a,x)=>a+x.count,0)} lượt NV\n`;
+ arr.slice(0,25).forEach((x,i)=>{const u=bcMatchUnstable(x.bc)?' [BẤT ỔN]':'';s+=`${i+1}. ${x.bc} (${x.am||'—'})${u}: ${x.count} NV, thấp nhất ${Math.round(x.minThu).toLocaleString('vi-VN')}đ/ngày\n`;});
+ return s;
+}
 function renderNS(){
  const N=window._NS;if(!N.rows.length)return;
- N.bc2am=buildBc2AmMap();
  const data=nsFiltered();
  const m=nsComputeMetrics(data);
  const dates=[...new Set(data.map(r=>r.date))].sort();
@@ -1821,14 +1886,14 @@ function renderNS(){
  const noteEl=document.getElementById('ns_chartNote');
  if(noteEl&&n1)noteEl.innerHTML=`<div class="analysis-box" style="margin-top:10px;font-size:12px">📅 <strong>${shortD(n1)}</strong>: NS Gán Giao <strong>${n1m.nsGan.toFixed(1)}</strong> · NS GTC <strong>${n1m.nsGtc.toFixed(1)}</strong> · Thu nhập <strong>${Math.round(n1m.thuNhap).toLocaleString('vi-VN')}đ</strong>/ngày · Δ GTC hôm trước: <span style="color:${dGtc.col};font-weight:700">${dGtc.txt}</span> · Δ Thu nhập: <span style="color:${dThu.col};font-weight:700">${dThu.txt}</span></div>`;
  const amAgg={},bcAgg={};
- const bc2am=N.bc2am;
  data.forEach(r=>{
-  const amK=bc2am[r.bc]||'(chưa gán AM)';
+  const amK=r.am||'(chưa gán AM)';
   if(!amAgg[amK])amAgg[amK]={name:amK,gan:0,gtc:0,ngay:0,luong:0};
   const a=amAgg[amK];a.gan+=r.ganGiao;a.gtc+=r.gtc;a.ngay+=r.ngayLam;a.luong+=r.luong;
   if(!bcAgg[r.bc])bcAgg[r.bc]={name:r.bc,am:amK,gan:0,gtc:0,ngay:0,luong:0};
   const b=bcAgg[r.bc];b.gan+=r.ganGiao;b.gtc+=r.gtc;b.ngay+=r.ngayLam;b.luong+=r.luong;
  });
+ const warnEl=document.getElementById('ns_warnTable');if(warnEl)warnEl.innerHTML=nsLowIncomeWarnHTML(data);
  document.getElementById('ns_amTable').innerHTML=nsAggTable(Object.values(amAgg).sort((a,b)=>b.gan-a.gan),false);
  document.getElementById('ns_bcTable').innerHTML=nsAggTable(Object.values(bcAgg).sort((a,b)=>b.gan-a.gan),true);
  const anaEl=document.getElementById('ns_analysis');
@@ -1937,6 +2002,7 @@ function buildAIPage(){
     <button class="ai-preset-btn" onclick="setAIPrompt('so-sanh-n1-n7')">📅 So sánh N-1 vs N-7</button>
     <button class="ai-preset-btn" onclick="setAIPrompt('kien-nghi')">💡 Kiến nghị cải thiện</button>
     <button class="ai-preset-btn" onclick="setAIPrompt('nhan-su')">👥 Phân tích Nhân sự</button>
+    <button class="ai-preset-btn" onclick="setAIPrompt('nang-thu-nhap')">💰 Nâng cao thu nhập TNT</button>
    </div>
   </div>
   <div id="aiAllBlock" style="display:none">
@@ -2003,7 +2069,8 @@ const AI_PRESETS={
  'bat-unstable':'Phân tích tất cả Bưu Cục Bất Ổn (nguồn Baton cột D): (1) Tỷ lệ %GTC 3 ngày; (2) Số đơn GTC tăng/giảm N-1 vs N-7; (3) Số Hàng Tồn còn lại 3 ngày; (4) Đối chiếu Aging và Rớt LC tại các BC này; (5) Ưu tiên can thiệp.',
  'so-sanh-n1-n7':'So sánh toàn diện ngày N-1 (hôm qua) với N-7 trên tất cả chỉ số: %GTC, %FD, Ontime ODR/OPR, Aging, Rớt LC. Chỉ ra AM/BC biến động mạnh nhất và nguyên nhân có thể.',
  'kien-nghi':'Dựa trên toàn bộ dữ liệu, đưa ra 5-7 kiến nghị cải thiện cụ thể. Mỗi kiến nghị: vấn đề → giải pháp → kỳ vọng kết quả. Ưu tiên BC bất ổn và chỉ số xấu nhất N-1.',
- 'nhan-su':'Phân tích nhân sự và năng suất (Data_HRON + Data_Năng_Suất): (1) Biến động số nhân sự theo ngày N-1 vs hôm trước vs tuần trước; (2) NS Gán Giao TB, NS GTC, Thu nhập TB — tăng/giảm ra sao; (3) Số NV phát sinh lương; (4) Đối chiếu BC bất ổn (Baton) với năng suất/thu nhập thấp — BC nào thiếu người hoặc năng suất kém ảnh hưởng vận hành; (5) Kiến nghị cụ thể cho AM/BC.'
+ 'nhan-su':'Đóng vai trò CHUYÊN GIA NHÂN SỰ vận hành logistics Vùng TNT. Phân tích Data_HRON + Data_Năng_Suất và đề xuất CỤ THỂ cách nâng cao thu nhập cho nhân viên/BC/AM:\n(1) Biến động số nhân sự N-1 vs hôm trước vs tuần trước;\n(2) NS Gán Giao TB, NS GTC, Thu nhập TB (= Tổng lương ÷ Số ngày đi làm) — xu hướng tăng/giảm;\n(3) BC có NV thu nhập <300.000đ/ngày — nguyên nhân và hành động;\n(4) Đối chiếu BC bất ổn (Baton) với năng suất/thu nhập thấp;\n(5) 5-7 kiến nghị nâng thu nhập vùng TNT: gắn với tăng đơn GTC, giảm tồn, tối ưu ca, coaching AM…',
+ 'nang-thu-nhap':'Với vai trò CHUYÊN GIA NHÂN SỰ, phân tích thu nhập Vùng TNT từ Data_Năng_Suất (Thu nhập TB = Tổng lương ÷ Ngày đi làm). Liệt kê BC/AM thu nhập thấp nhất, BC có NV <300kđ/ngày, mối liên hệ năng suất–thu nhập. Đề xuất 5-7 giải pháp thực tế để nâng thu nhập bình quân vùng trong 30 ngày tới.'
 };
 const AI_DATA_REGISTRY={
  gtcTotal:{tag:'GTC Total',aliases:['gtc total','%gtc total','tổng gtc'],fields:['Vol','%GTC','%Gán','Số đơn GTC']},
@@ -2359,19 +2426,19 @@ function aiHron(days,subject){
 }
 function aiNangSuat(days,subject){
  const rows=window._NS?.rows||[];if(!rows.length)return'';
- const bc2am=window._NS.bc2am||buildBc2AmMap();
  const ds=[...new Set(rows.map(r=>r.date))].sort().slice(-days);if(!ds.length)return'';
  const dset=new Set(ds),n1=ds[ds.length-1]||'',n2=ds[ds.length-2]||'';
  const f=rows.filter(r=>dset.has(r.date));
  const m1=nsComputeMetrics(f.filter(r=>r.date===n1)),m2=n2?nsComputeMetrics(f.filter(r=>r.date===n2)):null,mAll=nsComputeMetrics(f);
  const key=subject==='bc'?'bc':'am';
  const agg={};
- f.forEach(r=>{const k=key==='bc'?r.bc:(bc2am[r.bc]||'(chưa gán AM)');if(!agg[k])agg[k]={k,gan:0,gtc:0,ngay:0,luong:0};const a=agg[k];a.gan+=r.ganGiao;a.gtc+=r.gtc;a.ngay+=r.ngayLam;a.luong+=r.luong;});
- const arr=Object.entries(agg).map(([k,a])=>({k,nsG:a.ngay?a.gan/a.ngay:0,nsT:a.ngay?a.gtc/a.ngay:0,thu:a.ngay?a.luong/a.ngay:0,nv:a.ngay})).sort((a,b)=>a.nsG-b.nsG);
- let s=`\n### Năng suất nhân viên (Data_Năng_Suất) — ${ds[0]}→${n1} (theo ${key==='bc'?'Bưu Cục':'AM'})\n[Mốc N-1=${shortD(n1)}] NS Gán Giao TB=${m1.nsGan.toFixed(1)} đơn/ngày${m2?` (${m1.nsGan>=m2.nsGan?'▲':'▼'} ${Math.abs(m1.nsGan-m2.nsGan).toFixed(1)} vs hôm trước)`:''}; NS GTC=${m1.nsGtc.toFixed(1)}; Thu nhập TB=${Math.round(m1.thuNhap).toLocaleString('vi-VN')}đ/ngày; ${m1.nvCount} NV phát sinh lương\nKhoảng ${days}N: NS Gán Giao TB bq=${mAll.nsGan.toFixed(1)}, Thu nhập TB bq=${Math.round(mAll.thuNhap).toLocaleString('vi-VN')}đ/ngày\n`;
+ f.forEach(r=>{const k=key==='bc'?r.bc:(r.am||'(chưa gán AM)');if(!agg[k])agg[k]={k,gan:0,gtc:0,ngay:0,luong:0};const a=agg[k];a.gan+=r.ganGiao;a.gtc+=r.gtc;a.ngay+=r.ngayLam;a.luong+=r.luong;});
+ const arr=Object.entries(agg).map(([k,a])=>({k,nsG:a.ngay?a.gan/a.ngay:0,nsT:a.ngay?a.gtc/a.ngay:0,thu:a.ngay?a.luong/a.ngay:0})).sort((a,b)=>a.thu-b.thu);
+ let s=`\n### Năng suất nhân viên (Data_Năng_Suất) — ${ds[0]}→${n1} (theo ${key==='bc'?'Bưu Cục':'AM'})\n[Công thức] Thu nhập TB = Tổng lương ÷ Số ngày đi làm · AM từ cột S\n[Mốc N-1=${shortD(n1)}] NS Gán Giao TB=${m1.nsGan.toFixed(1)} đơn/ngày${m2?` (${m1.nsGan>=m2.nsGan?'▲':'▼'} ${Math.abs(m1.nsGan-m2.nsGan).toFixed(1)} vs hôm trước)`:''}; NS GTC=${m1.nsGtc.toFixed(1)}; Thu nhập TB=${Math.round(m1.thuNhap).toLocaleString('vi-VN')}đ/ngày; ${m1.nvCount} NV phát sinh lương\nKhoảng ${days}N: NS Gán Giao TB bq=${mAll.nsGan.toFixed(1)}, Thu nhập TB bq=${Math.round(mAll.thuNhap).toLocaleString('vi-VN')}đ/ngày\n`;
  arr.forEach((x,i)=>{const u=key==='bc'&&bcMatchUnstable(x.k)?' [BẤT ỔN]':'';s+=`${i+1}. ${x.k}${u}: NS Gán=${x.nsG.toFixed(1)}, NS GTC=${x.nsT.toFixed(1)}, Thu nhập=${Math.round(x.thu).toLocaleString('vi-VN')}đ/ngày\n`;});
+ s+=nsLowIncomeForAI(rows,days);
  const unst=arr.filter(x=>key==='bc'&&bcMatchUnstable(x.k));
- if(unst.length)s+=`\nBC bất ổn có năng suất: ${unst.map(x=>`${x.k}(NS Gán=${x.nsG.toFixed(1)})`).join(', ')}\n`;
+ if(unst.length)s+=`\nBC bất ổn — thu nhập thấp: ${unst.slice(0,10).map(x=>`${x.k}(${Math.round(x.thu).toLocaleString('vi-VN')}đ/ngày)`).join(', ')}\n`;
  return s;
 }
 function aiBaton(days,subject){
@@ -2509,7 +2576,9 @@ QUY TẮC ĐÁNH GIÁ TỐT/XẤU (TUYỆT ĐỐI KHÔNG ĐƯỢC HIỂU NGƯỢ
 - NS Gán Giao TB / NS GTC: CÀNG THẤP CÀNG TỆ (cao = tốt) — đơn/ngày đi làm.
 - Thu nhập TB: đánh giá theo ngữ cảnh; thường thấp kéo theo năng suất thấp hoặc thiếu đơn.
 - Số nhân sự (HRON): giảm đột ngột tại BC bất ổn có thể là rủi ro vận hành; cần đối chiếu với %GTC và năng suất.
-Khi xếp hạng "tốt nhất / tệ nhất", phải áp dụng đúng chiều trên. Bưu cục/AM TỆ là nơi %GTC thấp, Ontime thấp, %FD cao, Aging cao, Rớt LC cao, năng suất thấp.
+- Thu nhập TB = Tổng lương ÷ Số ngày đi làm (đồng/đơn vị ngày công). Ngưỡng cảnh báo: <300.000đ/ngày.
+Khi phân tích NHÂN SỰ / NĂNG SUẤT / THU NHẬP: đóng vai CHUYÊN GIA NHÂN SỰ, ưu tiên đề xuất thực tế để nâng thu nhập và năng suất Vùng TNT (6 tỉnh). Kết hợp số liệu HRON, Năng suất, BC bất ổn.
+Khi xếp hạng "tốt nhất / tệ nhất", phải áp dụng đúng chiều trên. Bưu cục/AM TỆ là nơi %GTC thấp, Ontime thấp, %FD cao, Aging cao, Rớt LC cao, năng suất thấp, thu nhập thấp.
 
 CÁCH TRÌNH BÀY:
 - Phần TỔNG QUAN: viết thành LỜI VĂN (narrative), lồng số liệu vào câu thay vì liệt kê khô khan. Ví dụ: "Ngày 25/06/2026 GTC đạt 870 đơn, tăng 30 đơn so với 24/06 nhưng giảm 13 đơn so với 23/06...". So sánh N-1 (hôm qua) với N-7 ngay trong câu.
@@ -2553,7 +2622,7 @@ async function runAIAnalysis(){
    if(detected){dataset=detected;const sel=document.getElementById('aiCustDataset');if(sel)sel.value=detected;scopeNote=`[Tự nhận diện nguồn: ${AI_DATA_REGISTRY[detected]?.tag||detected}] `;}
    document.getElementById('aiStatus').textContent='⏳ Đang nạp dữ liệu...';
    const f=aiEnsureFlags(dataset);
-   const needHR=userQ.toLowerCase().includes('nhân sự')||userQ.toLowerCase().includes('năng suất');
+   const needHR=/nhân sự|năng suất|hron|thu nhập|định biên|nâng.*thu nhập|300\.?000/i.test(userQ);
    await aiEnsureData(f.canNang,f.aging,f.rotLC,f.baton,f.hron||needHR,f.ns||needHR);
    ctx=aiCtxCustom(dataset,days,subject);
    if(needHR&&(dataset!=='hron'&&dataset!=='nangSuat')){ctx+=aiHron(days,'am')+aiNangSuat(days,'am');}
@@ -2565,13 +2634,13 @@ async function runAIAnalysis(){
    if(detected){
     document.getElementById('aiStatus').textContent='⏳ Tự nhận diện nguồn: '+AI_DATA_REGISTRY[detected].tag+'...';
     const f=aiEnsureFlags(detected);
-    const needHR=/nhân sự|năng suất|hron|thu nhập|định biên/i.test(userQ);
+    const needHR=/nhân sự|năng suất|hron|thu nhập|định biên|nâng.*thu nhập|300\.?000/i.test(userQ);
     await aiEnsureData(f.canNang,f.aging,f.rotLC,f.baton,f.hron||needHR,f.ns||needHR);
     ctx=aiCtxCustom(detected,7,detected==='baton'||detected==='aging'||detected==='rotLC'?'bc':'am');
     if(needHR&&detected!=='hron'&&detected!=='nangSuat')ctx+=aiHron(7,'am')+aiNangSuat(7,'am');
     scopeNote=`[Tự nhận diện] ${AI_DATA_REGISTRY[detected].tag} · N-1 vs N-7.`;
    }else{
-    const needHR=/nhân sự|năng suất|hron|thu nhập|định biên/i.test(userQ);
+    const needHR=/nhân sự|năng suất|hron|thu nhập|định biên|nâng.*thu nhập|300\.?000/i.test(userQ);
     await aiEnsureData(false,false,true,false,true,needHR);
     ctx=gatherDashboardData();
     if(needHR)ctx+=aiHron(7,'am')+aiNangSuat(7,'am');
@@ -2703,7 +2772,7 @@ async function init(){
 loadAll=async function(){
  const btn=document.getElementById('refreshBtn');btn.classList.add('spinning');btn.disabled=true;
  window._ROTLC=null;window._BATON={rows:[],unstable:new Set(),byBC:{}};
- window._HRON={rows:[],charts:{}};window._NS={rows:[],charts:{},bc2am:{}};
+ window._HRON={rows:[],charts:{}};window._NS={rows:[],charts:{}};
  window._gtcdLoaded=false;window._rotlcLoaded=false;window._hronLoaded=false;window._nsLoaded=false;
  ['p0','p1','p2','p3','p4','p5','p6','p7','p8','p9','p10','p11'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML='<div class="loading"><div class="spinner"></div><div class="loading-text">Đang tải dữ liệu mới...</div></div>';});
  await init();
