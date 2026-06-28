@@ -1607,10 +1607,15 @@ function buildOverviewPage(R,rotData){
 // cols: Ngày thống kê(0), AM(1), Tỉnh(2), Bưu cục(3), Số lượng nhân sự(4)
 window._HRON={rows:[],charts:{}};
 function normalizeHRONRows(raw){
- return(raw||[]).slice(1).map(r=>({
-  date:parseSheetDate(r[0]),am:(r[1]||'').trim(),tinh:(r[2]||'').trim(),bc:(r[3]||'').trim(),
-  count:Math.round(parseFloat(String(r[4]||'').replace(/\./g,'').replace(',','.'))||0)
- })).filter(r=>r.date&&r.count>=0);
+ let lastDate='';
+ return(raw||[]).slice(1).map(r=>{
+  let d=parseSheetDate(r[0]);
+  if(d)lastDate=d; else d=lastDate; // tự điền ngày cho dòng trống / ô gộp (merged cells)
+  return{
+   date:d,am:(r[1]||'').trim(),tinh:(r[2]||'').trim(),bc:(r[3]||'').trim(),
+   count:Math.round(parseFloat(String(r[4]||'').replace(/\./g,'').replace(',','.'))||0)
+  };
+ }).filter(r=>r.date&&r.count>=0);
 }
 async function loadHRONData(){
  if(window._HRON?.rows?.length)return window._HRON.rows;
