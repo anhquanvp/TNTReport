@@ -555,7 +555,7 @@ function ovUnstableBCAnalysis(gBC,gtcdRows){
  let h=`<div class="card"><div class="card-header"><div class="card-title"><div class="card-icon" style="background:var(--red)">⚠️</div>Bưu Cục Bất Ổn — Phân tích 3 ngày</div></div>`;
  h+=monoCopyBox('BƯU CỤC BẤT ỔN — TỔNG HỢP',headers,rows,'');
  if(window._BATON?.rows?.length){
-  const bh=['Bưu Cục','Tỉnh','BL LM','%LM >5N','Đơn GTC N-1','Đơn GTC L7D','Lý do'];
+  const bh=['Bưu Cục','Tỉnh','Tồn LM (tồn đơn hệ thống)','%Tồn LM >5N','Đơn GTC N-1','Đơn GTC L7D','Lý do'];
   const br=window._BATON.rows.map(r=>[r.bc,r.tinh,fmt(r.blLmTong),r.pctBlLmOver5.toFixed(1)+'%',fmt(r.donGtcN1),fmt(r.donGtcL7d),r.lyDo||'—']);
   h+=monoCopyBox('BATON — Chi tiết sheet nguồn',bh,br,'');
  }
@@ -1817,7 +1817,7 @@ function nsLowIncomeWarnHTML(data){
  return h;
 }
 function nsLowIncomeForAI(data,days){
- const dset=new Set([...new Set(data.map(r=>r.date))].sort().slice(-days));
+ const dset=aiDatasetDates(data.map(r=>r.date),days).win;
  const f=data.filter(r=>dset.has(r.date));
  const bcGtcTB={};
  f.forEach(r=>{if(!r.bc)return;if(!bcGtcTB[r.bc])bcGtcTB[r.bc]={giaoTB:0,ngay:0};bcGtcTB[r.bc].giaoTB+=r.giaoTB;bcGtcTB[r.bc].ngay+=r.ngayLam;});
@@ -2050,7 +2050,7 @@ const AI_PRESETS={
  'so-sanh-am':'So sánh hiệu suất từng AM: xếp hạng theo %GTC, tỉ lệ trả, ontime, aging và rớt LC. Ai đang cải thiện? Ai đang giảm? Phân tích nguyên nhân. So sánh N-1 vs N-7.',
  'tra-hang':'Phân tích sâu tỉ lệ trả hàng (%FD) từ nguồn FD: (1) AM/BC nào cao/thấp nhất; (2) Xu hướng N-1 vs N-7; (3) So sánh FD Total vs SME vs TTS vs Shopee; (4) Đề xuất giảm FD.',
  'rot-lc':'Phân tích Rớt LC (nguồn Rot_LC_Raw): (1) Tổng đơn rớt LC hôm qua (N-1) vs 7 ngày trước (N-7); (2) AM/BC/Loại KH nào phát sinh nhiều nhất; (3) Xu hướng 7 ngày; (4) Kiến nghị xử lý.',
- 'bat-unstable':'Đóng vai trò CHUYÊN GIA NHÂN SỰ vận hành logistics Vùng TNT (giống phân tích Năng suất & Thu nhập). Phân tích tất cả Bưu Cục Bất Ổn (Baton cột D) và LIÊN KẾT với năng suất/thu nhập:\n(1) Vận hành: %GTC 3 ngày, biến động đơn GTC N-1 vs N-7, Hàng Tồn, BL LM, Lý do;\n(2) Nhân sự & năng suất: số nhân sự (HRON), NS Gán Giao TB, NS GTC, GTC TB (= Giao TB/ngày ÷ Ngày đi làm), Thu nhập TB (= Tổng lương ÷ Ngày đi làm);\n(3) BC có NV thu nhập <300kđ/ngày — đối chiếu với BC bất ổn;\n(4) Phân tích nguyên nhân gốc: thiếu đơn vs thiếu người vs năng suất thấp;\n(5) 5-7 giải pháp CỤ THỂ theo từng BC/AM ưu tiên: tăng GTC, coaching NV, bổ sung nhân sự, tối ưu ca — kỳ vọng tác động thu nhập.',
+ 'bat-unstable':'Đóng vai trò CHUYÊN GIA NHÂN SỰ vận hành logistics Vùng TNT (giống phân tích Năng suất & Thu nhập). Phân tích tất cả Bưu Cục Bất Ổn (Baton cột D) và LIÊN KẾT với năng suất/thu nhập:\n(1) Vận hành: %GTC 3 ngày, biến động đơn GTC N-1 vs N-7, Hàng Tồn, Tồn LM (tồn đơn trên hệ thống), Lý do;\n(2) Nhân sự & năng suất: số nhân sự (HRON), NS Gán Giao TB, NS GTC, GTC TB (= Giao TB/ngày ÷ Ngày đi làm), Thu nhập TB (= Tổng lương ÷ Ngày đi làm);\n(3) BC có NV thu nhập <300kđ/ngày — đối chiếu với BC bất ổn;\n(4) Phân tích nguyên nhân gốc: thiếu đơn vs thiếu người vs năng suất thấp;\n(5) 5-7 giải pháp CỤ THỂ theo từng BC/AM ưu tiên: tăng GTC, coaching NV, bổ sung nhân sự, tối ưu ca — kỳ vọng tác động thu nhập.',
  'so-sanh-n1-n7':'So sánh toàn diện ngày N-1 (hôm qua) với N-7 trên tất cả chỉ số: %GTC, %FD, Ontime ODR/OPR, Aging, Rớt LC. Chỉ ra AM/BC biến động mạnh nhất và nguyên nhân có thể.',
  'kien-nghi':'Dựa trên toàn bộ dữ liệu, đưa ra 5-7 kiến nghị cải thiện cụ thể. Mỗi kiến nghị: vấn đề → giải pháp → kỳ vọng kết quả. Ưu tiên BC bất ổn và chỉ số xấu nhất N-1.',
  'nhan-su':'Đóng vai trò CHUYÊN GIA NHÂN SỰ vận hành logistics Vùng TNT. Phân tích Data_HRON + Data_Năng_Suất và đề xuất CỤ THỂ cách nâng cao thu nhập cho nhân viên/BC/AM:\n(1) Biến động số nhân sự N-1 vs hôm trước vs tuần trước;\n(2) NS Gán Giao TB, NS GTC, Thu nhập TB (= Tổng lương ÷ Số ngày đi làm) — xu hướng tăng/giảm;\n(3) BC có NV thu nhập <300.000đ/ngày — nguyên nhân và hành động;\n(4) Đối chiếu BC bất ổn (Baton) với năng suất/thu nhập thấp;\n(5) 5-7 kiến nghị nâng thu nhập vùng TNT: gắn với tăng đơn GTC, giảm tồn, tối ưu ca, coaching AM…',
@@ -2067,7 +2067,7 @@ const AI_DATA_REGISTRY={
  rotLC:{tag:'Rớt LC',aliases:['rớt lc','rot lc','lấy không thành công','rot_lc'],fields:['Số đơn Rớt LC','Loại KH','Loại hàng']},
  hron:{tag:'Định biên nhân sự',aliases:['hron','định biên','nhân sự','headcount','số lượng nhân sự'],fields:['Số nhân sự','Định biên']},
  nangSuat:{tag:'Năng suất nhân viên',aliases:['năng suất','ns gán giao','ns gtc','thu nhập','lương','data_năng_suất'],fields:['NS Gán Giao TB','NS GTC','Thu nhập TB','NV phát sinh lương']},
- baton:{tag:'Bưu Cục Bất Ổn',aliases:['bất ổn','baton','bc bất ổn','bưu cục bất ổn'],fields:['BL LM','%LM >5N','Đơn GTC','Lý do','NS Gán Giao TB','NS GTC','GTC TB','Thu nhập TB','Nhân sự']}
+ baton:{tag:'Bưu Cục Bất Ổn',aliases:['bất ổn','baton','bc bất ổn','bưu cục bất ổn'],fields:['Tồn LM (tồn đơn hệ thống)','%Tồn LM >5N','Đơn GTC','Lý do','NS Gán Giao TB','NS GTC','GTC TB','Thu nhập TB','Nhân sự']}
 };
 function aiLoadSaved(){try{return JSON.parse(localStorage.getItem(AI_Q_KEY)||'[]');}catch(_){return[];}}
 function aiRenderSavedQuestions(){
@@ -2215,24 +2215,22 @@ function aiComputeFromSheet(def,raw,days){
  const ni=(m==='fd'||m==='gtcAM'||m==='ontAM')?0:1;
  const di=(m==='fd')?1:(m==='gtcAM'||m==='ontAM')?1:2;
  const flt=rows.filter(r=>(r[ni]||'').trim()&&!(r[ni]||'').toLowerCase().includes('grand total'));
- const allD=[...new Set(flt.map(r=>isoD(r[di])).filter(Boolean))].sort();
- const sel=allD.slice(-days);if(!sel.length)return'';
- const dset=new Set(sel),n1=sel[sel.length-1],n7=sel[0];
+ const A=aiDatasetDates(flt.map(r=>isoD(r[di])),days);const dset=A.win,n1=A.dN1,n7=A.dN7;if(!A.winArr.length)return'';
  const agg={};
- flt.forEach(r=>{const d=isoD(r[di]);if(!dset.has(d))return;const k=(r[ni]||'').trim();
-  const a=(agg[k]=agg[k]||{a:0,b:0,n1:null,n7:null});
-  if(m==='fd'){a.a+=parsePct(r[4]);a.b+=parsePct(r[2]);if(d===n1)a.n1=parsePct(r[3]);if(d===n7)a.n7=parsePct(r[3]);}
-  else if(m==='gtcAM'){const v=Math.round(parseFloat(r[2])||0);a.b+=v;a.a+=Math.round(parseFloat(r[5])||0);if(d===n1)a.n1=(parseFloat(r[4])||0)*100;if(d===n7)a.n7=(parseFloat(r[4])||0)*100;}
-  else if(m==='gtcBC'){const v=Math.round(parseFloat(r[3])||0);a.b+=v;a.a+=Math.round(parseFloat(r[6])||0);if(d===n1)a.n1=(parseFloat(r[5])||0)*100;if(d===n7)a.n7=(parseFloat(r[5])||0)*100;}
-  else if(m==='ontAM'){const v=Math.round(parseFloat(r[2])||0);a.b+=v;a.a+=Math.round(parseFloat(r[4])||0);if(d===n1)a.n1=(parseFloat(r[3])||0)*100;if(d===n7)a.n7=(parseFloat(r[3])||0)*100;}
-  else if(m==='ontBC'){const v=Math.round(parseFloat(r[3])||0);a.b+=v;a.a+=Math.round(parseFloat(r[5])||0);if(d===n1)a.n1=(parseFloat(r[4])||0)*100;if(d===n7)a.n7=(parseFloat(r[4])||0)*100;}
+ flt.forEach(r=>{const d=isoD(r[di]);if(!dset.has(d)&&d!==n1&&d!==n7)return;const k=(r[ni]||'').trim();
+  const a=(agg[k]=agg[k]||{a:0,b:0,n1:null,n7:null});const inWin=dset.has(d);
+  if(m==='fd'){if(inWin){a.a+=parsePct(r[4]);a.b+=parsePct(r[2]);}if(d===n1)a.n1=parsePct(r[3]);if(d===n7)a.n7=parsePct(r[3]);}
+  else if(m==='gtcAM'){if(inWin){a.b+=Math.round(parseFloat(r[2])||0);a.a+=Math.round(parseFloat(r[5])||0);}if(d===n1)a.n1=(parseFloat(r[4])||0)*100;if(d===n7)a.n7=(parseFloat(r[4])||0)*100;}
+  else if(m==='gtcBC'){if(inWin){a.b+=Math.round(parseFloat(r[3])||0);a.a+=Math.round(parseFloat(r[6])||0);}if(d===n1)a.n1=(parseFloat(r[5])||0)*100;if(d===n7)a.n7=(parseFloat(r[5])||0)*100;}
+  else if(m==='ontAM'){if(inWin){a.b+=Math.round(parseFloat(r[2])||0);a.a+=Math.round(parseFloat(r[4])||0);}if(d===n1)a.n1=(parseFloat(r[3])||0)*100;if(d===n7)a.n7=(parseFloat(r[3])||0)*100;}
+  else if(m==='ontBC'){if(inWin){a.b+=Math.round(parseFloat(r[3])||0);a.a+=Math.round(parseFloat(r[5])||0);}if(d===n1)a.n1=(parseFloat(r[4])||0)*100;if(d===n7)a.n7=(parseFloat(r[4])||0)*100;}
  });
  const isFD=m==='fd';
  const arr=Object.entries(agg).map(([k,a])=>({k,avg:a.b?a.a/a.b*100:0,n1:a.n1,n7:a.n7}))
   .sort((x,y)=>isFD?y.avg-x.avg:x.avg-y.avg); // FD cao→tệ xếp trên; còn lại thấp→tệ xếp trên
  const fld=isFD?'%FD':(m.startsWith('gtc')?'%GTC':'%Ontime');
  const rule=isFD?'CÀNG CAO CÀNG TỆ':'CÀNG THẤP CÀNG TỆ';
- let s=`\n### [SHEET NGUỒN: ${def.sheet}] ${def.label} ${fld} (${def.level==='bc'?'Bưu Cục':'AM'}) — tính trực tiếp\n[Mốc: N-7=${shortD(n7)} → N-1=${shortD(n1)}] · Quy tắc: ${fld} ${rule}\n`;
+ let s=`\n### [SHEET NGUỒN: ${def.sheet}] ${def.label} ${fld} (${def.level==='bc'?'Bưu Cục':'AM'}) — tính trực tiếp\n[Mốc chung: N-7=${shortD(n7)} → N-1=${shortD(n1)}]${A.lagNote} · Quy tắc: ${fld} ${rule}\n`;
  arr.forEach((x,i)=>{const u=def.level==='bc'&&getUnstableSet().has(x.k)?' [BẤT ỔN]':'';const n1t=x.n1==null?'—':x.n1.toFixed(2)+'%';const n7t=x.n7==null?'—':x.n7.toFixed(2)+'%';s+=`${i+1}. ${x.k}${u}: ${fld} bq=${x.avg.toFixed(2)}% (N-7=${n7t}→N-1=${n1t})\n`;});
  return s;
 }
@@ -2308,6 +2306,49 @@ function aiCustDatasetChange(){
  const sug=document.getElementById('aiCustSuggest');if(sug)sug.innerHTML=aiChips(aiCustSuggest(ds,subj?subj.value:'am'));
 }
 function aiLastDateSet(rows,dateIdx,days){const s=[...new Set(rows.map(r=>isoD(r[dateIdx])).filter(Boolean))].sort();return new Set(s.slice(-days));}
+/* ===== MỐC THỜI GIAN CHUNG (anchor) cho TOÀN BỘ dữ liệu AI =====
+   N-1 = ngày mới nhất tuyệt đối có trong mọi sheet; N-7 = N-1 trừ 6 ngày lịch.
+   Mỗi nhóm dữ liệu canh theo cùng mốc này; nếu sheet cập nhật chậm (lệch mốc) sẽ ghi chú rõ. */
+function aiShiftISO(iso,delta){
+ if(!iso)return'';const p=iso.split('-');if(p.length!==3)return'';
+ const dt=new Date(Date.UTC(+p[0],+p[1]-1,+p[2]));dt.setUTCDate(dt.getUTCDate()+delta);
+ return`${dt.getUTCFullYear()}-${String(dt.getUTCMonth()+1).padStart(2,'0')}-${String(dt.getUTCDate()).padStart(2,'0')}`;
+}
+function aiCollectAllDates(){
+ const set=new Set();const add=d=>{const x=isoD(d);if(x)set.add(x);};
+ const D=window._D||{};
+ [D.gtcTotalAM,D.gtcTTSAM,D.odrAM,D.oprAM,D.fdTotalAM].forEach(sh=>{if(sh&&sh.length>1)sh.slice(1).forEach(r=>add(r[1]));});
+ [D.gtcTotalBC,D.gtcTTSBC,D.odrBC,D.oprBC].forEach(sh=>{if(sh&&sh.length>1)sh.slice(1).forEach(r=>add(r[2]));});
+ const F=window._FD||{};[F.totalAM,F.smeAM,F.ttsAM,F.shopeeAM].forEach(sh=>{if(sh&&sh.length>1)sh.slice(1).forEach(r=>add(r[1]));});
+ (window._GTCD?.rows||[]).forEach(r=>add(r.date));
+ (window._AGING?.rows||[]).forEach(r=>add(r.date));
+ (window._ROTLC||[]).forEach(r=>add(r.date));
+ (window._HRON?.rows||[]).forEach(r=>add(r.date));
+ (window._NS?.rows||[]).forEach(r=>add(r.date));
+ return[...set].filter(Boolean).sort();
+}
+function getAIAnchor(){
+ if(window._AI_ANCHOR)return window._AI_ANCHOR;
+ const all=aiCollectAllDates();
+ const n1=all.length?all[all.length-1]:'';
+ const n7=n1?aiShiftISO(n1,-6):'';
+ window._AI_ANCHOR={n1,n7,all};
+ return window._AI_ANCHOR;
+}
+/* Trả về mốc cho 1 nhóm dữ liệu cụ thể, canh theo anchor chung.
+   datesRaw: mảng ngày (chuỗi) của nhóm dữ liệu đó; days: số ngày cửa sổ phân tích. */
+function aiDatasetDates(datesRaw,days){
+ days=days||7;const A=getAIAnchor();const n1=A.n1,n7=A.n7;
+ const uniq=[...new Set((datesRaw||[]).map(d=>isoD(d)).filter(Boolean))].sort();
+ const winStart=n1?aiShiftISO(n1,-(days-1)):'';
+ const leN1=uniq.filter(d=>!n1||d<=n1);const dN1=leN1.length?leN1[leN1.length-1]:'';
+ const leN7=uniq.filter(d=>!n7||d<=n7);const dN7=leN7.length?leN7[leN7.length-1]:'';
+ const before=uniq.filter(d=>dN1&&d<dN1);const dPrev=before.length?before[before.length-1]:'';
+ const win=uniq.filter(d=>(!winStart||d>=winStart)&&(!n1||d<=n1));
+ const lag=!!(dN1&&n1&&dN1!==n1);
+ return{n1,n7,dN1,dN7,dPrev,win:new Set(win),winArr:win,lag,
+  lagNote:lag?` [⚠ LỆCH MỐC: nhóm này chỉ có dữ liệu đến ${shortD(dN1)}, không tới mốc chung N-1=${shortD(n1)}]`:''};
+}
 function aiN1N7(sheet,dateIdx){
  if(!sheet||sheet.length<2)return'';
  const ds=[...new Set(sheet.slice(1).map(r=>isoD(r[dateIdx])).filter(Boolean))].sort((a,b)=>b.localeCompare(a));
@@ -2318,10 +2359,10 @@ function aiGTC(label,sheetAM,sheetBC,days,subject){
  const isBC=subject==='bc';const sh=isBC?sheetBC:sheetAM;if(!sh||sh.length<2)return'';
  const ni=isBC?1:0,di=isBC?2:1,vi=isBC?3:2,gi=isBC?4:3,ci=isBC?6:5;
  const rows=sh.slice(1).filter(r=>(r[ni]||'').trim()&&!(r[ni]||'').toLowerCase().includes('grand total'));
- const ds=aiLastDateSet(rows,di,days),dl=[...ds].sort();if(!dl.length)return'';
+ const A=aiDatasetDates(rows.map(r=>isoD(r[di])),days);const ds=A.win,dl=A.winArr;if(!dl.length)return'';
  const agg={};rows.forEach(r=>{const d=isoD(r[di]);if(!ds.has(d))return;const k=(r[ni]||'').trim();const v=Math.round(parseFloat(r[vi])||0);(agg[k]=agg[k]||{vol:0,cnt:0,gw:0});agg[k].vol+=v;agg[k].cnt+=Math.round(parseFloat(r[ci])||0);agg[k].gw+=v*((parseFloat(r[gi])||0)*100);});
  let tv=0,tc=0;const arr=Object.entries(agg).map(([k,a])=>{tv+=a.vol;tc+=a.cnt;return{k,vol:a.vol,cnt:a.cnt,gtc:a.vol?a.cnt/a.vol*100:0,gan:a.vol?a.gw/a.vol:0};}).sort((a,b)=>b.gtc-a.gtc);
- let s=`\n### ${label} — ${dl[0]}→${dl[dl.length-1]} (theo ${isBC?'Bưu Cục':'AM'})${aiN1N7(sh,di)}\nTổng: Vol=${tv}, GTC=${tc} (${tv?(tc/tv*100).toFixed(1):0}%)\n`;
+ let s=`\n### ${label} — ${dl[0]}→${dl[dl.length-1]} (theo ${isBC?'Bưu Cục':'AM'})\n[Mốc chung: N-1=${A.dN1?shortD(A.dN1):'—'}, N-7=${A.dN7?shortD(A.dN7):'—'}]${A.lagNote}\nTổng: Vol=${tv}, GTC=${tc} (${tv?(tc/tv*100).toFixed(1):0}%)\n`;
  arr.forEach((x,i)=>{const u=isBC&&getUnstableSet().has(x.k)?' [BẤT ỔN]':'';s+=`${i+1}. ${x.k}${u}: Vol=${x.vol}, %GTC=${x.gtc.toFixed(1)}%, %Gán=${x.gan.toFixed(1)}%\n`;});
  return s;
 }
@@ -2335,19 +2376,17 @@ function aiFD(days,subject){
  ].filter(c=>c.sh&&c.sh.length>1);
  if(!channels.length)return'';
  const baseRows=channels[0].sh.slice(1).filter(r=>(r[0]||'').trim());
- const allD=[...new Set(baseRows.map(r=>isoD(r[1])).filter(Boolean))].sort();
- const sel=allD.slice(-days);if(!sel.length)return'';
- const dset=new Set(sel),n1=sel[sel.length-1],n7=sel[0];
- let s=`\n### FD — Tỷ lệ trả hàng (theo ${isBC?'Bưu Cục':'AM'}) · so N-1 vs N-7\n[Mốc: N-7=${shortD(n7)} → N-1=${shortD(n1)}] · Quy tắc: %FD CÀNG CAO CÀNG TỆ · %FD = Σ Trả Total / Σ %Vol\n`;
+ const A=aiDatasetDates(baseRows.map(r=>isoD(r[1])),days);const dset=A.win,n1=A.dN1,n7=A.dN7;if(!A.winArr.length)return'';
+ let s=`\n### FD — Tỷ lệ trả hàng (theo ${isBC?'Bưu Cục':'AM'}) · so N-1 vs N-7\n[Mốc chung: N-7=${shortD(n7)} → N-1=${shortD(n1)}]${A.lagNote} · Quy tắc: %FD CÀNG CAO CÀNG TỆ · %FD = Σ Trả Total / Σ %Vol\n`;
  channels.forEach(ch=>{
   const rows=ch.sh.slice(1).filter(r=>(r[0]||'').trim()&&!(r[0]||'').toLowerCase().includes('grand total'));
   const agg={};let tTra=0,tVol=0,tN1=0,tN1v=0,tN7=0,tN7v=0;
-  rows.forEach(r=>{const d=isoD(r[1]);if(!dset.has(d))return;const k=(r[0]||'').trim();
+  rows.forEach(r=>{const d=isoD(r[1]);const k=(r[0]||'').trim();
    const tra=parsePct(r[4]),vol=parsePct(r[2]);
-   const a=(agg[k]=agg[k]||{tra:0,vol:0,n1:null,n7:null});a.tra+=tra;a.vol+=vol;
+   const a=(agg[k]=agg[k]||{tra:0,vol:0,n1:null,n7:null});
+   if(dset.has(d)){a.tra+=tra;a.vol+=vol;tTra+=tra;tVol+=vol;}
    if(d===n1){a.n1=parsePct(r[3]);tN1+=tra;tN1v+=vol;}
-   if(d===n7){a.n7=parsePct(r[3]);tN7+=tra;tN7v+=vol;}
-   tTra+=tra;tVol+=vol;});
+   if(d===n7){a.n7=parsePct(r[3]);tN7+=tra;tN7v+=vol;}});
   const arr=Object.entries(agg).map(([k,a])=>({k,avg:a.vol?a.tra/a.vol*100:0,n1:a.n1,n7:a.n7})).sort((a,b)=>b.avg-a.avg);
   const avgAll=tVol?tTra/tVol*100:0,fdN1=tN1v?tN1/tN1v*100:0,fdN7=tN7v?tN7/tN7v*100:0,dpp=fdN1-fdN7;
   s+=`\n— Kênh ${ch.label}: TỔNG vùng %FD bq=${avgAll.toFixed(2)}% (N-7=${fdN7.toFixed(2)}% → N-1=${fdN1.toFixed(2)}%, Δ=${dpp>=0?'+':''}${dpp.toFixed(2)}pp)\n`;
@@ -2359,74 +2398,72 @@ function aiOnt(which,days,subject){
  const isBC=subject==='bc';const sh=isBC?window._D[which+'BC']:window._D[which+'AM'];if(!sh||sh.length<2)return'';
  const ni=isBC?1:0,di=isBC?2:1,vi=isBC?3:2,ci=isBC?5:4;
  const rows=sh.slice(1).filter(r=>(r[ni]||'').trim()&&!(r[ni]||'').toLowerCase().includes('grand total'));
- const ds=aiLastDateSet(rows,di,days),dl=[...ds].sort();if(!dl.length)return'';
+ const A=aiDatasetDates(rows.map(r=>isoD(r[di])),days);const ds=A.win,dl=A.winArr;if(!dl.length)return'';
  const agg={};rows.forEach(r=>{const d=isoD(r[di]);if(!ds.has(d))return;const k=(r[ni]||'').trim();(agg[k]=agg[k]||{v:0,c:0});agg[k].v+=Math.round(parseFloat(r[vi])||0);agg[k].c+=Math.round(parseFloat(r[ci])||0);});
  const arr=Object.entries(agg).map(([k,a])=>({k,v:a.v,p:a.v?a.c/a.v*100:0})).sort((a,b)=>a.p-b.p);
- let s=`\n### ${which.toUpperCase()} TTS Ontime — ${dl[0]}→${dl[dl.length-1]} (theo ${isBC?'Bưu Cục':'AM'})\n`;
+ let s=`\n### ${which.toUpperCase()} TTS Ontime — ${dl[0]}→${dl[dl.length-1]} (theo ${isBC?'Bưu Cục':'AM'})\n[Mốc chung N-1=${A.dN1?shortD(A.dN1):'—'}]${A.lagNote}\n`;
  arr.forEach((x,i)=>s+=`${i+1}. ${x.k}: Vol=${x.v}, %Ontime=${x.p.toFixed(1)}%\n`);
  return s;
 }
 function aiCanNang(days,subject){
  const rows=(window._GTCD&&window._GTCD.rows)||[];if(!rows.length)return'';
- const ds=[...new Set(rows.map(r=>r.date))].sort().slice(-days);if(!ds.length)return'';const dset=new Set(ds);
+ const A=aiDatasetDates(rows.map(r=>r.date),days);const ds=A.winArr,dset=A.win;if(!ds.length)return'';
  const f=rows.filter(r=>dset.has(r.date));
  const key=subject==='bc'?'bc':subject==='loai'?'loai':'am';
  const agg={};f.forEach(r=>{const k=r[key];if(!k)return;(agg[k]=agg[k]||{vol:0,ngtc:0,ntra:0,heavy:0});agg[k].vol+=r.vol;agg[k].ngtc+=r.ngtc;agg[k].ntra+=r.ntra;if(r.kl!=='1. <5Kg')agg[k].heavy+=r.vol;});
  const arr=Object.entries(agg).map(([k,a])=>({k,vol:a.vol,gtc:a.vol?a.ngtc/a.vol*100:0,ton:a.vol-a.ngtc-a.ntra,heavyP:a.vol?a.heavy/a.vol*100:0})).sort((a,b)=>b.vol-a.vol);
  const kl={};f.forEach(r=>{(kl[r.kl]=kl[r.kl]||{vol:0,ngtc:0});kl[r.kl].vol+=r.vol;kl[r.kl].ngtc+=r.ngtc;});
- let s=`\n### GTC chi tiết theo cân nặng — ${ds[0]}→${ds[ds.length-1]} (theo ${subject==='bc'?'Bưu Cục':subject==='loai'?'Loại hàng':'AM'})\n`;
+ let s=`\n### GTC chi tiết theo cân nặng — ${ds[0]}→${ds[ds.length-1]} (theo ${subject==='bc'?'Bưu Cục':subject==='loai'?'Loại hàng':'AM'})\n[Mốc chung N-1=${A.dN1?shortD(A.dN1):'—'}]${A.lagNote}\n`;
  s+='Phân bố khối lượng: '+GTCD_KL.map(k=>`${k.label}: Vol=${kl[k.id]?kl[k.id].vol:0}, %GTC=${kl[k.id]&&kl[k.id].vol?(kl[k.id].ngtc/kl[k.id].vol*100).toFixed(1):0}%`).join(' | ')+'\n';
  arr.forEach((x,i)=>{const u=subject==='bc'&&getUnstableSet().has(x.k)?' [BẤT ỔN]':'';s+=`${i+1}. ${x.k}${u}: Vol=${x.vol}, %GTC=${x.gtc.toFixed(1)}%, Tồn=${x.ton}, %Cồng kềnh=${x.heavyP.toFixed(1)}%\n`;});
  return s;
 }
 function aiAging(days,subject){
- const A=window._AGING;if(!A||!A.rows||!A.rows.length)return'';
- const ds=[...new Set(A.rows.map(r=>r.date))].sort().slice(-days);if(!ds.length)return'';const dset=new Set(ds);
- const f=A.rows.filter(r=>dset.has(r.date));
+ const AG=window._AGING;if(!AG||!AG.rows||!AG.rows.length)return'';
+ const A=aiDatasetDates(AG.rows.map(r=>r.date),days);const ds=A.winArr,dset=A.win;if(!ds.length)return'';
+ const f=AG.rows.filter(r=>dset.has(r.date));
  const key=subject==='am'?'am':'bc';
  const agg={};f.forEach(r=>{const k=r[key];if(!k)return;agg[k]=(agg[k]||0)+1;});
  const arr=Object.entries(agg).map(([k,v])=>({k,v})).sort((a,b)=>b.v-a.v);
- let s=`\n### Aging >5 ngày — ${ds[0]}→${ds[ds.length-1]} (theo ${key==='am'?'AM':'Bưu Cục'})\nTổng đơn aging: ${f.length}\n`;
- arr.forEach((x,i)=>{const u=key==='bc'&&A.unstable.has(x.k)?' [BẤT ỔN]':'';s+=`${i+1}. ${x.k}${u}: ${x.v} đơn\n`;});
+ let s=`\n### Aging >5 ngày — ${ds[0]}→${ds[ds.length-1]} (theo ${key==='am'?'AM':'Bưu Cục'})\n[Mốc chung N-1=${A.dN1?shortD(A.dN1):'—'}]${A.lagNote}\nTổng đơn aging: ${f.length}\n`;
+ arr.forEach((x,i)=>{const u=key==='bc'&&AG.unstable.has(x.k)?' [BẤT ỔN]':'';s+=`${i+1}. ${x.k}${u}: ${x.v} đơn\n`;});
  return s;
 }
 function aiRotLC(days,subject){
  const data=window._ROTLC||[];if(!data.length)return'';
- const allD=[...new Set(data.map(r=>r.date))].sort((a,b)=>b.localeCompare(a));
- const n1=allD[0]||'',n7=allD[6]||allD[allD.length-1]||'';
- const dset=new Set(allD.slice(0,days));
+ const A=aiDatasetDates(data.map(r=>r.date),days);const n1=A.dN1,n7=A.dN7,dset=A.win;if(!A.winArr.length)return'';
  const key=subject==='bc'?'bc':subject==='loaihang'?'loaihang':subject==='loaikh'?'loaikh':'am';
  const agg={};data.filter(r=>dset.has(r.date)).forEach(r=>{const k=r[key]||'(trống)';agg[k]=(agg[k]||0)+1;});
  const n1a={},n7a={};data.filter(r=>r.date===n1).forEach(r=>{const k=r[key]||'(trống)';n1a[k]=(n1a[k]||0)+1;});data.filter(r=>r.date===n7).forEach(r=>{const k=r[key]||'(trống)';n7a[k]=(n7a[k]||0)+1;});
  const arr=Object.entries(agg).map(([k,v])=>({k,v,n1:n1a[k]||0,n7:n7a[k]||0})).sort((a,b)=>b.v-a.v);
- let s=`\n### Rớt LC — ${allD[days-1]||allD[allD.length-1]}→${n1} (theo ${key})\n[Mốc: N-1=${shortD(n1)}, N-7=${shortD(n7)}] · Tổng ${days}N: ${data.filter(r=>dset.has(r.date)).length} đơn\n`;
+ let s=`\n### Rớt LC — ${A.winArr[0]}→${n1} (theo ${key})\n[Mốc chung: N-1=${shortD(n1)}, N-7=${shortD(n7)}]${A.lagNote} · Tổng ${days}N: ${data.filter(r=>dset.has(r.date)).length} đơn\n`;
  arr.slice(0,40).forEach((x,i)=>{const u=key==='bc'&&getUnstableSet().has(x.k)?' [BẤT ỔN]':'';s+=`${i+1}. ${x.k}${u}: ${x.v} đơn (N-1=${x.n1}, N-7=${x.n7})\n`;});
  return s;
 }
 function aiHron(days,subject){
  const rows=window._HRON?.rows||[];if(!rows.length)return'';
- const ds=[...new Set(rows.map(r=>r.date))].sort().slice(-days);if(!ds.length)return'';
- const dset=new Set(ds),n1=ds[ds.length-1]||'',n2=ds[ds.length-2]||'',n7=ds[0]||'';
+ const A=aiDatasetDates(rows.map(r=>r.date),days);const ds=A.winArr,dset=A.win;if(!ds.length)return'';
+ const n1=A.dN1,n2=A.dPrev,n7=A.dN7;
  const key=subject==='bc'?'bc':'am';
  const agg={};
  rows.filter(r=>dset.has(r.date)).forEach(r=>{const k=r[key]||'(trống)';if(!agg[k])agg[k]={k,am:r.am,total:0,byDate:{}};agg[k].total+=r.count;agg[k].byDate[r.date]=(agg[k].byDate[r.date]||0)+r.count;});
  const arr=Object.values(agg).sort((a,b)=>(b.byDate[n1]||0)-(a.byDate[n1]||0));
  let tN1=0,tN2=0,tN7=0;rows.filter(r=>r.date===n1).forEach(r=>tN1+=r.count);rows.filter(r=>r.date===n2).forEach(r=>tN2+=r.count);rows.filter(r=>r.date===n7).forEach(r=>tN7+=r.count);
- let s=`\n### Định biên nhân sự (Data_HRON) — ${ds[0]}→${n1} (theo ${key==='bc'?'Bưu Cục':'AM'})\n[Mốc: N-1=${shortD(n1)}, N-2=${shortD(n2)}, N-7=${shortD(n7)}] · Tổng NS N-1=${tN1} (${tN2?`vs hôm trước ${tN1-tN2>=0?'+':''}${tN1-tN2}`:'—'}, ${n7&&n7!==n1?`vs N-7 ${tN1-tN7>=0?'+':''}${tN1-tN7}`:'—'})\n`;
+ let s=`\n### Định biên nhân sự (Data_HRON) — ${ds[0]}→${n1} (theo ${key==='bc'?'Bưu Cục':'AM'})\n[Mốc chung: N-1=${shortD(n1)}, N-2=${shortD(n2)}, N-7=${shortD(n7)}]${A.lagNote} · Tổng NS N-1=${tN1} (${tN2?`vs hôm trước ${tN1-tN2>=0?'+':''}${tN1-tN2}`:'—'}, ${n7&&n7!==n1?`vs N-7 ${tN1-tN7>=0?'+':''}${tN1-tN7}`:'—'})\n`;
  arr.slice(0,40).forEach((x,i)=>{const u=key==='bc'&&bcMatchUnstable(x.k)?' [BẤT ỔN]':'';const c1=x.byDate[n1]||0,c2=x.byDate[n2]||0;s+=`${i+1}. ${x.k}${u}: NS N-1=${c1}${c2?` (Δ ${c1-c2>=0?'+':''}${c1-c2} vs hôm trước)`:''}\n`;});
  return s;
 }
 function aiNangSuat(days,subject){
  const rows=window._NS?.rows||[];if(!rows.length)return'';
- const ds=[...new Set(rows.map(r=>r.date))].sort().slice(-days);if(!ds.length)return'';
- const dset=new Set(ds),n1=ds[ds.length-1]||'',n2=ds[ds.length-2]||'';
+ const A=aiDatasetDates(rows.map(r=>r.date),days);const ds=A.winArr,dset=A.win;if(!ds.length)return'';
+ const n1=A.dN1,n2=A.dPrev;
  const f=rows.filter(r=>dset.has(r.date));
- const m1=nsComputeMetrics(f.filter(r=>r.date===n1)),m2=n2?nsComputeMetrics(f.filter(r=>r.date===n2)):null,mAll=nsComputeMetrics(f);
+ const m1=nsComputeMetrics(rows.filter(r=>r.date===n1)),m2=n2?nsComputeMetrics(rows.filter(r=>r.date===n2)):null,mAll=nsComputeMetrics(f);
  const key=subject==='bc'?'bc':'am';
  const agg={};
  f.forEach(r=>{const k=key==='bc'?r.bc:(r.am||'(chưa gán AM)');if(!agg[k])agg[k]={k,gan:0,gtc:0,giaoTB:0,ngay:0,luong:0};const a=agg[k];a.gan+=r.ganGiao;a.gtc+=r.gtc;a.giaoTB+=r.giaoTB;a.ngay+=r.ngayLam;a.luong+=r.luong;});
  const arr=Object.entries(agg).map(([k,a])=>({k,nsG:a.ngay?a.gan/a.ngay:0,nsT:a.ngay?a.gtc/a.ngay:0,gtcTB:a.ngay?a.giaoTB/a.ngay:0,thu:a.ngay?a.luong/a.ngay:0})).sort((a,b)=>a.thu-b.thu);
- let s=`\n### Năng suất nhân viên (Data_Năng_Suất) — ${ds[0]}→${n1} (theo ${key==='bc'?'Bưu Cục':'AM'})\n[Công thức] Thu nhập TB = Tổng lương ÷ Số ngày đi làm · GTC TB = Giao TB/ngày ÷ Số ngày đi làm · AM từ cột S\n[Mốc N-1=${shortD(n1)}] NS Gán Giao TB=${m1.nsGan.toFixed(1)} đơn/ngày${m2?` (${m1.nsGan>=m2.nsGan?'▲':'▼'} ${Math.abs(m1.nsGan-m2.nsGan).toFixed(1)} vs hôm trước)`:''}; NS GTC=${m1.nsGtc.toFixed(1)}; GTC TB=${m1.gtcTB.toFixed(1)}; Thu nhập TB=${Math.round(m1.thuNhap).toLocaleString('vi-VN')}đ/ngày; ${m1.nvCount} NV phát sinh lương\nKhoảng ${days}N: NS Gán Giao TB bq=${mAll.nsGan.toFixed(1)}, GTC TB bq=${mAll.gtcTB.toFixed(1)}, Thu nhập TB bq=${Math.round(mAll.thuNhap).toLocaleString('vi-VN')}đ/ngày\n`;
+ let s=`\n### Năng suất nhân viên (Data_Năng_Suất) — ${ds[0]}→${n1} (theo ${key==='bc'?'Bưu Cục':'AM'})\n[Công thức] Thu nhập TB = Tổng lương ÷ Số ngày đi làm · GTC TB = Giao TB/ngày ÷ Số ngày đi làm · AM từ cột S\n[Mốc chung N-1=${shortD(n1)}]${A.lagNote} NS Gán Giao TB=${m1.nsGan.toFixed(1)} đơn/ngày${m2?` (${m1.nsGan>=m2.nsGan?'▲':'▼'} ${Math.abs(m1.nsGan-m2.nsGan).toFixed(1)} vs hôm trước)`:''}; NS GTC=${m1.nsGtc.toFixed(1)}; GTC TB=${m1.gtcTB.toFixed(1)}; Thu nhập TB=${Math.round(m1.thuNhap).toLocaleString('vi-VN')}đ/ngày; ${m1.nvCount} NV phát sinh lương\nKhoảng ${days}N: NS Gán Giao TB bq=${mAll.nsGan.toFixed(1)}, GTC TB bq=${mAll.gtcTB.toFixed(1)}, Thu nhập TB bq=${Math.round(mAll.thuNhap).toLocaleString('vi-VN')}đ/ngày\n`;
  arr.forEach((x,i)=>{const u=key==='bc'&&bcMatchUnstable(x.k)?' [BẤT ỔN]':'';s+=`${i+1}. ${x.k}${u}: NS Gán=${x.nsG.toFixed(1)}, NS GTC=${x.nsT.toFixed(1)}, GTC TB=${x.gtcTB.toFixed(1)}, Thu nhập=${Math.round(x.thu).toLocaleString('vi-VN')}đ/ngày\n`;});
  s+=nsLowIncomeForAI(rows,days);
  const unst=arr.filter(x=>key==='bc'&&bcMatchUnstable(x.k));
@@ -2440,11 +2477,11 @@ function aiRowsForBC(bc,rows,key){
 }
 function aiBatonNSMetrics(bc,days){
  const NS=window._NS?.rows||[],H=window._HRON?.rows||[];
- const nsDs=[...new Set(NS.map(r=>r.date))].sort().slice(-days);
- const hDs=[...new Set(H.map(r=>r.date))].sort().slice(-days);
- const dset=new Set(nsDs.length?nsDs:hDs);
- const nsF=aiRowsForBC(bc,NS.filter(r=>dset.has(r.date)),'bc');
- const hF=aiRowsForBC(bc,H.filter(r=>dset.has(r.date)),'bc');
+ const nsA=aiDatasetDates(NS.map(r=>r.date),days);
+ const hA=aiDatasetDates(H.map(r=>r.date),days);
+ const nsSet=nsA.win.size?nsA.win:hA.win;
+ const nsF=aiRowsForBC(bc,NS.filter(r=>nsSet.has(r.date)),'bc');
+ const hF=aiRowsForBC(bc,H.filter(r=>hA.win.has(r.date)),'bc');
  const m=nsF.length?nsComputeMetrics(nsF):null;
  let nvLow=0,minThu=0;
  if(nsF.length){
@@ -2452,7 +2489,7 @@ function aiBatonNSMetrics(bc,days){
   nsF.forEach(r=>{if(!r.nv||r.ngayLam<=0)return;const thu=nsThuNhapRow(r);if(thu>0&&thu<NS_LOW_INCOME){nvSet.add(r.nv);if(!minThu||thu<minThu)minThu=thu;}});
   nvLow=nvSet.size;
  }
- const n1=hDs[hDs.length-1]||'',n2=hDs[hDs.length-2]||'';
+ const n1=hA.dN1,n2=hA.dPrev;
  const staffN1=n1?hF.filter(r=>r.date===n1).reduce((s,r)=>s+r.count,0):0;
  const staffN2=n2?hF.filter(r=>r.date===n2).reduce((s,r)=>s+r.count,0):0;
  const am=nsF[0]?.am||hF[0]?.am||'';
@@ -2460,12 +2497,13 @@ function aiBatonNSMetrics(bc,days){
 }
 function aiBaton(days,subject){
  const B=window._BATON;if(!B||!B.rows?.length)return'';
- const gBC=window._D?.gtcTotalBC;const allD=gBC?ovDatesDesc(gBC,2):[];
- const d3=allD.slice(0,3),n1=allD[0]||'',n7=allD[6]||allD[allD.length-1]||'';
+ const gBC=window._D?.gtcTotalBC;
+ const GA=aiDatasetDates(gBC?gBC.slice(1).map(r=>isoD(r[2])):[],3);
+ const d3=GA.winArr.slice(-3),n1=GA.dN1,n7=GA.dN7;
  const NS=window._NS?.rows||[];
- const nsDs=[...new Set(NS.map(r=>r.date))].sort().slice(-days);
- const mVung=nsDs.length?nsComputeMetrics(NS.filter(r=>nsDs.includes(r.date))):null;
- let s=`\n### Bưu Cục Bất Ổn (Baton cột D) — ${B.rows.length} BC · LIÊN KẾT Năng suất & Thu nhập\n[Mốc GTC: N-1=${shortD(n1)}, N-7=${shortD(n7)}, 3N=${d3.map(shortD).join(',')}]\n[Công thức] GTC TB = Giao TB/ngày ÷ Ngày đi làm · Thu nhập TB = Tổng lương ÷ Ngày đi làm · Ngưỡng cảnh báo <${NS_LOW_INCOME.toLocaleString('vi-VN')}đ/ngày\n`;
+ const NA=aiDatasetDates(NS.map(r=>r.date),days);
+ const mVung=NA.winArr.length?nsComputeMetrics(NS.filter(r=>NA.win.has(r.date))):null;
+ let s=`\n### Bưu Cục Bất Ổn (Baton cột D) — ${B.rows.length} BC · LIÊN KẾT Năng suất & Thu nhập\n[Mốc chung GTC: N-1=${shortD(n1)}, N-7=${shortD(n7)}, 3N=${d3.map(shortD).join(',')}]${GA.lagNote}\nGhi chú: Tồn LM = Tồn đơn trên hệ thống (số đơn còn tồn chưa xử lý/đẩy đi — CÀNG CAO CÀNG TỆ).\n[Công thức] GTC TB = Giao TB/ngày ÷ Ngày đi làm · Thu nhập TB = Tổng lương ÷ Ngày đi làm · Ngưỡng cảnh báo <${NS_LOW_INCOME.toLocaleString('vi-VN')}đ/ngày\n`;
  if(mVung)s+=`[TB Vùng ${days}N] NS Gán Giao=${mVung.nsGan.toFixed(1)}, NS GTC=${mVung.nsGtc.toFixed(1)}, GTC TB=${mVung.gtcTB.toFixed(1)}, Thu nhập TB=${Math.round(mVung.thuNhap).toLocaleString('vi-VN')}đ/ngày\n`;
  const metrics=[];
  B.rows.forEach((r,i)=>{
@@ -2486,7 +2524,7 @@ function aiBaton(days,subject){
   const nsPart=ns.hasNS?`NS_Gán=${ns.nsG.toFixed(1)}, NS_GTC=${ns.nsT.toFixed(1)}, GTC_TB=${ns.gtcTB.toFixed(1)}, Thu_nhập_TB=${Math.round(ns.thu).toLocaleString('vi-VN')}đ/ngày, NV=${ns.nvCount}${ns.nvLow?`, NV<300k=${ns.nvLow}(thấp nhất ${Math.round(ns.minThu).toLocaleString('vi-VN')}đ)`:''}`:'NS/Thu nhập: chưa có DL';
   const hronPart=ns.hasHron?`Nhân_sự_N-1=${ns.staffN1}${ns.staffD?` (Δ ${ns.staffD>=0?'+':''}${ns.staffD})`:''}`:'Nhân sự: chưa có DL';
   const vsVung=mVung&&ns.hasNS?(ns.thu<mVung.thuNhap*0.85?' [Thu nhập THẤP hơn TB vùng]':ns.nsT<mVung.nsGtc*0.85?' [NS GTC THẤP hơn TB vùng]':''):'';
-  s+=`${i+1}. ${r.bc} (AM: ${ns.am||'—'})${vsVung}\n   Vận hành: BL_LM=${fmt(r.blLmTong)}, %LM>5N=${r.pctBlLmOver5.toFixed(1)}%, %GTC_3N=${pct3}, ΔGTC_N1_N7=${dGtc}, HàngTồn_3N=${ton3}, Lý_do=${r.lyDo||'—'}\n   Nhân sự/Năng suất: ${hronPart} · ${nsPart}\n`;
+  s+=`${i+1}. ${r.bc} (AM: ${ns.am||'—'})${vsVung}\n   Vận hành: Tồn_LM(tồn đơn hệ thống)=${fmt(r.blLmTong)}, %Tồn_LM>5N=${r.pctBlLmOver5.toFixed(1)}%, %GTC_3N=${pct3}, ΔGTC_N1_N7=${dGtc}, HàngTồn_3N=${ton3}, Lý_do=${r.lyDo||'—'}\n   Nhân sự/Năng suất: ${hronPart} · ${nsPart}\n`;
  });
  const belowThu=metrics.filter(x=>x.ns.hasNS&&mVung&&x.ns.thu<mVung.thuNhap*0.9).map(x=>x.bc);
  const belowNS=metrics.filter(x=>x.ns.hasNS&&mVung&&x.ns.nsT<mVung.nsGtc*0.9).map(x=>x.bc);
@@ -2565,9 +2603,8 @@ function gatherDashboardData(){
  function isoDate(d){return(d||'').match(/\d{4}-\d{2}-\d{2}/)?.[0]||'';}
  if(D.gtcTotalAM&&D.gtcTotalAM.length>1){
   const rows=D.gtcTotalAM.slice(1).filter(r=>(r[0]||'').trim());
-  const dates=[...new Set(rows.map(r=>isoD(r[1])).filter(d=>d))].sort((a,b)=>b.localeCompare(a));
-  const n1=dates[0]||'',n7=dates[6]||dates[dates.length-1]||'';
-  lines.push(`[Mốc: N-1=${shortD(n1)}, N-7=${shortD(n7)}]`);
+  const GA=aiDatasetDates(rows.map(r=>isoD(r[1])),7);const n1=GA.dN1,n7=GA.dN7;
+  lines.push(`[Mốc chung: N-1=${shortD(n1)}, N-7=${shortD(n7)}]${GA.lagNote}`);
   [n1,n7].forEach(dt=>{
    const grand=rows.filter(r=>(r[0]||'').toLowerCase().includes('grand total')&&isoD(r[1])===dt);
    if(grand[0])lines.push(`GTC Total (${shortD(dt)}): Vol=${Math.round(parseFloat(grand[0][2])||0)}, %Gán=${((parseFloat(grand[0][3])||0)*100).toFixed(1)}%, %GTC=${((parseFloat(grand[0][4])||0)*100).toFixed(1)}%`);
@@ -2578,8 +2615,7 @@ function gatherDashboardData(){
  }
  if(D.fdTotalAM&&D.fdTotalAM.length>1){
   const rows=D.fdTotalAM.slice(1).filter(r=>(r[0]||'').trim());
-  const dates=[...new Set(rows.map(r=>isoD(r[1])).filter(d=>d))].sort((a,b)=>b.localeCompare(a));
-  const n1=dates[0]||'',n7=dates[6]||'';
+  const FA=aiDatasetDates(rows.map(r=>isoD(r[1])),7);const n1=FA.dN1,n7=FA.dN7;
   [n1,n7].filter(Boolean).forEach(dt=>{
    lines.push(`\nFD Total (${shortD(dt)}):`);
    rows.filter(r=>isoD(r[1])===dt).forEach(r=>lines.push(`  ${(r[0]||'').trim()}: %Vol=${parsePct(r[2]).toFixed(2)}%, %FD=${parsePct(r[3]).toFixed(2)}%`));
@@ -2587,15 +2623,13 @@ function gatherDashboardData(){
  }
  if(D.odrAM&&D.odrAM.length>1){
   const rows=D.odrAM.slice(1).filter(r=>(r[0]||'').trim());
-  const dates=[...new Set(rows.map(r=>isoD(r[1])).filter(d=>d))].sort((a,b)=>b.localeCompare(a));
-  const n1=dates[0]||'';
+  const OA=aiDatasetDates(rows.map(r=>isoD(r[1])),7);const n1=OA.dN1;
   const dRows=rows.filter(r=>isoD(r[1])===n1);
   let tv=0,tc=0;dRows.forEach(r=>{tv+=Math.round(parseFloat(r[2])||0);tc+=Math.round(parseFloat(r[4])||0);});
   if(tv>0)lines.push(`\nODR TTS N-1 (${shortD(n1)}): Vol=${tv}, Ontime=${tc} (${(tc/tv*100).toFixed(1)}%)`);
  }
  if(window._ROTLC&&window._ROTLC.length){
-  const dates=[...new Set(window._ROTLC.map(r=>r.date))].sort((a,b)=>b.localeCompare(a));
-  const n1=dates[0]||'',n7=dates[6]||'';
+  const RA=aiDatasetDates(window._ROTLC.map(r=>r.date),7);const n1=RA.dN1,n7=RA.dN7;
   lines.push(`\nRớt LC: N-1=${window._ROTLC.filter(r=>r.date===n1).length} đơn, N-7=${n7?window._ROTLC.filter(r=>r.date===n7).length:0} đơn`);
  }
  if(window._BATON?.rows?.length)lines.push(`\nBưu Cục Bất Ổn (Baton): ${window._BATON.rows.length} BC — ${window._BATON.rows.map(r=>r.bc).join(', ')}`);
@@ -2604,6 +2638,8 @@ function gatherDashboardData(){
 }
 const AI_SYSTEM_PROMPT=`Bạn đóng vai trò là CHUYÊN GIA CỐ VẤN VẬN HÀNH LOGISTICS Vùng TNT (GHN). Nhiệm vụ: đọc dữ liệu, đưa ra nhận định chuyên sâu, cảnh báo rủi ro và khuyến nghị hành động cụ thể. CHỈ phân tích dựa trên đúng phần DỮ LIỆU được cung cấp; nếu thiếu số liệu, nói rõ KHÔNG bịa. Trả lời tiếng Việt.
 LƯU Ý: Phần "NGUỒN DỮ LIỆU AI TỰ TÌM/ĐỌC" được TÍNH TRỰC TIẾP từ sheet thô — ưu tiên dùng các con số này, đọc kỹ để hiểu ngữ cảnh từng AM/Bưu Cục trước khi nhận định, không suy diễn ngoài dữ liệu.
+MỐC THỜI GIAN (RẤT QUAN TRỌNG): TẤT CẢ các nhóm dữ liệu đều được canh theo CÙNG MỘT MỐC THỜI GIAN CHUNG — N-1 là ngày mới nhất chung, N-7 = N-1 trừ đúng 6 ngày lịch. Khi so sánh chéo giữa các chỉ số (GTC, FD, Ontime, Aging, Rớt LC, Nhân sự, Năng suất, Baton) PHẢI hiểu chúng cùng một mốc ngày. Nếu một nhóm dữ liệu có ghi chú "[⚠ LỆCH MỐC...]" nghĩa là sheet đó cập nhật chậm, chỉ có dữ liệu đến ngày sớm hơn mốc chung — phải nêu rõ điều này khi nhận định, KHÔNG so sánh nhầm như thể cùng ngày.
+ĐỊNH NGHĨA THUẬT NGỮ: "Tồn LM" (= cột BL LM / blLmTong trong Baton) = TỒN ĐƠN TRÊN HỆ THỐNG — tức số đơn còn tồn đọng chưa được xử lý/đẩy đi trên hệ thống Last Mile. CÀNG CAO CÀNG TỆ. KHÔNG hiểu nhầm đây là sản lượng (Vol) hay đơn đã giao. "%Tồn LM >5N" = tỉ trọng tồn đơn quá 5 ngày — càng cao càng tệ.
 ĐẶC BIỆT về NHÂN SỰ (Định biên/HRON): số nhân sự GIẢM là TÍN HIỆU XẤU (rủi ro thiếu người, ảnh hưởng năng suất/giao hàng) — đánh dấu cảnh báo; số nhân sự TĂNG là tín hiệu tốt. Khi BC bất ổn đi kèm nhân sự giảm, mức rủi ro càng cao.
 
 QUY TẮC ĐÁNH GIÁ TỐT/XẤU (TUYỆT ĐỐI KHÔNG ĐƯỢC HIỂU NGƯỢC):
@@ -2649,6 +2685,7 @@ async function runAIAnalysis(){
  document.getElementById('aiResultArea').innerHTML='<div class="ai-thinking"><div class="ai-thinking-dot"></div><div class="ai-thinking-dot"></div><div class="ai-thinking-dot"></div><span style="margin-left:8px">AI đang phân tích...</span></div>';
  const mode=window._aiMode||'preset';
  let ctx,scopeNote='',forceDS='';
+ window._AI_ANCHOR=null; // tính lại mốc thời gian chung sau khi nạp dữ liệu cho lần phân tích này
  try{
   if(mode==='all'){
    document.getElementById('aiStatus').textContent='⏳ Đang nạp toàn bộ dữ liệu...';
