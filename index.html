@@ -2050,7 +2050,7 @@ const AI_PRESETS={
  'so-sanh-am':'So sánh hiệu suất từng AM: xếp hạng theo %GTC, tỉ lệ trả, ontime, aging và rớt LC. Ai đang cải thiện? Ai đang giảm? Phân tích nguyên nhân. So sánh N-1 vs N-7.',
  'tra-hang':'Phân tích sâu tỉ lệ trả hàng (%FD) từ nguồn FD: (1) AM/BC nào cao/thấp nhất; (2) Xu hướng N-1 vs N-7; (3) So sánh FD Total vs SME vs TTS vs Shopee; (4) Đề xuất giảm FD.',
  'rot-lc':'Phân tích Rớt LC (nguồn Rot_LC_Raw): (1) Tổng đơn rớt LC hôm qua (N-1) vs 7 ngày trước (N-7); (2) AM/BC/Loại KH nào phát sinh nhiều nhất; (3) Xu hướng 7 ngày; (4) Kiến nghị xử lý.',
- 'bat-unstable':'Đóng vai trò CHUYÊN GIA NHÂN SỰ vận hành logistics Vùng TNT (giống phân tích Năng suất & Thu nhập). Phân tích tất cả Bưu Cục Bất Ổn (Baton cột D) và LIÊN KẾT với năng suất/thu nhập:\n(1) Vận hành: %GTC 3 ngày, biến động đơn GTC N-1 vs N-7, Hàng Tồn, Tồn LM (tồn đơn trên hệ thống), Lý do;\n(2) Nhân sự & năng suất: số nhân sự (HRON), NS Gán Giao TB, NS GTC, GTC TB (= Giao TB/ngày ÷ Ngày đi làm), Thu nhập TB (= Tổng lương ÷ Ngày đi làm);\n(3) BC có NV thu nhập <300kđ/ngày — đối chiếu với BC bất ổn;\n(4) Phân tích nguyên nhân gốc: thiếu đơn vs thiếu người vs năng suất thấp;\n(5) 5-7 giải pháp CỤ THỂ theo từng BC/AM ưu tiên: tăng GTC, coaching NV, bổ sung nhân sự, tối ưu ca — kỳ vọng tác động thu nhập.',
+ 'bat-unstable':'Đóng vai trò CHUYÊN GIA NHÂN SỰ vận hành logistics Vùng TNT (giống phân tích Năng suất & Thu nhập). Phân tích TẤT CẢ Bưu Cục Bất Ổn (Baton cột D) và LIÊN KẾT với năng suất/thu nhập — KHÔNG bỏ sót BC nào:\n(1) Vận hành: %GTC 3 ngày, biến động đơn GTC N-1 vs N-7, Hàng Tồn, Tồn LM (tồn đơn trên hệ thống), Lý do;\n(2) Nhân sự & năng suất: số nhân sự (HRON), NS Gán Giao TB, NS GTC, GTC TB (= Giao TB/ngày ÷ Ngày đi làm), Thu nhập TB (= Tổng lương ÷ Ngày đi làm);\n(3) Phân tích nguyên nhân gốc: thiếu đơn vs thiếu người vs năng suất thấp;\n(4) 3-5 giải pháp CỤ THỂ theo từng BC/AM ưu tiên: tăng GTC, coaching NV, bổ sung nhân sự, tối ưu ca — kỳ vọng tác động thu nhập.\nTrình bày đủ 4 phần I→IV, mỗi BC phải có dòng trong bảng và phần giải pháp.',
  'so-sanh-n1-n7':'So sánh toàn diện ngày N-1 (hôm qua) với N-7 trên tất cả chỉ số: %GTC, %FD, Ontime ODR/OPR, Aging, Rớt LC. Chỉ ra AM/BC biến động mạnh nhất và nguyên nhân có thể.',
  'kien-nghi':'Dựa trên toàn bộ dữ liệu, đưa ra 5-7 kiến nghị cải thiện cụ thể. Mỗi kiến nghị: vấn đề → giải pháp → kỳ vọng kết quả. Ưu tiên BC bất ổn và chỉ số xấu nhất N-1.',
  'nhan-su':'Đóng vai trò CHUYÊN GIA NHÂN SỰ vận hành logistics Vùng TNT. Phân tích Data_HRON + Data_Năng_Suất và đề xuất CỤ THỂ cách nâng cao thu nhập cho nhân viên/BC/AM:\n(1) Biến động số nhân sự N-1 vs hôm trước vs tuần trước;\n(2) NS Gán Giao TB, NS GTC, Thu nhập TB (= Tổng lương ÷ Số ngày đi làm) — xu hướng tăng/giảm;\n(3) BC có NV thu nhập <300.000đ/ngày — nguyên nhân và hành động;\n(4) Đối chiếu BC bất ổn (Baton) với năng suất/thu nhập thấp;\n(5) 5-7 kiến nghị nâng thu nhập vùng TNT: gắn với tăng đơn GTC, giảm tồn, tối ưu ca, coaching AM…',
@@ -2099,6 +2099,10 @@ function aiDetectFromQuestion(q){
   if(sc>score){score=sc;best=id;}
  });
  return score>=2?best:null;
+}
+function aiIsBatonHRPrompt(q){
+ const s=(q||'').toLowerCase();
+ return/(bưu cục bất ổn|bc bất ổn|baton)/.test(s)&&/(nhân sự|năng suất|thu nhập|chuyên gia nhân sự|baton cột)/.test(s);
 }
 /* ===== REGISTRY SHEET NGUỒN — AI tự tìm sheet theo tên/từ khoá rồi TÍNH tỉ lệ ===== */
 // Danh sách sheet nguồn chính (dùng chung init + AI)
@@ -2503,28 +2507,45 @@ function aiBaton(days,subject){
  const NS=window._NS?.rows||[];
  const NA=aiDatasetDates(NS.map(r=>r.date),days);
  const mVung=NA.winArr.length?nsComputeMetrics(NS.filter(r=>NA.win.has(r.date))):null;
- let s=`\n### Bưu Cục Bất Ổn (Baton cột D) — ${B.rows.length} BC · LIÊN KẾT Năng suất & Thu nhập\n[Mốc chung GTC: N-1=${shortD(n1)}, N-7=${shortD(n7)}, 3N=${d3.map(shortD).join(',')}]${GA.lagNote}\nGhi chú: Tồn LM = Tồn đơn trên hệ thống (số đơn còn tồn chưa xử lý/đẩy đi — CÀNG CAO CÀNG TỆ).\n[Công thức] GTC TB = Giao TB/ngày ÷ Ngày đi làm · Thu nhập TB = Tổng lương ÷ Ngày đi làm · Ngưỡng cảnh báo <${NS_LOW_INCOME.toLocaleString('vi-VN')}đ/ngày\n`;
- if(mVung)s+=`[TB Vùng ${days}N] NS Gán Giao=${mVung.nsGan.toFixed(1)}, NS GTC=${mVung.nsGtc.toFixed(1)}, GTC TB=${mVung.gtcTB.toFixed(1)}, Thu nhập TB=${Math.round(mVung.thuNhap).toLocaleString('vi-VN')}đ/ngày\n`;
- const metrics=[];
- B.rows.forEach((r,i)=>{
-  let pct3='—',dGtc='—',ton3='—';
+ const rows=[];
+ B.rows.forEach(r=>{
+  let pct3='—',dGtc='—',ton3='—',pct3n=0,n1g=0,n7g=0;
   if(gBC){
-   let v3=0,g3=0,n1g=0,n7g=0;
+   let v3=0,g3=0;
    gBC.slice(1).forEach(row=>{
     if((row[1]||'').trim()!==r.bc)return;const d=isoD(row[2]);
     const v=Math.round(parseFloat(row[3])||0),g=Math.round(parseFloat(row[6])||0);
     if(d3.includes(d)){v3+=v;g3+=g;}if(d===n1)n1g=g;if(d===n7)n7g=g;
    });
-   pct3=v3?(g3/v3*100).toFixed(1)+'%':'—';dGtc=`${n7g}→${n1g} (${n1g-n7g>=0?'+':''}${n1g-n7g})`;
+   pct3n=v3?g3/v3*100:0;pct3=pct3n?pct3n.toFixed(1)+'%':'—';dGtc=`${n7g}→${n1g} (${n1g-n7g>=0?'+':''}${n1g-n7g})`;
   }
   const gtcd=(window._GTCD?.rows||[]).filter(x=>x.bc===r.bc&&x.loai==='Hàng Tồn'&&d3.includes(x.date));
-  if(gtcd.length)ton3=String(gtcd.reduce((a,x)=>a+x.vol-x.ngtc-x.ntra,0));
+  if(gtcd.length){ton3=String(gtcd.reduce((a,x)=>a+x.vol-x.ngtc-x.ntra,0));}
   const ns=aiBatonNSMetrics(r.bc,days);
+  rows.push({r,pct3,pct3n,dGtc,ton3,ns});
+ });
+ let s=`\n### Bưu Cục Bất Ổn (Baton cột D) — ${B.rows.length} BC · LIÊN KẾT Năng suất & Thu nhập\n[Mốc chung GTC: N-1=${shortD(n1)}, N-7=${shortD(n7)}, 3N=${d3.map(shortD).join(',')}]${GA.lagNote}\nGhi chú: Tồn LM = Tồn đơn trên hệ thống (số đơn còn tồn chưa xử lý/đẩy đi — CÀNG CAO CÀNG TỆ).\n[Công thức] GTC TB = Giao TB/ngày ÷ Ngày đi làm · Thu nhập TB = Tổng lương ÷ Ngày đi làm · Ngưỡng cảnh báo <${NS_LOW_INCOME.toLocaleString('vi-VN')}đ/ngày\n`;
+ if(mVung)s+=`[TB Vùng ${days}N] NS Gán Giao=${mVung.nsGan.toFixed(1)}, NS GTC=${mVung.nsGtc.toFixed(1)}, GTC TB=${mVung.gtcTB.toFixed(1)}, Thu nhập TB=${Math.round(mVung.thuNhap).toLocaleString('vi-VN')}đ/ngày\n`;
+ s+=`\n#### BẢNG I — VẬN HÀNH (TẤT CẢ ${B.rows.length} BC)\nBC | AM | %GTC_3N | ΔGTC_N1_N7 | Tồn_LM | %Tồn_LM>5N | HàngTồn_3N | Lý_do\n-----|-----|--------|------------|--------|------------|------------|------\n`;
+ rows.forEach(x=>{s+=`${x.r.bc} | ${x.ns.am||'—'} | ${x.pct3} | ${x.dGtc} | ${fmt(x.r.blLmTong)} | ${x.r.pctBlLmOver5.toFixed(1)}% | ${x.ton3} | ${x.r.lyDo||'—'}\n`;});
+ s+=`\n#### BẢNG II — NHÂN SỰ & NĂNG SUẤT (TẤT CẢ ${B.rows.length} BC)\nBC | AM | NS_N-1 | ΔNS | NS_Gán | NS_GTC | GTC_TB | Thu_nhập_TB | NV | NV<300k\n-----|-----|-------|-----|--------|--------|--------|-------------|----|--------\n`;
+ rows.forEach(x=>{
+  const n=x.ns;
+  const nsPart=n.hasHron?`${n.staffN1}${n.staffD?` (${n.staffD>=0?'+':''}${n.staffD})`:''}`:'—';
+  const nsG=n.hasNS?n.nsG.toFixed(1):'—',nsT=n.hasNS?n.nsT.toFixed(1):'—',gtcTB=n.hasNS?n.gtcTB.toFixed(1):'—';
+  const thu=n.hasNS?Math.round(n.thu).toLocaleString('vi-VN')+'đ':'—';
+  const nvLow=n.nvLow?`${n.nvLow}(↓${Math.round(n.minThu).toLocaleString('vi-VN')}đ)`:'0';
+  s+=`${x.r.bc} | ${n.am||'—'} | ${nsPart} | ${n.hasHron&&n.staffD?`${n.staffD>=0?'+':''}${n.staffD}`:'—'} | ${nsG} | ${nsT} | ${gtcTB} | ${thu} | ${n.hasNS?n.nvCount:'—'} | ${nvLow}\n`;
+ });
+ s+=`\n#### CHI TIẾT TỪNG BC\n`;
+ const metrics=[];
+ rows.forEach((x,i)=>{
+  const{r,ns}=x;
   metrics.push({bc:r.bc,ns});
   const nsPart=ns.hasNS?`NS_Gán=${ns.nsG.toFixed(1)}, NS_GTC=${ns.nsT.toFixed(1)}, GTC_TB=${ns.gtcTB.toFixed(1)}, Thu_nhập_TB=${Math.round(ns.thu).toLocaleString('vi-VN')}đ/ngày, NV=${ns.nvCount}${ns.nvLow?`, NV<300k=${ns.nvLow}(thấp nhất ${Math.round(ns.minThu).toLocaleString('vi-VN')}đ)`:''}`:'NS/Thu nhập: chưa có DL';
   const hronPart=ns.hasHron?`Nhân_sự_N-1=${ns.staffN1}${ns.staffD?` (Δ ${ns.staffD>=0?'+':''}${ns.staffD})`:''}`:'Nhân sự: chưa có DL';
   const vsVung=mVung&&ns.hasNS?(ns.thu<mVung.thuNhap*0.85?' [Thu nhập THẤP hơn TB vùng]':ns.nsT<mVung.nsGtc*0.85?' [NS GTC THẤP hơn TB vùng]':''):'';
-  s+=`${i+1}. ${r.bc} (AM: ${ns.am||'—'})${vsVung}\n   Vận hành: Tồn_LM(tồn đơn hệ thống)=${fmt(r.blLmTong)}, %Tồn_LM>5N=${r.pctBlLmOver5.toFixed(1)}%, %GTC_3N=${pct3}, ΔGTC_N1_N7=${dGtc}, HàngTồn_3N=${ton3}, Lý_do=${r.lyDo||'—'}\n   Nhân sự/Năng suất: ${hronPart} · ${nsPart}\n`;
+  s+=`${i+1}. ${r.bc} (AM: ${ns.am||'—'})${vsVung}\n   Vận hành: Tồn_LM=${fmt(r.blLmTong)}, %Tồn_LM>5N=${r.pctBlLmOver5.toFixed(1)}%, %GTC_3N=${x.pct3}, ΔGTC_N1_N7=${x.dGtc}, HàngTồn_3N=${x.ton3}, Lý_do=${r.lyDo||'—'}\n   Nhân sự/Năng suất: ${hronPart} · ${nsPart}\n`;
  });
  const belowThu=metrics.filter(x=>x.ns.hasNS&&mVung&&x.ns.thu<mVung.thuNhap*0.9).map(x=>x.bc);
  const belowNS=metrics.filter(x=>x.ns.hasNS&&mVung&&x.ns.nsT<mVung.nsGtc*0.9).map(x=>x.bc);
@@ -2536,6 +2557,12 @@ function aiBaton(days,subject){
   if(lowInc.length)s+=`- BC có NV thu nhập <300k/ngày: ${lowInc.join(', ')}\n`;
  }
  s+=nsLowIncomeForAI(NS,days);
+ s+=`\n[CHECKLIST BẮT BUỘC — PHẢI TRẢ LỜI ĐỦ ${B.rows.length} BC TRONG 4 PHẦN]\n`;
+ s+=`Phần I: Bảng vận hành (đã có ${B.rows.length} dòng ở trên)\n`;
+ s+=`Phần II: Bảng nhân sự & năng suất (đã có ${B.rows.length} dòng ở trên)\n`;
+ s+=`Phần III: Nguyên nhân gốc TỪNG BC (thiếu đơn / thiếu người / năng suất thấp) — ${B.rows.length} BC:\n`;
+ B.rows.forEach((r,i)=>{s+=`  ${i+1}. ${r.bc}\n`;});
+ s+=`Phần IV: 3-5 giải pháp CỤ THỂ/BC (bảng STT | Giải pháp | Thực hiện | Kỳ vọng thu nhập) — ${B.rows.length} BC, KHÔNG để bảng trống, KHÔNG dừng giữa chừng.\n`;
  return s;
 }
 function aiCtxAll(days){
@@ -2655,6 +2682,14 @@ QUY TẮC ĐÁNH GIÁ TỐT/XẤU (TUYỆT ĐỐI KHÔNG ĐƯỢC HIỂU NGƯỢ
 - GTC TB = Giao TB/ngày ÷ Số ngày đi làm — đơn GTC trung bình thực tế/NV.
 Khi phân tích NHÂN SỰ / NĂNG SUẤT / THU NHẬP: đóng vai CHUYÊN GIA NHÂN SỰ, ưu tiên đề xuất thực tế để nâng thu nhập và năng suất Vùng TNT (6 tỉnh). Kết hợp số liệu HRON, Năng suất, BC bất ổn.
 Khi phân tích BƯU CỤC BẤT ỔN (Baton): CŨNG đóng vai CHUYÊN GIA NHÂN SỰ — không chỉ liệt kê vận hành. Bắt buộc đối chiếu từng BC với NS Gán Giao TB, NS GTC, GTC TB, Thu nhập TB, số nhân sự và NV <300k. Giải thích mối liên hệ (thiếu đơn → thu nhập thấp; thiếu người → NS thấp; vận hành kém → tồn cao → ít đơn mới). Mỗi kiến nghị phải gắn BC cụ thể và kỳ vọng tác động thu nhập/năng suất.
+
+CẤU TRÚC BẮT BUỘC KHI PHÂN TÍCH BC BẤT ỔN + NHÂN SỰ (KHÔNG ĐƯỢC BỎ SÓT BC, KHÔNG DỪNG GIỮA CHỪNG):
+Phải trả lời ĐỦ 4 phần cho TẤT CẢ BC trong danh sách (số lượng ghi trong dữ liệu/checklist):
+## I. BẢNG TỔNG HỢP VẬN HÀNH — mọi BC: %GTC 3N, ΔGTC N-1↔N-7, Tồn LM, %Tồn LM>5N, Hàng Tồn, Lý do
+## II. BẢNG NHÂN SỰ & NĂNG SUẤT — mọi BC: NS N-1, ΔNS, NS Gán, NS GTC, GTC TB, Thu nhập TB, NV<300k
+## III. PHÂN TÍCH NGUYÊN NHÂN GỐC — từng BC (2-3 câu): phân loại thiếu đơn / thiếu người / năng suất thấp / vận hành kém
+## IV. GIẢI PHÁP CỤ THỂ — mỗi BC 3-5 giải pháp, bảng đầy đủ: STT | Giải pháp | Thực hiện cụ thể | Kỳ vọng tác động thu nhập
+Nếu có N BC trong checklist, phải có N dòng ở phần III và giải pháp cho cả N BC ở phần IV. Không được chỉ phân tích 1-2 BC rồi dừng. Phần IV không được để bảng trống.
 Khi xếp hạng "tốt nhất / tệ nhất", phải áp dụng đúng chiều trên. Bưu cục/AM TỆ là nơi %GTC thấp, Ontime thấp, %FD cao, Aging cao, Rớt LC cao, năng suất thấp, thu nhập thấp.
 
 CÁCH TRÌNH BÀY:
@@ -2684,10 +2719,19 @@ async function runAIAnalysis(){
  const card=document.getElementById('aiResultCard');card.style.display='block';
  document.getElementById('aiResultArea').innerHTML='<div class="ai-thinking"><div class="ai-thinking-dot"></div><div class="ai-thinking-dot"></div><div class="ai-thinking-dot"></div><span style="margin-left:8px">AI đang phân tích...</span></div>';
  const mode=window._aiMode||'preset';
- let ctx,scopeNote='',forceDS='';
+ let ctx,scopeNote='',forceDS='',maxTokens=4096;
+ const isBatonHR=aiIsBatonHRPrompt(userQ);
  window._AI_ANCHOR=null; // tính lại mốc thời gian chung sau khi nạp dữ liệu cho lần phân tích này
  try{
-  if(mode==='all'){
+  if(isBatonHR){
+   document.getElementById('aiStatus').textContent='⏳ Đang nạp Baton + Nhân sự + Năng suất...';
+   await aiEnsureData(true,false,false,true,true,true);
+   const days=7;
+   ctx=aiBaton(days,'bc');
+   const nBC=window._BATON?.rows?.length||0;
+   scopeNote=`[CHUYÊN GIA NHÂN SỰ · BATON] Phân tích đủ ${nBC} BC bất ổn · 4 phần I→IV bắt buộc · không bỏ sót BC · không dừng giữa chừng. So sánh N-1 vs N-7.`;
+   maxTokens=8192;
+  }else if(mode==='all'){
    document.getElementById('aiStatus').textContent='⏳ Đang nạp toàn bộ dữ liệu...';
    await aiEnsureData(true,true,true,true,true,true);
    const days=+(document.getElementById('aiAllDays')?.value)||7;
@@ -2726,7 +2770,8 @@ async function runAIAnalysis(){
     scopeNote='Phạm vi: dữ liệu nhanh (GTC, FD, ODR, Rớt LC, Baton'+(needHR?', Nhân sự':'')+') · N-1 vs N-7.';
    }
   }
-  // ===== AI tự tìm/đọc sheet nguồn để TÍNH trực tiếp (custom: luôn đọc file dù không khớp từ khoá) =====
+  // ===== AI tự tìm/đọc sheet nguồn (bỏ qua với Baton+HR để tập trung dữ liệu) =====
+  if(!isBatonHR){
   try{
    const subjForSearch=aiDetectLevelFromQuestion(userQ)||(document.getElementById('aiCustSubject')?.value==='bc'?'bc':'am');
    const daysSearch=+(document.getElementById('aiCustDays')?.value||document.getElementById('aiAllDays')?.value)||7;
@@ -2734,13 +2779,15 @@ async function runAIAnalysis(){
    const auto=await aiAutoSourceContext(userQ,subjForSearch,daysSearch,mode==='custom'?forceDS:'');
    if(auto){ctx=auto.ctx+'\n\n'+ctx;scopeNote=(scopeNote||'')+` · Sheet đã đọc (${auto.level==='bc'?'Bưu Cục':'AM'}): ${auto.used.join(', ')}.`;}
   }catch(_){}
+  }
   document.getElementById('aiStatus').textContent='';
  }catch(_){ctx=gatherDashboardData();}
  try{
-  const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:4096,system:AI_SYSTEM_PROMPT,messages:[{role:'user',content:`${scopeNote}\n\nDỮ LIỆU:\n${ctx}\n\nYÊU CẦU:\n${userQ}`}]})});
+  const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:maxTokens,system:AI_SYSTEM_PROMPT,messages:[{role:'user',content:`${scopeNote}\n\nDỮ LIỆU:\n${ctx}\n\nYÊU CẦU:\n${userQ}`}]})});
   if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||`HTTP ${res.status}`);}
   const data=await res.json();const text=(data.content&&data.content[0]&&data.content[0].text)||'(Không có phản hồi)';
-  document.getElementById('aiResultArea').innerHTML=md2html(text);window._lastAIResult=text;
+  const truncated=data.stop_reason==='max_tokens';
+  document.getElementById('aiResultArea').innerHTML=md2html(text)+(truncated?'<div style="margin-top:12px;padding:10px 14px;background:#FEF3C7;border:1px solid #FCD34D;border-radius:8px;font-size:12.5px;color:#92400E">⚠️ Phản hồi có thể bị cắt do giới hạn độ dài. Thử chạy lại hoặc giảm số BC cần phân tích chi tiết.</div>':'');window._lastAIResult=text;
   try{const hist=aiLoadSaved();if(!hist.some(q=>q.text===userQ))localStorage.setItem(AI_Q_KEY,JSON.stringify([{text:userQ,ts:Date.now()},...hist].slice(0,50)));aiRenderSavedQuestions();}catch(_){}
   card.scrollIntoView({behavior:'smooth',block:'start'});
  }catch(e){document.getElementById('aiResultArea').innerHTML=`<div style="color:#f87171;padding:12px;background:rgba(248,113,113,0.08);border-radius:8px">❌ ${e.message}</div>`;}
