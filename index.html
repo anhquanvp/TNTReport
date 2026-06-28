@@ -1627,18 +1627,12 @@ function buildHRONPage(){
  }).catch(e=>{el.innerHTML=errPage(`Định biên nhân sự: ${e.message}`);});
 }
 function hronSkeleton(rows){
- const allD=[...new Set(rows.map(r=>r.date))].sort((a,b)=>b.localeCompare(a));
  const ams=[...new Set(rows.map(r=>r.am).filter(Boolean))].sort();
  const bcs=[...new Set(rows.map(r=>r.bc).filter(Boolean))].sort();
- const dTo=allD[0]||'',dFrom=allD[Math.min(9,allD.length-1)]||'';
- const mkOpt=(arr,sv)=>arr.map(d=>`<option value="${d}"${d===sv?' selected':''}>${shortDDow(d)}</option>`).join('');
  return`<div class="page-header">
   <div class="page-title">Định biên nhân sự</div>
-  <div class="page-meta"><span class="tag tag-orange">📋 Nguồn: Data_HRON · 7 ngày gần nhất + Trend (giống Aging)</span><span>Ngày mới nhất: ${shortD(dTo)}</span></div>
  </div>
  <div class="date-filter-bar" style="flex-wrap:wrap;gap:14px">
-  <div><label style="display:block;margin-bottom:3px">Từ ngày</label><select id="hron_from" onchange="renderHRON()">${mkOpt(allD,dFrom)}</select></div>
-  <div><label style="display:block;margin-bottom:3px">Đến ngày</label><select id="hron_to" onchange="renderHRON()">${mkOpt(allD,dTo)}</select></div>
   <div><label style="display:block;margin-bottom:3px">AM</label><select id="hron_am" onchange="renderHRON()"><option value="">Tất cả AM</option>${ams.map(a=>`<option value="${a.replace(/"/g,'&quot;')}">${a}</option>`).join('')}</select></div>
   <div><label style="display:block;margin-bottom:3px">Bưu cục</label><select id="hron_bc" onchange="renderHRON()"><option value="">Tất cả BC</option>${bcs.map(b=>`<option value="${b.replace(/"/g,'&quot;')}">${b}</option>`).join('')}</select></div>
  </div>
@@ -1647,10 +1641,8 @@ function hronSkeleton(rows){
 }
 function hronFiltered(){
  const H=window._HRON;
- const from=document.getElementById('hron_from')?.value||'',to=document.getElementById('hron_to')?.value||'';
- const lo=from<=to?from:to,hi=from<=to?to:from;
  const am=document.getElementById('hron_am')?.value||'',bc=document.getElementById('hron_bc')?.value||'';
- return H.rows.filter(r=>r.date>=lo&&r.date<=hi&&(!am||r.am===am)&&(!bc||r.bc===bc));
+ return H.rows.filter(r=>(!am||r.am===am)&&(!bc||r.bc===bc));
 }
 function hronTrendTable(arr,keyField,title,icon,badge,last7,latest,prev,unstableSet){
  const maxV=Math.max(...arr.map(r=>r[latest]||0),1);
@@ -1662,33 +1654,37 @@ function hronTrendTable(arr,keyField,title,icon,badge,last7,latest,prev,unstable
   const rankColor=idx<3?'color:var(--orange);font-weight:800;font-size:14px':'color:var(--text-sub);font-weight:600';
   t+=`<tr style="border-bottom:1px solid var(--border)"><td style="padding:9px 14px;${rankColor}">${idx+1}</td><td style="padding:9px 14px;font-weight:600;font-size:13px">${name}${isUnstable?'<span style="display:inline-block;background:#FEE2E2;color:var(--red);border:1px solid #FECACA;border-radius:4px;font-size:9px;font-weight:700;padding:1px 5px;margin-left:5px">⚠ bất ổn</span>':''}</td>`;
   last7.forEach((d,i)=>{const v=row[d]||0;const isLatest=i===last7.length-1;const barW=isLatest&&maxV>0?Math.round((v/maxV)*50):0;if(isLatest){t+=`<td style="padding:9px 14px;text-align:right;background:#FFF0EB"><div style="display:flex;align-items:center;justify-content:flex-end;gap:5px"><div style="height:5px;border-radius:3px;background:var(--orange);width:${barW}px;min-width:${v>0?2:0}px"></div><span style="font-weight:800;font-size:14px;color:var(--orange-dark,#C8461A)">${v>0?fmt(v):'—'}</span></div></td>`;}else{t+=`<td style="padding:9px 14px;text-align:right;font-weight:500;color:${v>0?'var(--text-main)':'var(--border)'}">${v>0?fmt(v):'—'}</td>`;}});
-  const curr=row[latest]||0,prevRow=row[prev]||0;const trendColor=curr<prevRow?'var(--red)':curr>prevRow?'var(--green)':'var(--text-sub)';const trendTxt=curr<prevRow?`▼ ${prevRow-curr}`:curr>prevRow?`▲ ${curr-prevRow}`:'—';
+  const curr=row[latest]||0,prevRow=prev?(row[prev]||0):null;
+  const trendColor=prevRow==null?'var(--text-sub)':curr<prevRow?'var(--red)':curr>prevRow?'var(--green)':'var(--text-sub)';
+  const trendTxt=prevRow==null?'—':curr<prevRow?`▼ ${prevRow-curr}`:curr>prevRow?`▲ ${curr-prevRow}`:'—';
   t+=`<td style="padding:9px 14px;text-align:right;color:${trendColor};font-weight:700;font-size:13px;white-space:nowrap">${trendTxt}</td></tr>`;
  });
  t+=`<tfoot><tr style="background:var(--orange-light,#FFF0EB);border-top:2px solid var(--orange)"><td style="padding:9px 12px;font-weight:800;color:var(--orange)"></td><td style="padding:9px 12px;font-weight:800;color:var(--orange)">TỔNG CỘNG</td>`;
  last7.forEach((d,i)=>{const sum=arr.reduce((s,r)=>s+(r[d]||0),0);const isLatest=i===last7.length-1;t+=`<td style="padding:9px 12px;text-align:right;font-weight:800;${isLatest?'color:var(--orange-dark,#C8461A);background:#FFE0CC':'color:var(--text-main)'}">${fmt(sum)}</td>`;});
- const sC=arr.reduce((s,r)=>s+(r[latest]||0),0),sP=arr.reduce((s,r)=>s+(r[prev]||0),0),sD=sC-sP;
- t+=`<td style="padding:9px 12px;text-align:right;color:${sD<0?'var(--red)':sD>0?'var(--green)':'var(--text-sub)'};font-weight:800;white-space:nowrap">${sD<0?`▼ ${sP-sC}`:sD>0?`▲ ${sC-sP}`:'—'}</td></tr></tfoot></table></div></div>`;
+ const sC=arr.reduce((s,r)=>s+(r[latest]||0),0),sP=prev?arr.reduce((s,r)=>s+(r[prev]||0),0):null,sD=sP!=null?sC-sP:null;
+ t+=`<td style="padding:9px 12px;text-align:right;color:${sD==null?'var(--text-sub)':sD<0?'var(--red)':sD>0?'var(--green)':'var(--text-sub)'};font-weight:800;white-space:nowrap">${sD==null?'—':sD<0?`▼ ${sP-sC}`:sD>0?`▲ ${sC-sP}`:'—'}</td></tr></tfoot></table></div></div>`;
  return t;
 }
 function renderHRON(){
  const H=window._HRON;if(!H.rows.length)return;
  const data=hronFiltered();
- const allDates=[...new Set(data.map(r=>r.date))].sort();
+ const allDates=[...new Set(H.rows.map(r=>r.date))].sort();
  const last7=allDates.slice(-7);
- if(!last7.length){document.getElementById('hron_tables').innerHTML='<p style="padding:16px;color:var(--text-sub)">Không có dữ liệu trong bộ lọc.</p>';return;}
- const latest=last7[last7.length-1],prev=last7[last7.length-2];
+ if(!last7.length){document.getElementById('hron_tables').innerHTML='<p style="padding:16px;color:var(--text-sub)">Không có dữ liệu.</p>';return;}
+ const latest=last7[last7.length-1],prev=last7.length>=2?last7[last7.length-2]:'';
  const recent=data.filter(r=>last7.includes(r.date));
  const unstableSet=getUnstableSet();
  const byDate={};recent.forEach(r=>{byDate[r.date]=(byDate[r.date]||0)+r.count;});
- const latestTotal=byDate[latest]||0,prevTotal=byDate[prev]||0,delta=latestTotal-prevTotal;
+ const latestTotal=byDate[latest]||0,prevTotal=prev?(byDate[prev]||0):null;
+ const delta=prevTotal!=null?latestTotal-prevTotal:null;
  const unstableLatest=recent.filter(r=>r.date===latest&&bcMatchUnstable(r.bc)).reduce((s,r)=>s+r.count,0);
- const deltaSign=delta>0?'+':'';const deltaIcon=delta<0?'▼':delta>0?'▲':'—';const deltaColor=delta<0?'var(--red)':delta>0?'var(--green)':'var(--text-sub)';
+ const deltaSign=delta!=null&&delta>0?'+':'';const deltaIcon=delta==null?'—':delta<0?'▼':delta>0?'▲':'—';
+ const deltaColor=delta==null?'var(--text-sub)':delta<0?'var(--red)':delta>0?'var(--green)':'var(--text-sub)';
  let kpi=`<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px">`;
- [{icon:'👥',label:'Nhân sự hôm nay',val:fmt(latestTotal),sub:shortD(latest),color:'var(--orange)'},
-  {icon:'📅',label:'Nhân sự N-1',val:fmt(prevTotal),sub:shortD(prev),color:'#3182CE'},
-  {icon:delta<0?'📉':'📈',label:'Tăng/Giảm so N-1',val:`${deltaIcon} ${fmt(Math.abs(delta))}`,sub:`${deltaSign}${delta} người`,color:deltaColor},
-  {icon:'⚠️',label:'NS BC bất ổn hôm nay',val:fmt(unstableLatest),sub:`${unstableSet.size} bưu cục bất ổn`,color:'var(--red)'}
+ [{icon:'👥',label:'Nhân sự mới nhất',val:fmt(latestTotal),sub:shortD(latest),color:'var(--orange)'},
+  {icon:'📅',label:'Nhân sự N-1',val:prevTotal!=null?fmt(prevTotal):'—',sub:prev?shortD(prev):'Chưa có dữ liệu',color:'#3182CE'},
+  {icon:delta!=null&&delta<0?'📉':'📈',label:'Tăng/Giảm so N-1',val:delta==null?'—':`${deltaIcon} ${fmt(Math.abs(delta))}`,sub:delta==null?'—':`${deltaSign}${delta} người`,color:deltaColor},
+  {icon:'⚠️',label:'NS BC bất ổn',val:fmt(unstableLatest),sub:`${unstableSet.size} bưu cục bất ổn`,color:'var(--red)'}
  ].forEach(k=>{kpi+=`<div style="background:var(--card);border-radius:12px;padding:18px 16px;text-align:center;box-shadow:var(--shadow-sm);border-top:3px solid ${k.color}"><div style="font-size:24px;margin-bottom:8px">${k.icon}</div><div style="font-size:10px;font-weight:700;color:var(--text-sub);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">${k.label}</div><div style="font-size:32px;font-weight:800;color:${k.color};line-height:1">${k.val}</div><div style="font-size:11px;color:var(--text-sub);margin-top:5px">${k.sub}</div></div>`;});
  kpi+=`</div>`;
  document.getElementById('hron_kpi').innerHTML=kpi;
@@ -1749,7 +1745,6 @@ function nsSkeleton(rows){
  const mkOpt=(arr,sv)=>arr.map(d=>`<option value="${d}"${d===sv?' selected':''}>${shortDDow(d)}</option>`).join('');
  return`<div class="page-header">
   <div class="page-title">Năng suất nhân viên</div>
-  <div class="page-meta"><span class="tag tag-orange">📈 Nguồn: Data_Năng_Suất · Thu nhập TB = Tổng lương ÷ Số ngày đi làm · AM cột S</span><span>Ngày mới nhất: ${shortD(dTo)}</span></div>
  </div>
  <div class="date-filter-bar" style="flex-wrap:wrap;gap:14px">
   <div><label style="display:block;margin-bottom:3px">Từ ngày</label><select id="ns_from" onchange="renderNS()">${mkOpt(allD,dFrom)}</select></div>
@@ -1758,10 +1753,10 @@ function nsSkeleton(rows){
   <div><label style="display:block;margin-bottom:3px">Bưu cục</label><select id="ns_bc" onchange="renderNS()"><option value="">Tất cả BC</option>${bcs.map(b=>`<option value="${b.replace(/"/g,'&quot;')}">${b}</option>`).join('')}</select></div>
  </div>
  <div class="kpi-grid" id="ns_kpi"></div>
- <div class="chart-box"><h3>Xu hướng năng suất theo ngày</h3><div class="csub">Đường = NS Gán Giao TB · NS GTC · Thu nhập TB (Tổng lương ÷ Ngày đi làm)</div><div class="chart-canvas-wrap"><canvas id="ns_chart"></canvas></div><div id="ns_chartNote"></div></div>
- <div class="card" id="ns_warnCard"><div class="card-header"><div class="card-title"><div class="card-icon" style="background:var(--red)">⚠️</div>Cảnh báo thu nhập thấp</div><div class="card-info">BC có NV thu nhập &lt; ${(NS_LOW_INCOME/1000).toFixed(0)}kđ/ngày (Tổng lương ÷ Ngày đi làm)</div></div><div id="ns_warnTable"></div></div>
- <div class="card"><div class="card-header"><div class="card-title"><div class="card-icon">👤</div>Thống kê AM</div><div class="card-info">NS Gán Giao · NS GTC · GTC TB (Giao TB/ngày ÷ Ngày đi làm) · Thu nhập TB</div></div><div id="ns_amTable"></div></div>
- <div class="card"><div class="card-header"><div class="card-title"><div class="card-icon">🏪</div>Thống kê Bưu Cục</div><div class="card-info">Đánh dấu ⚠ bưu cục bất ổn (nguồn: Baton)</div></div><div id="ns_bcTable"></div></div>
+ <div class="chart-box"><h3>Xu hướng năng suất theo ngày</h3><div class="chart-canvas-wrap"><canvas id="ns_chart"></canvas></div><div id="ns_chartNote"></div></div>
+ <div class="card" id="ns_warnCard"><div class="card-header"><div class="card-title"><div class="card-icon" style="background:var(--red)">⚠️</div>Cảnh báo thu nhập thấp</div></div><div id="ns_warnTable"></div></div>
+ <div class="card"><div class="card-header"><div class="card-title"><div class="card-icon">👤</div>Thống kê AM</div></div><div id="ns_amTable"></div></div>
+ <div class="card"><div class="card-header"><div class="card-title"><div class="card-icon">🏪</div>Thống kê Bưu Cục</div></div><div id="ns_bcTable"></div></div>
  <div id="ns_analysis"></div>`;
 }
 function nsFiltered(){
