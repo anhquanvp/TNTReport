@@ -1608,11 +1608,13 @@ function buildOverviewPage(R,rotData){
 window._HRON={rows:[],charts:{}};
 function normalizeHRONRows(raw){
  let lastDate='';
+ const bc2am=buildBc2AmMap(); // AM chuẩn theo BC (ưu tiên cột AM từ GTC Total theo Bưu Cục)
  return(raw||[]).slice(1).map(r=>{
   let d=parseSheetDate(r[0]);
   if(d)lastDate=d; else d=lastDate; // tự điền ngày cho dòng trống / ô gộp (merged cells)
+  const bc=(r[3]||'').trim();
   return{
-   date:d,am:(r[1]||'').trim(),tinh:(r[2]||'').trim(),bc:(r[3]||'').trim(),
+   date:d,am:bc2am[bc]||(r[1]||'').trim(),tinh:(r[2]||'').trim(),bc,
    count:Math.round(parseFloat(String(r[4]||'').replace(/\./g,'').replace(',','.'))||0)
   };
  }).filter(r=>r.date&&r.count>=0);
