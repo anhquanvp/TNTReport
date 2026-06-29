@@ -344,6 +344,7 @@ tr.tot td{background:#F4F8FF;font-weight:700;border-top:2px solid var(--orange-m
  <div class="page" id="p10"><div class="loading"><div class="spinner"></div><div class="loading-text">Đang tải dữ liệu...</div></div></div>
  <div class="page" id="p11"><div class="loading"><div class="spinner"></div><div class="loading-text">Đang tải dữ liệu...</div></div></div>
  <div class="page" id="p12"></div>
+ <div class="page" id="p13"><div class="loading"><div class="spinner"></div><div class="loading-text">Đang tải dữ liệu...</div></div></div>
 </main>
 
 <script>
@@ -354,6 +355,7 @@ const NAV_GROUPS=[
  {id:'g_gtc',icon:'📦',label:'GTC',items:[['p1','📊','% GTC'],['p2','🛡️','TITAN TTS'],['p8','🧰','GTC Bulky']]},
  {id:'g_fd',icon:'🔄',label:'FD',items:[['p3','📅','FD Daily'],['p4','🗓️','FD Weekly']]},
  {id:'g_ot',icon:'⏱️',label:'Ontime',items:[['p5','🛰️','ODR TTS'],['p6','🚀','OPR TTS']]},
+ {id:'g_lt',icon:'⏲️',label:'Leadtime',page:'p13',cap:'Leadtime KCT'},
  {id:'g_ag',icon:'⏳',label:'Aging',page:'p7',cap:'Aging Daily'},
  {id:'g_rl',icon:'📉',label:'Rớt LC',page:'p9',cap:'Rớt LC Daily'},
  {id:'g_hr',icon:'👥',label:'Nhân sự',items:[['p10','📋','Định biên'],['p11','📈','Năng suất']]},
@@ -395,6 +397,7 @@ function nav(id,grpId){
  if(id==='p9'&&!window._rotlcLoaded){window._rotlcLoaded=true;buildRotLCPage();}
  if(id==='p10'&&!window._hronLoaded){window._hronLoaded=true;buildHRONPage();}
  if(id==='p11'&&!window._nsLoaded){window._nsLoaded=true;buildNSPage();}
+ if(id==='p13'&&!window._ltkctLoaded){window._ltkctLoaded=true;buildLTKCTPage();}
 }
 function show(id,btn){nav(id,PAGE2GRP[id]);}
 document.addEventListener('click',()=>document.querySelectorAll('.nav-pod.open').forEach(p=>p.classList.remove('open')));
@@ -1023,7 +1026,14 @@ function buildOntimePage(rowsAM,rowsBC,title,volLabel,countLabel,greenThr,yellow
   const gPivot={};
   dates.forEach(d=>{let tv=0,tc=0;Object.values(pivot).forEach(row=>{if(row[d]){tv+=row[d].vol;tc+=row[d].cnt;}});if(tv>0)gPivot[d]={vol:tv,pct:tc/tv*100,cnt:tc};});
   const latest=dates[dates.length-1];
-  const names=Object.keys(pivot).sort((a,b)=>(pivot[a][latest]?.pct??999)-(pivot[b][latest]?.pct??999));
+  // Sắp xếp: bưu cục có %Ontime THẤP → CAO của NGÀY MỚI NHẤT (BC chưa có dữ liệu ngày mới nhất xuống cuối)
+  const names=Object.keys(pivot).sort((a,b)=>{
+   const pa=pivot[a][latest]?.pct,pb=pivot[b][latest]?.pct;
+   const ha=pa!=null,hb=pb!=null;
+   if(ha&&hb)return pa-pb;
+   if(ha)return -1;if(hb)return 1;
+   return 0;
+  });
   const cs='padding:5px 8px;';
   let h=`<div class="table-wrap" style="overflow-x:auto;max-height:1100px"><table style="font-size:12px"><thead style="position:sticky;top:0;z-index:4;background:#FEEDE4">
    <tr>
@@ -1331,6 +1341,134 @@ function gtcdDrawChart(canvasId,key,labels,datasets,isPct){
   plugins:{legend:{position:'bottom',labels:{usePointStyle:true,boxWidth:8,font:{size:11}}},
    tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.y==null?'—':isPct?c.parsed.y.toFixed(1)+'%':c.parsed.y.toLocaleString('vi-VN')}`}}},
   scales:{y:{beginAtZero:true,ticks:{font:{size:10},callback:v=>isPct?v+'%':v.toLocaleString('vi-VN')},grid:{color:'#F0F0F0'}},x:{ticks:{font:{size:10}},grid:{display:false}}}
+ }});
+}
+
+/* ===== LEADTIME KCT (p13) — sheet "Leadtime KCT" ===== */
+// cols: Miền(0), Mốc giờ(1), Time(2), Volume(3), %Volume(4), LeadTime(5), Bưu Cục(6), Total_LT(7), Tuần(8), Tháng(9)
+// Leadtime = ΣTotal_LT(H) / ΣVolume(D)
+const LTKCT_GID='125700493';
+const LTKCT_MOC=['1.0 - 6h','2.6 - 12h','3.12 - 24h','4.>24h'];
+const LTKCT_LINEC=['#F15D29','#2563EB','#10B981','#A855F7','#EC4899','#F59E0B'];
+window._LTKCT={rows:[],charts:{},selMoc:new Set(LTKCT_MOC)};
+function ltNum(v){const s=String(v??'').trim();if(!s||s.includes('#'))return 0;const n=parseFloat(s.replace(/,/g,''));return isFinite(n)?n:0;}
+function buildLTKCTPage(){
+ const el=document.getElementById('p13');
+ fetchSheetByGid(LTKCT_GID).then(raw=>{
+  const rows=(raw||[]).slice(1).filter(r=>r.length>7&&(r[2]||'').trim()).map(r=>({
+   mien:(r[0]||'').trim(),moc:(r[1]||'').trim(),date:isoD(r[2]),
+   vol:ltNum(r[3]),bc:(r[6]||'').trim(),totLT:ltNum(r[7])
+  })).filter(r=>r.date&&r.bc);
+  window._LTKCT.rows=rows;
+  window._LTKCT.selMoc=new Set(LTKCT_MOC);
+  el.innerHTML=ltkctSkeleton(rows);
+  setTimeout(()=>renderLTKCT(),0);
+ }).catch(e=>{el.innerHTML=errPage(`Leadtime KCT: ${e.message}`);});
+}
+function ltkctSkeleton(rows){
+ const allD=[...new Set(rows.map(r=>r.date))].sort((a,b)=>b.localeCompare(a));
+ const bcs=[...new Set(rows.map(r=>r.bc))].sort();
+ const dTo=allD[0]||'',dFrom=allD[Math.min(6,allD.length-1)]||'';
+ const mkOpt=(arr,sv)=>arr.map(d=>`<option value="${d}"${d===sv?' selected':''}>${shortDDow(d)}</option>`).join('');
+ return`<div class="page-header">
+  <div class="page-title">Leadtime KCT — Kho Chuyển Tiếp</div>
+  <div class="page-meta"><span class="tag tag-orange">⏲️ Leadtime = Total_LT / Volume · theo ngày & mốc giờ</span><span>Ngày mới nhất: ${shortD(allD[0])}</span></div>
+ </div>
+ <div class="date-filter-bar" style="flex-wrap:wrap;gap:14px">
+  <div><label style="display:block;margin-bottom:3px">Từ ngày</label><select id="ltkct_from" onchange="renderLTKCT()">${mkOpt(allD,dFrom)}</select></div>
+  <div><label style="display:block;margin-bottom:3px">Đến ngày</label><select id="ltkct_to" onchange="renderLTKCT()">${mkOpt(allD,dTo)}</select></div>
+  <div><label style="display:block;margin-bottom:3px">Bưu cục (Kho chuyển tiếp)</label><select id="ltkct_bc" onchange="renderLTKCT()"><option value="">Tất cả kho</option>${bcs.map(b=>`<option value="${b.replace(/"/g,'&quot;')}">${b}</option>`).join('')}</select></div>
+ </div>
+ <div class="date-filter-bar" style="flex-wrap:wrap;gap:14px;border-top:none">
+  <div class="chip-row"><span class="chip-label">Mốc giờ</span>${LTKCT_MOC.map(m=>`<span class="chip active" data-moc="${m}" onclick="ltkctToggle(this)">${m}</span>`).join('')}</div>
+ </div>
+ <div class="kpi-grid" id="ltkct_kpi" style="grid-template-columns:repeat(5,1fr)"></div>
+ <div class="chart-box"><h3>Xu hướng Leadtime theo ngày — theo Kho chuyển tiếp</h3><div class="csub">Mỗi đường = 1 kho chuyển tiếp · Leadtime = ΣTotal_LT / ΣVolume theo ngày.</div><div class="chart-canvas-wrap"><canvas id="ltkct_chart"></canvas></div></div>
+ <div class="card"><div class="card-header"><div class="card-title"><div class="card-icon">📦</div>Volume theo Mốc giờ</div><div class="card-info">Cột Trend = ngày mới nhất so với ngày trước</div></div><div id="ltkct_volTable"></div></div>
+ <div class="card"><div class="card-header"><div class="card-title"><div class="card-icon">⏱️</div>Leadtime theo Mốc giờ</div><div class="card-info">Leadtime = ΣTotal_LT/ΣVol · Cột Trend = ngày mới nhất so với ngày trước</div></div><div id="ltkct_ltTable"></div></div>`;
+}
+function ltkctToggle(elm){
+ elm.classList.toggle('active');
+ const m=elm.dataset.moc;
+ if(elm.classList.contains('active'))window._LTKCT.selMoc.add(m);else window._LTKCT.selMoc.delete(m);
+ renderLTKCT();
+}
+function ltkctFiltered(){
+ const G=window._LTKCT;
+ const from=document.getElementById('ltkct_from')?.value||'',to=document.getElementById('ltkct_to')?.value||'';
+ const lo=from<=to?from:to,hi=from<=to?to:from;
+ const bc=document.getElementById('ltkct_bc')?.value||'';
+ return G.rows.filter(r=>r.date>=lo&&r.date<=hi&&(!bc||r.bc===bc)&&G.selMoc.has(r.moc));
+}
+function renderLTKCT(){
+ const G=window._LTKCT;if(!G.rows.length)return;
+ const data=ltkctFiltered();
+ const dates=[...new Set(data.map(r=>r.date))].sort();
+ const n1=dates[dates.length-1]||'',n2=dates[dates.length-2]||'';
+ const dayAgg=d=>{let v=0,t=0;data.filter(r=>r.date===d).forEach(r=>{v+=r.vol;t+=r.totLT;});return{v,t,lt:v?t/v:0};};
+ const a1=dayAgg(n1),a2=dayAgg(n2);
+ const volByMoc={};LTKCT_MOC.forEach(m=>volByMoc[m]=0);
+ data.filter(r=>r.date===n1).forEach(r=>{if(volByMoc[r.moc]!==undefined)volByMoc[r.moc]+=r.vol;});
+ const dVol=a1.v-a2.v,dLT=a1.lt-a2.lt;
+ const volDelta=n2?`<span style="color:${dVol>=0?'var(--green)':'var(--red)'}">${dVol>=0?'▲':'▼'} ${fmt(Math.abs(dVol))}</span>`:'—';
+ const ltDelta=n2?`<span style="color:${dLT>0?'var(--red)':dLT<0?'var(--green)':'var(--text-sub)'}">${dLT>0?'▲':dLT<0?'▼':'—'} ${Math.abs(dLT).toFixed(2)}h</span>`:'—';
+ const mocMini=LTKCT_MOC.filter(m=>G.selMoc.has(m)).map(m=>`<div style="display:flex;justify-content:space-between;gap:8px;font-size:11px;margin-top:2px"><span style="color:var(--text-sub)">${m}</span><strong>${fmt(volByMoc[m])}</strong></div>`).join('');
+ document.getElementById('ltkct_kpi').innerHTML=`
+  <div class="kpi-card" style="border-top-color:var(--orange)"><div class="kpi-ico" style="background:#FFF0EB">📦</div><div class="kpi-label">Volume ngày ${n1?shortD(n1):'—'}</div><div class="kpi-val" style="color:var(--orange)">${fmt(a1.v)}</div></div>
+  <div class="kpi-card" style="border-top-color:#3B82F6"><div class="kpi-ico" style="background:#EFF6FF">🕐</div><div class="kpi-label">Volume theo Mốc giờ</div><div style="margin-top:4px">${mocMini||'<span style="font-size:11px;color:var(--text-sub)">—</span>'}</div></div>
+  <div class="kpi-card" style="border-top-color:#7C3AED"><div class="kpi-ico" style="background:#FAF5FF">⏱️</div><div class="kpi-label">Leadtime TB ngày ${n1?shortD(n1):'—'}</div><div class="kpi-val" style="color:#7C3AED">${a1.lt.toFixed(2)}<span style="font-size:13px">h</span></div></div>
+  <div class="kpi-card" style="border-top-color:var(--green)"><div class="kpi-ico" style="background:#DCFCE7">📈</div><div class="kpi-label">Δ Volume (vs ${n2?shortD(n2):'—'})</div><div class="kpi-val">${volDelta}</div></div>
+  <div class="kpi-card" style="border-top-color:var(--red)"><div class="kpi-ico" style="background:#FEE2E2">⏲️</div><div class="kpi-label">Δ Leadtime (vs ${n2?shortD(n2):'—'})</div><div class="kpi-val">${ltDelta}</div></div>`;
+ const bcs=[...new Set(data.map(r=>r.bc))].sort();
+ const dIdx=Object.fromEntries(dates.map((d,i)=>[d,i]));
+ const perBC={};bcs.forEach(b=>perBC[b]=dates.map(()=>({v:0,t:0})));
+ data.forEach(r=>{const i=dIdx[r.date];if(i===undefined)return;const o=perBC[r.bc][i];o.v+=r.vol;o.t+=r.totLT;});
+ const labels=dates.map(d=>shortD(d));
+ const datasets=bcs.map((b,i)=>({label:b,data:perBC[b].map(o=>o.v?+(o.t/o.v).toFixed(2):null),borderColor:LTKCT_LINEC[i%LTKCT_LINEC.length],backgroundColor:'transparent',tension:.35,borderWidth:2.5,pointRadius:2,fill:false,spanGaps:true}));
+ ltkctDrawChart('ltkct_chart',labels,datasets);
+ const last=dates.slice(-7);
+ document.getElementById('ltkct_volTable').innerHTML=ltkctMocTable(data,last,'vol');
+ document.getElementById('ltkct_ltTable').innerHTML=ltkctMocTable(data,last,'lt');
+}
+function ltkctMocTable(data,dates,mode){
+ if(!dates.length)return'<p style="padding:16px;color:var(--text-sub)">Không có dữ liệu</p>';
+ const G=window._LTKCT;
+ const mocs=LTKCT_MOC.filter(m=>G.selMoc.has(m));
+ const latest=dates[dates.length-1],prev=dates[dates.length-2];
+ const agg={};mocs.forEach(m=>{agg[m]={};dates.forEach(d=>agg[m][d]={v:0,t:0});});
+ const tot={};dates.forEach(d=>tot[d]={v:0,t:0});
+ data.forEach(r=>{if(!agg[r.moc]||!agg[r.moc][r.date])return;agg[r.moc][r.date].v+=r.vol;agg[r.moc][r.date].t+=r.totLT;tot[r.date].v+=r.vol;tot[r.date].t+=r.totLT;});
+ const val=o=>mode==='vol'?o.v:(o.v?o.t/o.v:0);
+ const disp=x=>mode==='vol'?(x>0?fmt(x):'—'):(x>0?x.toFixed(2)+'h':'—');
+ const cs='padding:7px 10px;';
+ let h=`<div class="table-wrap" style="overflow-x:auto"><table style="font-size:12px"><thead><tr><th style="${cs}min-width:120px">Mốc giờ</th>`;
+ dates.forEach((d,i)=>{const isL=i===dates.length-1;h+=`<th style="${cs}text-align:right;white-space:nowrap${isL?';background:#FFE0CC;color:var(--orange-dark)':''}">${shortD(d)}</th>`;});
+ h+=`<th style="${cs}text-align:right">Trend</th></tr></thead><tbody>`;
+ const rowHtml=(label,getter,isTot)=>{
+  let t=`<tr${isTot?' class="tot"':''}><td style="${cs}font-weight:${isTot?800:700}${isTot?';color:var(--orange)':''}">${label}</td>`;
+  dates.forEach((d,i)=>{const isL=i===dates.length-1;t+=`<td style="${cs}text-align:right${isL?';background:#FFF0EB;font-weight:800;color:var(--orange-dark)':''}">${disp(getter(d))}</td>`;});
+  const c=getter(latest),p=prev?getter(prev):0;
+  let trend='—',col='var(--text-sub)';
+  if(prev&&(c||p)){const d=c-p;
+   if(mode==='vol'){col=d>0?'var(--green)':d<0?'var(--red)':'var(--text-sub)';trend=d>0?`▲ ${fmt(Math.abs(d))}`:d<0?`▼ ${fmt(Math.abs(d))}`:'—';}
+   else{col=d>0?'var(--red)':d<0?'var(--green)':'var(--text-sub)';trend=d>0?`▲ ${Math.abs(d).toFixed(2)}h`:d<0?`▼ ${Math.abs(d).toFixed(2)}h`:'—';}
+  }
+  t+=`<td style="${cs}text-align:right;font-weight:700;color:${col};white-space:nowrap">${trend}</td></tr>`;
+  return t;
+ };
+ mocs.forEach(m=>{h+=rowHtml(m,d=>val(agg[m][d]),false);});
+ h+=rowHtml(mode==='vol'?'Tổng cộng':'Leadtime chung',d=>val(tot[d]),true);
+ h+='</tbody></table></div>';
+ return h;
+}
+function ltkctDrawChart(canvasId,labels,datasets){
+ const ctx=document.getElementById(canvasId);if(!ctx||!window.Chart)return;
+ if(window._LTKCT.charts[canvasId])window._LTKCT.charts[canvasId].destroy();
+ window._LTKCT.charts[canvasId]=new Chart(ctx,{type:'line',data:{labels,datasets},options:{
+  responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+  plugins:{legend:{position:'bottom',labels:{usePointStyle:true,boxWidth:8,font:{size:11}}},
+   tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.y==null?'—':c.parsed.y.toFixed(2)+'h'}`}}},
+  scales:{y:{beginAtZero:true,ticks:{font:{size:10},callback:v=>v+'h'},grid:{color:'#F0F0F0'}},x:{ticks:{font:{size:10}},grid:{display:false}}}
  }});
 }
 
@@ -2889,6 +3027,10 @@ async function init(){
  const p8Active=document.getElementById('p8')?.classList.contains('active');
  window._gtcdLoaded=false;
  if(p8Active){window._gtcdLoaded=true;buildGTCDetailPage();}
+ // p13 — Leadtime KCT: lazy-load khi mở tab
+ const p13Active=document.getElementById('p13')?.classList.contains('active');
+ window._ltkctLoaded=false;
+ if(p13Active){window._ltkctLoaded=true;buildLTKCTPage();}
  // p9 — Rớt LC Daily: render lại nếu đang mở
  const p9Active=document.getElementById('p9')?.classList.contains('active');
  window._rotlcLoaded=false;
@@ -2909,8 +3051,8 @@ loadAll=async function(){
  const btn=document.getElementById('refreshBtn');btn.classList.add('spinning');btn.disabled=true;
  window._ROTLC=null;window._BATON={rows:[],unstable:new Set(),byBC:{}};
  window._HRON={rows:[],charts:{}};window._NS={rows:[],charts:{}};
- window._gtcdLoaded=false;window._rotlcLoaded=false;window._hronLoaded=false;window._nsLoaded=false;
- ['p0','p1','p2','p3','p4','p5','p6','p7','p8','p9','p10','p11'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML='<div class="loading"><div class="spinner"></div><div class="loading-text">Đang tải dữ liệu mới...</div></div>';});
+ window._gtcdLoaded=false;window._rotlcLoaded=false;window._hronLoaded=false;window._nsLoaded=false;window._ltkctLoaded=false;
+ ['p0','p1','p2','p3','p4','p5','p6','p7','p8','p9','p10','p11','p13'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML='<div class="loading"><div class="spinner"></div><div class="loading-text">Đang tải dữ liệu mới...</div></div>';});
  await init();
 };
 
