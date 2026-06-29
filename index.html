@@ -1606,6 +1606,19 @@ function buildOverviewPage(R,rotData){
 }
 
 /* ===== BỘ LỌC CHU KỲ: Ngày / Tuần / Tháng ===== */
+function periodISOWeekNum(iso){
+ if(!iso)return'';
+ const d=new Date(iso+'T12:00:00');
+ d.setDate(d.getDate()+3-((d.getDay()+6)%7));
+ const w1=new Date(d.getFullYear(),0,4);
+ return String(1+Math.round(((d-w1)/86400000-3+((w1.getDay()+6)%7))/7));
+}
+function periodMonthNum(iso){return iso?String(+iso.slice(5,7)):'';}
+function periodInRange(pk,lo,hi,mode){
+ if(!pk||!lo||!hi)return false;
+ if(mode==='day')return pk>=lo&&pk<=hi;
+ return+pk>=+lo&&+pk<=+hi;
+}
 function periodShiftISO(iso,delta){
  const d=new Date(iso+'T00:00:00');
  d.setDate(d.getDate()+delta);
@@ -1627,37 +1640,30 @@ function periodCalendarDays(from,to){
  while(cur<=hi){days.push(cur);cur=periodShiftISO(cur,1);}
  return days;
 }
-function periodWeekKey(iso){
- const d=new Date(iso+'T00:00:00');
- d.setDate(d.getDate()-((d.getDay()+6)%7));
- return d.toISOString().slice(0,10);
+function periodRowKey(row,mode){
+ if(mode==='week')return row.week||'';
+ if(mode==='month')return row.month||'';
+ return row.date||'';
 }
-function periodMonthKey(iso){return(iso||'').slice(0,7);}
 function periodDayToCol(iso,mode){
- if(mode==='week')return periodWeekKey(iso);
- if(mode==='month')return periodMonthKey(iso);
+ if(mode==='week')return periodISOWeekNum(iso);
+ if(mode==='month')return periodMonthNum(iso);
  return iso;
 }
 function periodColLabel(col,mode){
- if(mode==='week')return`Tuần ${shortD(col)}→${shortD(periodShiftISO(col,6))}`;
- if(mode==='month'){const[y,m]=col.split('-');return`T${+m}/${y}`;}
+ if(mode==='week')return`Tuần ${col}`;
+ if(mode==='month')return`Tháng ${col}`;
  return shortD(col);
 }
 function periodBuildColumns(mode,from,to){
  if(!from||!to)return[];
+ if(mode==='day')return periodCalendarDays(from,to);
  const lo=from<=to?from:to,hi=from<=to?to:from;
- if(mode==='day')return periodCalendarDays(lo,hi);
  if(mode==='week'){
-  const cols=[];let cur=lo;
-  while(cur<=hi){cols.push(cur);cur=periodShiftISO(cur,7);}
+  const cols=[];for(let w=+lo;w<=+hi;w++)cols.push(String(w));
   return cols;
  }
- const cols=[];let[y,m]=lo.split('-').map(Number);
- const [ey,em]=hi.split('-').map(Number);
- while(y<ey||(y===ey&&m<=em)){
-  cols.push(`${y}-${String(m).padStart(2,'0')}`);
-  m++;if(m>12){m=1;y++;}
- }
+ const cols=[];for(let m=+lo;m<=+hi;m++)cols.push(String(m));
  return cols;
 }
 function periodModeLabel(mode){
@@ -1665,6 +1671,13 @@ function periodModeLabel(mode){
 }
 function periodModeTitle(mode){
  return mode==='week'?'Tuần':mode==='month'?'Tháng':'Ngày';
+}
+function periodUniqueSorted(rows,mode){
+ const s=new Set();
+ if(mode==='week')rows.forEach(r=>{if(r.week)s.add(r.week);});
+ else if(mode==='month')rows.forEach(r=>{if(r.month)s.add(r.month);});
+ else rows.forEach(r=>{if(r.date)s.add(r.date);});
+ return[...s].sort((a,b)=>mode==='day'?a.localeCompare(b):+a-+b);
 }
 
 /* ===== NHÂN SỰ — ĐỊNH BIÊN (p10) Data_HRON ===== */
@@ -1676,7 +1689,8 @@ function normalizeHRONRows(raw){
   let d=parseSheetDate(r[0]);
   if(d)lastDate=d; else d=lastDate; // tự điền ngày cho dòng trống / ô gộp (merged cells)
   return{
-   date:d,am:(r[1]||'').trim(),tinh:(r[2]||'').trim(),bc:(r[3]||'').trim(),
+   date:d,week:periodISOWeekNum(d),month:periodMonthNum(d),
+   am:(r[1]||'').trim(),tinh:(r[2]||'').trim(),bc:(r[3]||'').trim(),
    count:Math.round(parseFloat(String(r[4]||'').replace(/\./g,'').replace(',','.'))||0)
   };
  }).filter(r=>r.date&&r.count>=0);
@@ -1686,20 +1700,25 @@ async function loadHRONData(force){
  const raw=await fetchSheet('Data_HRON');
  window._HRON=window._HRON||{charts:{}};
  window._HRON.rows=normalizeHRONRows(raw);
+ window._HRON._viewKey='';
  return window._HRON.rows;
+}
+function hronScheduleRender(){
+ clearTimeout(window._HRON._renderT);
+ window._HRON._renderT=setTimeout(renderHRONNow,40);
 }
 function buildHRONPage(){
  const el=document.getElementById('p10');
  loadHRONData(true).then(rows=>{
   el.innerHTML=hronSkeleton(rows);
-  setTimeout(()=>{hronRefreshRangeUI(true);renderHRON();},0);
+  setTimeout(()=>{hronRefreshRangeUI(true);renderHRONNow();},0);
  }).catch(e=>{el.innerHTML=errPage(`Định biên nhân sự: ${e.message}`);});
 }
 function hronSetPeriod(el){
  document.querySelectorAll('#hron_period .chip').forEach(c=>c.classList.remove('active'));
  el.classList.add('active');
  hronRefreshRangeUI(false);
- renderHRON();
+ hronScheduleRender();
 }
 function hronGetMode(){
  return document.querySelector('#hron_period .chip.active')?.dataset.mode||'day';
@@ -1720,7 +1739,7 @@ function hronRefreshRangeUI(keepSelection){
  if(mode==='week'){
   if(fromLbl)fromLbl.textContent='Từ tuần';
   if(toLbl)toLbl.textContent='Đến tuần';
-  const weeks=[...new Set(allD.map(periodWeekKey))].sort((a,b)=>a.localeCompare(b));
+  const weeks=periodUniqueSorted(window._HRON?.rows||[],'week');
   const mk=w=>`<option value="${w}">${periodColLabel(w,'week')}</option>`;
   fromEl.innerHTML=weeks.map(mk).join('');
   toEl.innerHTML=weeks.map(mk).join('');
@@ -1731,7 +1750,7 @@ function hronRefreshRangeUI(keepSelection){
  }else if(mode==='month'){
   if(fromLbl)fromLbl.textContent='Từ tháng';
   if(toLbl)toLbl.textContent='Đến tháng';
-  const months=[...new Set(allD.map(periodMonthKey))].sort((a,b)=>a.localeCompare(b));
+  const months=periodUniqueSorted(window._HRON?.rows||[],'month');
   const mk=m=>`<option value="${m}">${periodColLabel(m,'month')}</option>`;
   fromEl.innerHTML=months.map(mk).join('');
   toEl.innerHTML=months.map(mk).join('');
@@ -1761,10 +1780,10 @@ function hronSkeleton(rows){
   <div class="page-title">Định biên nhân sự</div>
  </div>
  <div class="date-filter-bar" style="flex-wrap:wrap;gap:14px">
-  <div><label style="display:block;margin-bottom:3px">Từ ngày</label><select id="hron_from" onchange="renderHRON()">${mkOpt(allD,def.from)}</select></div>
-  <div><label style="display:block;margin-bottom:3px">Đến ngày</label><select id="hron_to" onchange="renderHRON()">${mkOpt(allD,def.to)}</select></div>
-  <div><label style="display:block;margin-bottom:3px">AM</label><select id="hron_am" onchange="renderHRON()"><option value="">Tất cả AM</option>${ams.map(a=>`<option value="${a.replace(/"/g,'&quot;')}">${a}</option>`).join('')}</select></div>
-  <div><label style="display:block;margin-bottom:3px">Bưu cục</label><select id="hron_bc" onchange="renderHRON()"><option value="">Tất cả BC</option>${bcs.map(b=>`<option value="${b.replace(/"/g,'&quot;')}">${b}</option>`).join('')}</select></div>
+  <div><label style="display:block;margin-bottom:3px">Từ ngày</label><select id="hron_from" onchange="hronScheduleRender()">${mkOpt(allD,def.from)}</select></div>
+  <div><label style="display:block;margin-bottom:3px">Đến ngày</label><select id="hron_to" onchange="hronScheduleRender()">${mkOpt(allD,def.to)}</select></div>
+  <div><label style="display:block;margin-bottom:3px">AM</label><select id="hron_am" onchange="hronScheduleRender()"><option value="">Tất cả AM</option>${ams.map(a=>`<option value="${a.replace(/"/g,'&quot;')}">${a}</option>`).join('')}</select></div>
+  <div><label style="display:block;margin-bottom:3px">Bưu cục</label><select id="hron_bc" onchange="hronScheduleRender()"><option value="">Tất cả BC</option>${bcs.map(b=>`<option value="${b.replace(/"/g,'&quot;')}">${b}</option>`).join('')}</select></div>
   <div class="chip-row" id="hron_period" style="align-self:flex-end">
    <span class="chip-label">Xem theo</span>
    <span class="chip active" data-mode="day" onclick="hronSetPeriod(this)">Ngày</span>
@@ -1784,8 +1803,8 @@ function hronFiltered(){
  if(!from||!to){hronRefreshRangeUI(false);from=document.getElementById('hron_from')?.value||'';to=document.getElementById('hron_to')?.value||'';}
  const lo=from<=to?from:to,hi=from<=to?to:from;
  return H.rows.filter(r=>{
-  const pk=periodDayToCol(r.date,mode);
-  if(pk<lo||pk>hi)return false;
+  const pk=periodRowKey(r,mode);
+  if(!periodInRange(pk,lo,hi,mode))return false;
   if(am&&r.am!==am)return false;
   if(bc&&r.bc!==bc)return false;
   return true;
@@ -1800,20 +1819,23 @@ function hronPivotRows(rows,keyField,cols,mode){
   if(!dayMap[k])dayMap[k]={};
   dayMap[k][r.date]=(dayMap[k][r.date]||0)+r.count;
  });
- const map={};
+ const out=[];
  Object.entries(dayMap).forEach(([k,byDay])=>{
-  map[k]={[keyField]:k};
-  cols.forEach(col=>{
-   if(mode==='day'){
-    map[k][col]=byDay[col]||0;
-   }else{
-    const daysIn=Object.keys(byDay).filter(d=>periodDayToCol(d,mode)===col).sort();
-    const lastDay=daysIn[daysIn.length-1];
-    map[k][col]=lastDay?byDay[lastDay]:0;
-   }
-  });
+  const row={[keyField]:k};
+  if(mode==='day'){
+   cols.forEach(col=>{row[col]=byDay[col]||0;});
+  }else{
+   const bucket={};
+   Object.entries(byDay).forEach(([d,cnt])=>{
+    const col=mode==='week'?periodISOWeekNum(d):periodMonthNum(d);
+    if(!colSet.has(col))return;
+    if(!bucket[col]||d>bucket[col].d)bucket[col]={d,cnt};
+   });
+   cols.forEach(col=>{row[col]=bucket[col]?.cnt||0;});
+  }
+  out.push(row);
  });
- return Object.values(map);
+ return out;
 }
 function hronTrendTable(arr,keyField,title,icon,badge,cols,latest,prev,mode){
  const maxV=Math.max(...arr.map(r=>r[latest]||0),1);
@@ -1836,17 +1858,28 @@ function hronTrendTable(arr,keyField,title,icon,badge,cols,latest,prev,mode){
  t+=`<td style="padding:9px 12px;text-align:right;color:${sD==null?'var(--text-sub)':sD<0?'var(--red)':sD>0?'var(--green)':'var(--text-sub)'};font-weight:800;white-space:nowrap">${sD==null?'—':sD<0?`▼ ${sP-sC}`:sD>0?`▲ ${sC-sP}`:'—'}</td></tr></tfoot></table></div></div>`;
  return t;
 }
-function renderHRON(){
+function renderHRON(){hronScheduleRender();}
+function renderHRONNow(){
  const H=window._HRON;if(!H.rows.length)return;
  const mode=hronGetMode();
- const data=hronFiltered();
- let from=document.getElementById('hron_from')?.value||'',to=document.getElementById('hron_to')?.value||'';
- if(!from||!to){hronRefreshRangeUI(false);from=document.getElementById('hron_from')?.value||'';to=document.getElementById('hron_to')?.value||'';}
+ const am=document.getElementById('hron_am')?.value||'';
+ const bc=document.getElementById('hron_bc')?.value||'';
+ let from=document.getElementById('hron_from')?.value||'';
+ let to=document.getElementById('hron_to')?.value||'';
+ if(!from||!to){hronRefreshRangeUI(true);from=document.getElementById('hron_from')?.value||'';to=document.getElementById('hron_to')?.value||'';}
  const lo=from<=to?from:to,hi=from<=to?to:from;
+ const cacheKey=`${mode}|${lo}|${hi}|${am}|${bc}`;
+ if(H._viewKey===cacheKey&&H._viewCache){
+  document.getElementById('hron_modeNote').innerHTML=H._viewCache.note;
+  document.getElementById('hron_kpi').innerHTML=H._viewCache.kpi;
+  document.getElementById('hron_tables').innerHTML=H._viewCache.tables;
+  return;
+ }
+ const data=hronFiltered();
  const cols=periodBuildColumns(mode,lo,hi);
  const noteEl=document.getElementById('hron_modeNote');
  if(noteEl){
-  const modeHint=mode==='day'?'Mỗi cột = 1 ngày (hiển thị cả ngày chưa có dữ liệu là —)':mode==='week'?'Mỗi cột = 1 tuần (lấy nhân sự ngày cuối tuần có dữ liệu)':'Mỗi cột = 1 tháng (lấy nhân sự ngày cuối tháng có dữ liệu)';
+  const modeHint=mode==='day'?'Mỗi cột = 1 ngày (hiển thị cả ngày chưa có dữ liệu là —)':mode==='week'?'Mỗi cột = Tuần theo sheet (số tuần ISO, lấy ngày cuối trong tuần)':'Mỗi cột = Tháng theo sheet (lấy ngày cuối trong tháng)';
   noteEl.innerHTML=`<div class="analysis-box" style="margin:0 0 14px;font-size:12.5px">📊 Đang xem <strong>${periodModeTitle(mode)}</strong> · ${cols.length} cột · ${periodColLabel(lo,mode)} → ${periodColLabel(hi,mode)}<br><span style="color:var(--text-sub);font-size:11.5px">${modeHint}</span></div>`;
  }
  if(!cols.length){document.getElementById('hron_tables').innerHTML='<p style="padding:16px;color:var(--text-sub)">Chọn khoảng thời gian hợp lệ.</p>';return;}
@@ -1876,6 +1909,8 @@ function renderHRON(){
  h+=hronTrendTable(amArr,'am',`Theo AM — ${grp}`,'👤',`${amArr.length} AM`,cols,latest,prev,mode);
  h+=hronTrendTable(bcArr,'bc',`Theo Bưu Cục — ${grp}`,'🏪',`${bcArr.length} bưu cục`,cols,latest,prev,mode);
  document.getElementById('hron_tables').innerHTML=h;
+ H._viewKey=cacheKey;
+ H._viewCache={note:noteEl?.innerHTML||'',kpi,tables:h};
 }
 
 /* ===== NHÂN SỰ — NĂNG SUẤT (p11) Data_Năng_Suất ===== */
@@ -2996,20 +3031,10 @@ async function init(){
  const btn=document.getElementById('refreshBtn');btn.classList.add('spinning');btn.disabled=true;
  const sheetNames=AI_SHEET_NAMES;
  const R={};
- await Promise.all(sheetNames.map(async n=>{try{R[n]=await fetchSheet(n);}catch(e){R[n]=null;console.warn('Lỗi sheet',n,e.message);}}));
- // Cache sheet cho AI (tránh fetch lại)
- sheetNames.forEach(n=>{if(R[n])window._SHEETCACHE[n]=R[n];});
- // Save global cache for AI
- window._D={
-  gtcTotalAM:R['GTC Total theo AM'],gtcTotalBC:R['GTC Total theo Bưu Cục'],
-  gtcTTSAM:R['GTC TTS theo AM'],gtcTTSBC:R['GTC TTS theo Bưu Cục'],
-  fdTotalAM:R['FD Total theo AM'],fdTotalBC:R['FD Total theo Bưu Cục'],
-  fdSMEAM:R['FD SME theo AM'],fdSMEBC:R['FD SME theo Bưu Cục'],
-  fdTTSAM:R['FD TTS theo AM'],fdTTSBC:R['FD TTS theo Bưu Cục'],
-  fdShopeeAM:R['FD Shopee theo AM'],fdShopeeBC:R['FD Shopee theo Bưu Cục'],
-  odrAM:R['ODR TTS - AM'],odrBC:R['ODR TTS - Bưu Cục'],
-  oprAM:R['OPR TTS - AM'],oprBC:R['OPR TTS - Bưu Cục']
- };
+ const fetchInto=async n=>{try{R[n]=await fetchSheet(n);window._SHEETCACHE[n]=R[n];}catch(e){R[n]=null;console.warn('Lỗi sheet',n,e.message);}};
+ // ===== Ưu tiên cập nhật thẻ GTC TRƯỚC =====
+ const GTC_SHEETS=['GTC Total theo AM','GTC Total theo Bưu Cục','GTC TTS theo AM','GTC TTS theo Bưu Cục'];
+ await Promise.all(GTC_SHEETS.map(fetchInto));
  // p1 — GTC Total
  const p1el=document.getElementById('p1');
  if(R['GTC Total theo AM']&&R['GTC Total theo Bưu Cục']){
@@ -3022,6 +3047,19 @@ async function init(){
   p2el.innerHTML=buildGTCPage(R['GTC TTS theo AM'],R['GTC TTS theo Bưu Cục'],'Tổng quan GTC TTS','p2');
   setTimeout(()=>renderGTC('p2'),0);
  }else p2el.innerHTML=errPage('Không thể tải GTC TTS. Kiểm tra sheet "GTC TTS theo AM" / "GTC TTS theo Bưu Cục".');
+ // ===== Tải các sheet còn lại =====
+ await Promise.all(sheetNames.filter(n=>!GTC_SHEETS.includes(n)).map(fetchInto));
+ // Save global cache for AI
+ window._D={
+  gtcTotalAM:R['GTC Total theo AM'],gtcTotalBC:R['GTC Total theo Bưu Cục'],
+  gtcTTSAM:R['GTC TTS theo AM'],gtcTTSBC:R['GTC TTS theo Bưu Cục'],
+  fdTotalAM:R['FD Total theo AM'],fdTotalBC:R['FD Total theo Bưu Cục'],
+  fdSMEAM:R['FD SME theo AM'],fdSMEBC:R['FD SME theo Bưu Cục'],
+  fdTTSAM:R['FD TTS theo AM'],fdTTSBC:R['FD TTS theo Bưu Cục'],
+  fdShopeeAM:R['FD Shopee theo AM'],fdShopeeBC:R['FD Shopee theo Bưu Cục'],
+  odrAM:R['ODR TTS - AM'],odrBC:R['ODR TTS - Bưu Cục'],
+  oprAM:R['OPR TTS - AM'],oprBC:R['OPR TTS - Bưu Cục']
+ };
  // p3 — FD Ngày
  window._FD={
   totalAM:R['FD Total theo AM'],smeAM:R['FD SME theo AM'],
