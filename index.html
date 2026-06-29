@@ -444,6 +444,14 @@ function nsMetricDelta(cur,prev,unit,isMoney){
  return{txt:`${arrow} ${fmtV(Math.abs(d))}${unit||''}`,col};
 }
 function parsePct(v){const s=(v||'').toString().trim();if(s.endsWith('%'))return parseFloat(s);return(parseFloat(s)||0)*100;}
+function normOntimePct(v){
+ const s=String(v??'').trim().replace(/,/g,'.');
+ if(!s||/^null$|^#|^—$/i.test(s))return null;
+ if(s.endsWith('%'))return parseFloat(s)||null;
+ const n=parseFloat(s);
+ if(!isFinite(n))return null;
+ return n>1.5?n:n*100;
+}
 function parseCSV(text){return text.trim().split('\n').filter(l=>l.trim()).map(line=>{const cols=[];let cur='',inQ=false;for(const c of line){if(c==='"')inQ=!inQ;else if(c===','&&!inQ){cols.push(cur.trim());cur='';}else cur+=c;}cols.push(cur.trim());return cols;});}
 function errPage(msg){return`<div class="error-box">⚠️ Không thể tải dữ liệu: ${msg}<br><small>Kiểm tra kết nối hoặc quyền truy cập Google Sheet.</small></div>`;}
 
@@ -981,14 +989,20 @@ function buildOntimePage(rowsAM,rowsBC,title,volLabel,countLabel,greenThr,yellow
   const dates=allD.slice(0,7).reverse();
   if(!dates.length)return'<p style="padding:16px;color:var(--text-sub)">Không có dữ liệu</p>';
   const pivot={};
-  dRows.forEach(r=>{const name=(r[0]||'').trim(),d=isoD(r[1]);if(!name||!dates.includes(d))return;if(!pivot[name])pivot[name]={};pivot[name][d]={vol:Math.round(parseFloat(r[2])||0),pct:(parseFloat(r[3])||0)*100,cnt:Math.round(parseFloat(r[4])||0)};});
+  dRows.forEach(r=>{const name=(r[0]||'').trim(),d=isoD(r[1]);if(!name||!dates.includes(d))return;if(!pivot[name])pivot[name]={};pivot[name][d]={vol:Math.round(parseFloat(r[2])||0),pct:normOntimePct(r[3]),cnt:Math.round(parseFloat(r[4])||0)};});
   const gPivot={};
   // For Grand Total, compute from sum of individual rows (more accurate)
   dates.forEach(d=>{let tv=0,tc=0;Object.values(pivot).forEach(row=>{if(row[d]){tv+=row[d].vol;tc+=row[d].cnt;}});if(tv>0)gPivot[d]={vol:tv,pct:tc/tv*100,cnt:tc};});
   // Fallback from gRows if available
-  gRows.forEach(r=>{const d=isoD(r[1]);if(!dates.includes(d))return;gPivot[d]={vol:Math.round(parseFloat(r[2])||0),pct:(parseFloat(r[3])||0)*100,cnt:Math.round(parseFloat(r[4])||0)};});
-  const latest=dates[dates.length-1];
-  const names=Object.keys(pivot).sort((a,b)=>(pivot[a][latest]?.pct??999)-(pivot[b][latest]?.pct??999));
+  gRows.forEach(r=>{const d=isoD(r[1]);if(!dates.includes(d))return;const p=normOntimePct(r[3]);gPivot[d]={vol:Math.round(parseFloat(r[2])||0),pct:p!=null?p:(parseFloat(r[3])||0)*100,cnt:Math.round(parseFloat(r[4])||0)};});
+  const n1=allD[0]||'';
+  const names=Object.keys(pivot).sort((a,b)=>{
+   const pa=pivot[a][n1]?.pct,pb=pivot[b][n1]?.pct;
+   const ha=pa!=null&&isFinite(pa),hb=pb!=null&&isFinite(pb);
+   if(ha&&hb)return pa-pb||a.localeCompare(b,'vi');
+   if(ha)return -1;if(hb)return 1;
+   return a.localeCompare(b,'vi');
+  });
   const cs='padding:6px 10px;';
   let h=`<div class="table-wrap" style="overflow-x:auto"><table style="font-size:12px"><thead>
    <tr>
@@ -1000,7 +1014,7 @@ function buildOntimePage(rowsAM,rowsBC,title,volLabel,countLabel,greenThr,yellow
   </thead><tbody>`;
   names.forEach((name,i)=>{
    h+=`<tr><td style="${cs}text-align:center;color:var(--text-sub);font-size:11px">${i+1}</td><td style="${cs}font-weight:700;white-space:nowrap">${name}</td>`;
-   dates.forEach(d=>{const c=pivot[name]?.[d];if(c){const gc=c.pct>=greenThr?'g':c.pct>=yellowThr?'m':'b';h+=`<td style="${cs}text-align:right;border-left:2px solid #F3F4F6">${fmt(c.vol)}</td><td style="${cs}text-align:center"><span class="pct ${gc}">${c.pct.toFixed(1)}%</span></td>`;}else{h+=`<td style="${cs}text-align:right;border-left:2px solid #F3F4F6;color:var(--text-sub)">—</td><td>—</td>`;}});
+   dates.forEach(d=>{const c=pivot[name]?.[d];if(c&&c.pct!=null){const gc=c.pct>=greenThr?'g':c.pct>=yellowThr?'m':'b';h+=`<td style="${cs}text-align:right;border-left:2px solid #F3F4F6">${fmt(c.vol)}</td><td style="${cs}text-align:center"><span class="pct ${gc}">${c.pct.toFixed(1)}%</span></td>`;}else{h+=`<td style="${cs}text-align:right;border-left:2px solid #F3F4F6;color:var(--text-sub)">—</td><td>—</td>`;}});
    h+='</tr>';
   });
   if(Object.keys(gPivot).length){
@@ -1009,8 +1023,8 @@ function buildOntimePage(rowsAM,rowsBC,title,volLabel,countLabel,greenThr,yellow
    h+='</tr>';
   }
   h+='</tbody></table></div>';
-  const lg=gPivot[latest];
-  if(lg){h+=`<div class="analysis-box">⏱️ <strong>AM ngày ${shortD(latest)}:</strong> Tổng ${volLabel} <strong>${fmt(lg.vol)}</strong> · Ontime <strong>${fmt(lg.cnt)}</strong> đơn (<span style="color:${lg.pct>=greenThr?'var(--green)':lg.pct>=yellowThr?'var(--yellow)':'var(--red)'};font-weight:700">${lg.pct.toFixed(1)}%</span>).</div>`;}
+  const lg=gPivot[n1];
+  if(lg){h+=`<div class="analysis-box">⏱️ <strong>AM ngày ${shortD(n1)}:</strong> Tổng ${volLabel} <strong>${fmt(lg.vol)}</strong> · Ontime <strong>${fmt(lg.cnt)}</strong> đơn (<span style="color:${lg.pct>=greenThr?'var(--green)':lg.pct>=yellowThr?'var(--yellow)':'var(--red)'};font-weight:700">${lg.pct.toFixed(1)}%</span>).</div>`;}
   return h;
  }
  function bcTbl(rows){
@@ -1022,17 +1036,16 @@ function buildOntimePage(rowsAM,rowsBC,title,volLabel,countLabel,greenThr,yellow
   const dates=allD.slice(0,7).reverse();
   if(!dates.length)return'<p style="padding:16px;color:var(--text-sub)">Không có dữ liệu</p>';
   const pivot={};
-  dRows.forEach(r=>{const am=(r[0]||'').trim(),bc=(r[1]||'').trim(),d=isoD(r[2]);if(!bc||!dates.includes(d))return;if(!pivot[bc])pivot[bc]={am};pivot[bc][d]={vol:Math.round(parseFloat(r[3])||0),pct:(parseFloat(r[4])||0)*100,cnt:Math.round(parseFloat(r[5])||0)};});
+  dRows.forEach(r=>{const am=(r[0]||'').trim(),bc=(r[1]||'').trim(),d=isoD(r[2]);if(!bc||!dates.includes(d))return;if(!pivot[bc])pivot[bc]={am};pivot[bc][d]={vol:Math.round(parseFloat(r[3])||0),pct:normOntimePct(r[4]),cnt:Math.round(parseFloat(r[5])||0)};});
   const gPivot={};
   dates.forEach(d=>{let tv=0,tc=0;Object.values(pivot).forEach(row=>{if(row[d]){tv+=row[d].vol;tc+=row[d].cnt;}});if(tv>0)gPivot[d]={vol:tv,pct:tc/tv*100,cnt:tc};});
-  const latest=dates[dates.length-1];
-  // Sắp xếp: bưu cục có %Ontime THẤP → CAO của NGÀY MỚI NHẤT (BC chưa có dữ liệu ngày mới nhất xuống cuối)
+  const n1=allD[0]||'';
   const names=Object.keys(pivot).sort((a,b)=>{
-   const pa=pivot[a][latest]?.pct,pb=pivot[b][latest]?.pct;
-   const ha=pa!=null,hb=pb!=null;
-   if(ha&&hb)return pa-pb;
+   const pa=pivot[a][n1]?.pct,pb=pivot[b][n1]?.pct;
+   const ha=pa!=null&&isFinite(pa),hb=pb!=null&&isFinite(pb);
+   if(ha&&hb)return pa-pb||a.localeCompare(b,'vi');
    if(ha)return -1;if(hb)return 1;
-   return 0;
+   return a.localeCompare(b,'vi');
   });
   const cs='padding:5px 8px;';
   let h=`<div class="table-wrap" style="overflow-x:auto;max-height:1100px"><table style="font-size:12px"><thead style="position:sticky;top:0;z-index:4;background:#FEEDE4">
@@ -1047,7 +1060,7 @@ function buildOntimePage(rowsAM,rowsBC,title,volLabel,countLabel,greenThr,yellow
   names.forEach((name,i)=>{
    const row=pivot[name];
    h+=`<tr><td style="${cs}text-align:center;color:var(--text-sub);font-size:11px;position:sticky;left:0;background:#fff;z-index:2">${i+1}</td><td style="${cs}font-weight:700;white-space:nowrap;position:sticky;left:30px;background:#fff;z-index:2">${name}${bcUnstableBadge(name)}</td><td style="${cs}color:var(--text-sub);font-size:11px;position:sticky;left:170px;background:#fff;z-index:2">${row.am||''}</td>`;
-   dates.forEach(d=>{const c=row[d];if(c){const gc=c.pct>=greenThr?'g':c.pct>=yellowThr?'m':'b';h+=`<td style="${cs}text-align:right;border-left:2px solid #F3F4F6">${fmt(c.vol)}</td><td style="${cs}text-align:center"><span class="pct ${gc}">${c.pct.toFixed(1)}%</span></td>`;}else{h+=`<td style="${cs}text-align:right;border-left:2px solid #F3F4F6;color:var(--text-sub)">—</td><td>—</td>`;}});
+   dates.forEach(d=>{const c=row[d];if(c&&c.pct!=null){const gc=c.pct>=greenThr?'g':c.pct>=yellowThr?'m':'b';h+=`<td style="${cs}text-align:right;border-left:2px solid #F3F4F6">${fmt(c.vol)}</td><td style="${cs}text-align:center"><span class="pct ${gc}">${c.pct.toFixed(1)}%</span></td>`;}else{h+=`<td style="${cs}text-align:right;border-left:2px solid #F3F4F6;color:var(--text-sub)">—</td><td>—</td>`;}});
    h+='</tr>';
   });
   if(Object.keys(gPivot).length){
@@ -1056,8 +1069,8 @@ function buildOntimePage(rowsAM,rowsBC,title,volLabel,countLabel,greenThr,yellow
    h+='</tr>';
   }
   h+='</tbody></table></div>';
-  const lg=gPivot[latest];
-  if(lg){h+=`<div class="analysis-box">🏪 <strong>BC ngày ${shortD(latest)}:</strong> Tổng ${volLabel} <strong>${fmt(lg.vol)}</strong> · Ontime <strong>${fmt(lg.cnt)}</strong> đơn (<span style="color:${lg.pct>=greenThr?'var(--green)':lg.pct>=yellowThr?'var(--yellow)':'var(--red)'};font-weight:700">${lg.pct.toFixed(1)}%</span>).</div>`;}
+  const lg=gPivot[n1];
+  if(lg){h+=`<div class="analysis-box">🏪 <strong>BC ngày ${shortD(n1)}:</strong> Tổng ${volLabel} <strong>${fmt(lg.vol)}</strong> · Ontime <strong>${fmt(lg.cnt)}</strong> đơn (<span style="color:${lg.pct>=greenThr?'var(--green)':lg.pct>=yellowThr?'var(--yellow)':'var(--red)'};font-weight:700">${lg.pct.toFixed(1)}%</span>).</div>`;}
   return h;
  }
  return`<div class="page-header">
@@ -1354,16 +1367,24 @@ window._LTKCT={rows:[],charts:{},selMoc:new Set(LTKCT_MOC)};
 function ltNum(v){const s=String(v??'').trim();if(!s||s.includes('#'))return 0;const n=parseFloat(s.replace(/,/g,''));return isFinite(n)?n:0;}
 function buildLTKCTPage(){
  const el=document.getElementById('p13');
- fetchSheetByGid(LTKCT_GID).then(raw=>{
-  const rows=(raw||[]).slice(1).filter(r=>r.length>7&&(r[2]||'').trim()).map(r=>({
-   mien:(r[0]||'').trim(),moc:(r[1]||'').trim(),date:isoD(r[2]),
-   vol:ltNum(r[3]),bc:(r[6]||'').trim(),totLT:ltNum(r[7])
-  })).filter(r=>r.date&&r.bc);
-  window._LTKCT.rows=rows;
-  window._LTKCT.selMoc=new Set(LTKCT_MOC);
+ loadLTKCTData().then(rows=>{
   el.innerHTML=ltkctSkeleton(rows);
   setTimeout(()=>renderLTKCT(),0);
  }).catch(e=>{el.innerHTML=errPage(`Leadtime KCT: ${e.message}`);});
+}
+function parseLTKCTRows(raw){
+ return(raw||[]).slice(1).filter(r=>r.length>7&&(r[2]||'').trim()).map(r=>({
+  mien:(r[0]||'').trim(),moc:(r[1]||'').trim(),date:isoD(r[2]),
+  vol:ltNum(r[3]),bc:(r[6]||'').trim(),totLT:ltNum(r[7])
+ })).filter(r=>r.date&&r.bc);
+}
+async function loadLTKCTData(){
+ if(window._LTKCT?.rows?.length)return window._LTKCT.rows;
+ const raw=await fetchSheetByGid(LTKCT_GID);
+ window._LTKCT=window._LTKCT||{charts:{},selMoc:new Set(LTKCT_MOC)};
+ window._LTKCT.rows=parseLTKCTRows(raw);
+ if(!window._LTKCT.selMoc?.size)window._LTKCT.selMoc=new Set(LTKCT_MOC);
+ return window._LTKCT.rows;
 }
 function ltkctSkeleton(rows){
  const allD=[...new Set(rows.map(r=>r.date))].sort((a,b)=>b.localeCompare(a));
@@ -1385,17 +1406,7 @@ function ltkctSkeleton(rows){
  <div class="kpi-grid" id="ltkct_kpi" style="grid-template-columns:repeat(5,1fr)"></div>
  <div class="chart-box"><h3>Xu hướng Leadtime theo ngày — theo Kho chuyển tiếp</h3><div class="csub">Mỗi đường = 1 kho chuyển tiếp · Leadtime = ΣTotal_LT / ΣVolume theo ngày · Nhãn hiển thị trên điểm dữ liệu.</div><div class="chart-canvas-wrap"><canvas id="ltkct_chart"></canvas></div></div>
  <div class="card"><div class="card-header"><div class="card-title"><div class="card-icon">📦</div>Volume theo Kho & Mốc giờ</div><div class="card-info">Nhóm theo kho chuyển tiếp · Cột Trend = ngày mới nhất so với ngày trước</div></div><div id="ltkct_volTable"></div><div id="ltkct_volNote"></div></div>
- <div class="card"><div class="card-header"><div class="card-title"><div class="card-icon">⏱️</div>Leadtime theo Kho & Mốc giờ</div><div class="card-info">Leadtime = ΣTotal_LT/ΣVol · Cột Trend = ngày mới nhất so với ngày trước</div></div><div id="ltkct_ltTable"></div><div id="ltkct_ltNote"></div></div>
- <div class="card"><div class="card-header"><div class="card-title"><div class="card-icon" style="background:linear-gradient(135deg,#7C3AED,#5B21B6)">✨</div>Phân tích AI — Network Logistics TNT</div><div class="card-info">Chuyên gia phân tích Network Logistics vùng TNT</div></div>
-  <div style="padding:14px 18px">
-   <div style="font-size:12px;color:var(--text-sub);margin-bottom:10px;line-height:1.6">AI đọc dữ liệu Leadtime KCT theo bộ lọc hiện tại: volume, leadtime theo kho & mốc giờ, xu hướng N-1 vs N-2 — đưa nhận định và kiến nghị vận hành mạng KCT.</div>
-   <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-    <button class="ai-run-btn" id="ltkctAiBtn" onclick="runLTKCTAI()" style="margin-top:0"><span>✨</span><span>Phân tích Leadtime KCT</span></button>
-    <span style="font-size:12px;color:var(--text-sub)" id="ltkctAiStatus"></span>
-   </div>
-   <div id="ltkct_aiResult" style="margin-top:14px"></div>
-  </div>
- </div>`;
+ <div class="card"><div class="card-header"><div class="card-title"><div class="card-icon">⏱️</div>Leadtime theo Kho & Mốc giờ</div><div class="card-info">Leadtime = ΣTotal_LT/ΣVol · Cột Trend = ngày mới nhất so với ngày trước</div></div><div id="ltkct_ltTable"></div><div id="ltkct_ltNote"></div></div>`;
 }
 function ltkctToggle(elm){
  elm.classList.toggle('active');
@@ -1544,13 +1555,18 @@ function ltkctTableNote(data,dates,mode){
  if(bcNotes.length)parts.push(`Theo kho: ${bcNotes.join(' · ')}.`);
  return`<div class="analysis-box" style="margin:10px 16px 4px;font-size:12.5px;line-height:1.7">${parts.join(' ')}</div>`;
 }
-function ltkctGatherAICtx(){
- const data=ltkctFiltered();
- const dates=[...new Set(data.map(r=>r.date))].sort();
- const n1=dates[dates.length-1]||'',n2=dates[dates.length-2]||'';
+function ltkctGatherAICtx(days){
+ const G=window._LTKCT;
+ if(!G?.rows?.length)return'(Chưa có dữ liệu Leadtime KCT)';
+ const allDates=[...new Set(G.rows.map(r=>r.date))].sort();
+ const dates=allDates.slice(-(days||7));
+ const data=G.rows.filter(r=>dates.includes(r.date));
+ const prevSel=G.selMoc;G.selMoc=new Set(LTKCT_MOC);
  const {mocs,bcs,byBC,byMoc,tot}=ltkctMocAgg(data,dates);
+ G.selMoc=prevSel;
+ const n1=dates[dates.length-1]||'',n2=dates[dates.length-2]||'';
  const bcF=document.getElementById('ltkct_bc')?.value||'';
- let s=`## LEADTIME KCT — Dữ liệu phân tích\nCông thức Leadtime = Total_LT / Volume\nKhoảng ngày: ${dates.length?shortD(dates[0])+' → '+shortD(dates[dates.length-1]):'—'}\nBộ lọc kho: ${bcF||'Tất cả'}\nMốc giờ: ${[...window._LTKCT.selMoc].join(', ')}\n\n`;
+ let s=`## LEADTIME KCT — Dữ liệu phân tích\nCông thức Leadtime = Total_LT / Volume\nKhoảng ngày: ${dates.length?shortD(dates[0])+' → '+shortD(dates[dates.length-1]):'—'} (${dates.length} ngày)\nBộ lọc kho: ${bcF||'Tất cả'}\nMốc giờ: ${mocs.join(', ')}\n\n`;
  if(n1){
   const lt=tot[n1]?.v?tot[n1].t/tot[n1].v:0;
   s+=`### Tổng hợp ngày ${shortD(n1)}\n- Volume: ${fmt(tot[n1]?.v||0)}\n- Leadtime TB: ${lt.toFixed(2)}h\n`;
@@ -1569,6 +1585,75 @@ function ltkctGatherAICtx(){
   dates.slice(-7).forEach(d=>{const o=tot[d]||{v:0,t:0};s+=`- ${shortD(d)}: Vol=${fmt(o.v)}, LT=${o.v?(o.t/o.v).toFixed(2):'—'}h\n`;});
  }
  return s;
+}
+function ltkctOvSummary(){
+ const G=window._LTKCT;
+ if(!G?.rows?.length)return null;
+ const allDates=[...new Set(G.rows.map(r=>r.date))].sort();
+ const n1=allDates[allDates.length-1]||'',n2=allDates[allDates.length-2]||'';
+ if(!n1)return null;
+ const dates=[n1,n2].filter(Boolean);
+ const data=G.rows.filter(r=>dates.includes(r.date));
+ const prevSel=G.selMoc;G.selMoc=new Set(LTKCT_MOC);
+ const {mocs,bcs,byBC,tot}=ltkctMocAgg(data,dates);
+ G.selMoc=prevSel;
+ const wh=bcs.map(bc=>{
+  let v=0,t=0,pv=0,pt=0;
+  mocs.forEach(m=>{v+=byBC[bc][m][n1]?.v||0;t+=byBC[bc][m][n1]?.t||0;pv+=byBC[bc][m][n2]?.v||0;pt+=byBC[bc][m][n2]?.t||0;});
+  const lt=v?t/v:0,ltP=pv?pt/pv:0;
+  return{bc,short:bc.replace(/^Kho Chuyển Tiếp\s*/i,''),vol:v,lt,dVol:v-pv,dLt:lt-ltP};
+ }).sort((a,b)=>a.lt-b.lt);
+ const totLt=tot[n1]?.v?tot[n1].t/tot[n1].v:0,totLtP=tot[n2]?.v?tot[n2].t/tot[n2].v:0;
+ return{n1,n2,total:{vol:tot[n1]?.v||0,lt:totLt,dVol:(tot[n1]?.v||0)-(tot[n2]?.v||0),dLt:totLt-totLtP},warehouses:wh};
+}
+function ltkctGroupLabel(lt){if(!lt||!isFinite(lt))return'—';if(lt<=2)return'🟢 Tốt';if(lt<=3)return'🟢 Khá';if(lt<=4)return'🟡 TB';if(lt<=6)return'🟠 Kém';return'🔴 Cao';}
+function ovLTKCTAnalysis(){
+ const G=window._LTKCT;
+ if(!G?.rows?.length)return'';
+ const allDates=[...new Set(G.rows.map(r=>r.date))].sort();
+ const d7=allDates.slice(-7);
+ const n1=d7[d7.length-1]||'',n7=d7[0]||'';
+ const prevSel=G.selMoc;G.selMoc=new Set(LTKCT_MOC);
+ const data7=G.rows.filter(r=>d7.includes(r.date));
+ const {mocs,bcs,byBC,tot}=ltkctMocAgg(data7,d7);
+ G.selMoc=prevSel;
+ const wh=bcs.map(bc=>{
+  let v1=0,t1=0,v7=0,t7=0;
+  mocs.forEach(m=>{
+   v1+=byBC[bc][m][n1]?.v||0;t1+=byBC[bc][m][n1]?.t||0;
+   v7+=byBC[bc][m][n7]?.v||0;t7+=byBC[bc][m][n7]?.t||0;
+  });
+  const lt1=v1?t1/v1:0,lt7=v7?t7/v7:0;
+  return{bc,short:bc.replace(/^Kho Chuyển Tiếp\s*/i,''),v1,v7,lt1,lt7,dVol:v1-v7,dLt:lt1-lt7};
+ }).sort((a,b)=>a.lt1-b.lt1);
+ const dVolStr=(d,cur,prev)=>{if(!cur&&!prev)return'—';if(d===0)return'—';return`${d>0?'▲':'▼'} ${fmt(Math.abs(d))} (${fmt(prev)}→${fmt(cur)})`;};
+ const dLtStr=(d,cur,prev)=>{if(!cur&&!prev)return'—';if(d===0)return'—';return`${d>0?'▲':'▼'} ${Math.abs(d).toFixed(2)}h (${prev.toFixed(2)}→${cur.toFixed(2)})`;};
+ const headers=['#','Kho','Vol N-1','Δ Vol N-1↔N-7','LT N-1','Δ LT N-1↔N-7','Nhóm'];
+ const rows=wh.map((r,i)=>[String(i+1),r.short,fmt(r.v1),dVolStr(r.dVol,r.v1,r.v7),r.lt1>0?r.lt1.toFixed(2)+'h':'—',dLtStr(r.dLt,r.lt1,r.lt7),ltkctGroupLabel(r.lt1)]);
+ const tv1=tot[n1]?.v||0,tt1=tot[n1]?.t||0,tv7=tot[n7]?.v||0,tt7=tot[n7]?.t||0;
+ const lt1=tv1?tt1/tv1:0,lt7=tv7?tt7/tv7:0;
+ let h=`<div class="card" style="margin-top:18px"><div class="card-header"><div class="card-title"><div class="card-icon" style="background:#7C3AED">⏲️</div>Leadtime KCT — Volume &amp; Leadtime 3 Kho</div><div class="card-info">Ngày ${shortD(n1)} · LT = Total_LT/Volume · so với ${shortD(n7)}</div></div>`;
+ h+=monoCopyBox('LEADTIME KCT — TỔNG HỢP',headers,rows,'Sắp xếp kho theo leadtime thấp → cao · Chi tiết: tab Leadtime');
+ h+=`<div class="analysis-box" style="margin:0 18px 14px">📦 <strong>Tổng mạng KCT ngày ${shortD(n1)}:</strong> Volume <strong>${fmt(tv1)}</strong> · Leadtime TB <strong>${lt1.toFixed(2)}h</strong> (${ltkctGroupLabel(lt1)}) · ΔVol ${dVolStr(tv1-tv7,tv1,tv7)} · ΔLT ${dLtStr(lt1-lt7,lt1,lt7)}</div>`;
+ h+=`</div>`;
+ return h;
+}
+function ovLTKCTCardHTML(){return ovLTKCTAnalysis();}
+function ltkctBriefForAI(){
+ const s=ltkctOvSummary();if(!s)return'';
+ let t=`\nLeadtime KCT (${shortD(s.n1)}): TB ${s.total.lt.toFixed(2)}h, Vol ${fmt(s.total.vol)}`;
+ if(s.n2)t+=`, ΔLT ${s.total.dLt>=0?'+':''}${s.total.dLt.toFixed(2)}h vs ${shortD(s.n2)}`;
+ t+='\n3 Kho chuyển tiếp:';
+ s.warehouses.forEach(w=>{t+=`\n  ${w.bc}: LT=${w.lt.toFixed(2)}h, Vol=${fmt(w.vol)}${s.n2?`, ΔLT=${w.dLt>=0?'+':''}${w.dLt.toFixed(2)}h`:''}`;});
+ return t;
+}
+function aiNeedsLTKCT(q){
+ if(aiIsLTKCTPrompt(q))return true;
+ const s=(q||'').toLowerCase();
+ if(/highlight|lowlight|điểm sáng|điểm yếu/.test(s))return true;
+ if(/leadtime kct|kho chuyển tiếp|network logistics/.test(s))return true;
+ if(q===AI_PRESETS['hl-ll']||q===AI_PRESETS['tong-quan'])return true;
+ return false;
 }
 const LTKCT_AI_PROMPT=`Với vai trò là chuyên gia phân tích Network Logistics vùng TNT, hãy phân tích dữ liệu Leadtime KCT (Kho Chuyển Tiếp) và trình bày theo cấu trúc:
 
@@ -1593,31 +1678,8 @@ const LTKCT_AI_PROMPT=`Với vai trò là chuyên gia phân tích Network Logist
 - Ưu tiên theo impact (volume × leadtime)
 
 Trình bày tiếng Việt, lồng số liệu vào câu văn, không bịa số liệu ngoài dữ liệu cung cấp.`;
-async function runLTKCTAI(){
- const key=localStorage.getItem('claudeApiKey')||'';
- const status=document.getElementById('ltkctAiStatus');
- const result=document.getElementById('ltkct_aiResult');
- const btn=document.getElementById('ltkctAiBtn');
- if(!key){if(status)status.textContent='⚠️ Chưa nhập Claude API Key (tab AI)';return;}
- if(!window._LTKCT?.rows?.length){if(status)status.textContent='⚠️ Chưa có dữ liệu Leadtime KCT';return;}
- btn.disabled=true;btn.innerHTML='<span>⏳</span><span>Đang phân tích...</span>';
- if(status)status.textContent='';
- result.innerHTML='<div class="ai-thinking"><div class="ai-thinking-dot"></div><div class="ai-thinking-dot"></div><div class="ai-thinking-dot"></div><span style="margin-left:8px">AI đang phân tích Network Logistics KCT...</span></div>';
- const ctx=ltkctGatherAICtx();
- const system=`Bạn là CHUYÊN GIA PHÂN TÍCH NETWORK LOGISTICS Vùng TNT (GHN), chuyên về vận hành Kho Chuyển Tiếp (KCT), leadtime xử lý theo mốc giờ và tối ưu mạng chuyển tiếp. CHỈ phân tích dựa trên dữ liệu được cung cấp. Trả lời tiếng Việt, chuyên nghiệp, có số liệu cụ thể.`;
- try{
-  const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:4096,system,messages:[{role:'user',content:`${LTKCT_AI_PROMPT}\n\nDỮ LIỆU:\n${ctx}`}]})});
-  if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||`HTTP ${res.status}`);}
-  const data=await res.json();
-  const text=(data.content&&data.content[0]&&data.content[0].text)||'(Không có phản hồi)';
-  result.innerHTML=`<div class="ai-result">${md2html(text)}</div>`;
-  if(status)status.textContent='✅ Hoàn tất';
- }catch(e){
-  result.innerHTML=`<div style="color:#f87171;padding:12px;background:rgba(248,113,113,0.08);border-radius:8px">❌ ${e.message}</div>`;
-  if(status)status.textContent='';
- }
- btn.disabled=false;btn.innerHTML='<span>✨</span><span>Phân tích Leadtime KCT</span>';
-}
+const LTKCT_AI_SYSTEM=`Bạn là CHUYÊN GIA PHÂN TÍCH NETWORK LOGISTICS Vùng TNT (GHN), chuyên về vận hành Kho Chuyển Tiếp (KCT), leadtime xử lý theo mốc giờ và tối ưu mạng chuyển tiếp. CHỈ phân tích dựa trên dữ liệu được cung cấp. Trả lời tiếng Việt, chuyên nghiệp, có số liệu cụ thể.
+QUY TẮC: Leadtime = Total_LT/Volume — CÀNG CAO CÀNG TỆ (thấp = tốt). Volume giảm có thể là tín hiệu xấu nếu leadtime tăng. So sánh N-1 vs N-2 và xu hướng 7 ngày.`;
 function ltkctDrawChart(canvasId,labels,datasets){
  const ctx=document.getElementById(canvasId);if(!ctx||!window.Chart)return;
  if(window._LTKCT.charts[canvasId])window._LTKCT.charts[canvasId].destroy();
@@ -1911,6 +1973,7 @@ function buildOverviewPage(R,rotData){
  // ===== Render =====
  let h=`<div class="page-header"><div class="page-title">Tổng Quan Vận Hành TNT</div><div class="page-meta"><span class="tag tag-orange">🗺️ N-1: ${shortD(latest)} · So sánh N-7: ${shortD(ovDatesDesc(gAM,1)[6]||'')}</span><span>${TNT_TINH.join(' · ')}</span></div></div>`;
  h+=`<div class="kpi-grid">${kAttr.map(k=>`<div class="kpi-card" style="border-top:none"><div class="kpi-ico" style="background:${k.bg}">${k.ic}</div><div class="kpi-label">${k.label}</div><div class="kpi-val" style="color:${k.c}">${k.val}</div><div style="font-size:10.5px;color:var(--text-sub);margin-top:4px">${k.tgt}</div>${k.d?`<div style="font-size:11px;font-weight:700;color:${k.d.col};margin-top:3px">${k.d.txt}</div>`:''}${k.sub?`<div style="display:flex;gap:6px;margin-top:8px">${k.sub.map(s=>`<div style="flex:1;background:#F8FAFC;border-radius:7px;padding:5px 4px;text-align:center"><div style="font-size:9px;font-weight:700;color:var(--text-sub)">${s.l}</div><div style="font-size:12px;font-weight:800;color:${s.c}">${s.v}</div></div>`).join('')}</div>`:''}</div>`).join('')}</div>`;
+ h+=ovLTKCTAnalysis();
  h+=`<div style="display:flex;align-items:center;justify-content:space-between;margin:18px 0 12px"><div style="font-size:15px;font-weight:800">📍 6 tỉnh Vùng TNT</div><div style="font-size:11.5px;color:var(--text-sub)">Bấm tab phía trên để xem phân tích chi tiết từng chỉ số</div></div>`;
  h+=`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px">${tinhCards}</div>`;
  h+=ovUnstableBCAnalysis(gBC,window._GTCD?.rows||[]);
@@ -2315,6 +2378,7 @@ function buildAIPage(){
     <button class="ai-preset-btn" onclick="setAIPrompt('kien-nghi')">💡 Kiến nghị cải thiện</button>
     <button class="ai-preset-btn" onclick="setAIPrompt('nhan-su')">👥 Phân tích Nhân sự</button>
     <button class="ai-preset-btn" onclick="setAIPrompt('nang-thu-nhap')">💰 Nâng cao thu nhập TNT</button>
+    <button class="ai-preset-btn" onclick="setAIPrompt('leadtime-kct')">⏲️ Leadtime KCT</button>
    </div>
   </div>
   <div id="aiAllBlock" style="display:none">
@@ -2322,7 +2386,7 @@ function buildAIPage(){
     <div class="ai-cust-field"><label style="display:block;margin-bottom:3px">Khoảng thời gian</label>
      <select id="aiAllDays"><option value="3">3 ngày gần nhất</option><option value="7" selected>7 ngày gần nhất</option><option value="14">14 ngày gần nhất</option><option value="30">30 ngày gần nhất</option></select></div>
    </div>
-   <div style="font-size:11px;color:var(--text-sub);background:#FFF7ED;border-left:3px solid var(--orange);padding:8px 12px;border-radius:6px;margin-bottom:10px">Sẽ gửi cho AI: GTC Total · GTC TTS · GTC chi tiết · FD · ODR · OPR · Aging · Rớt LC · Nhân sự (HRON/Năng suất) · Baton (BC bất ổn) — so sánh N-1 vs N-7.</div>
+   <div style="font-size:11px;color:var(--text-sub);background:#FFF7ED;border-left:3px solid var(--orange);padding:8px 12px;border-radius:6px;margin-bottom:10px">Sẽ gửi cho AI: GTC Total · GTC TTS · GTC chi tiết · FD · ODR · OPR · Aging · Rớt LC · Leadtime KCT 3 kho · Nhân sự (HRON/Năng suất) · Baton (BC bất ổn) — so sánh N-1 vs N-7.</div>
    <div style="font-size:12px;color:var(--text-sub);margin-bottom:6px">Gợi ý câu hỏi:</div>
    <div class="ai-preset-row" id="aiAllSuggest"></div>
   </div>
@@ -2340,7 +2404,8 @@ function buildAIPage(){
       <option value="rotLC">Rớt LC</option>
       <option value="hron">Định biên nhân sự (HRON)</option>
       <option value="nangSuat">Năng suất nhân viên</option>
-      <option value="baton">Bưu Cục Bất Ổn (Baton)</option></select></div>
+      <option value="baton">Bưu Cục Bất Ổn (Baton)</option>
+      <option value="ltkct">Leadtime KCT (Kho chuyển tiếp)</option></select></div>
     <div class="ai-cust-field"><label style="display:block;margin-bottom:3px">Khoảng thời gian</label>
      <select id="aiCustDays"><option value="1">Ngày mới nhất</option><option value="3">3 ngày</option><option value="7" selected>7 ngày</option><option value="14">14 ngày</option><option value="30">30 ngày</option></select></div>
     <div class="ai-cust-field"><label style="display:block;margin-bottom:3px">Phân tích theo</label>
@@ -2373,8 +2438,8 @@ function buildAIPage(){
 }
 const AI_Q_KEY='tnt_ai_saved_questions';
 const AI_PRESETS={
- 'tong-quan':'Với vai trò chuyên gia cố vấn vận hành, hãy viết phân tích tổng quan dạng LỜI VĂN (không liệt kê khô khan), lồng số liệu vào câu. Ví dụ: "Ngày 25/06 GTC đạt 870 đơn, tăng 30 so với 24/06 nhưng giảm 13 so với 23/06...". Bao quát: GTC, Ontime (ODR/OPR), %FD, Aging, Rớt LC và BC bất ổn — luôn so N-1 vs N-7. Kết bằng khuyến nghị hành động.',
- 'hl-ll':'Liệt kê Highlight (điểm sáng) và Lowlight (điểm yếu):\n- HIGHLIGHT 🟢: Ai làm tốt, chỉ số nào ấn tượng?\n- LOWLIGHT 🔴: Ai tụt hậu, vấn đề gì nổi bật?\n- Gợi ý hành động cụ thể. So sánh N-1 vs N-7.',
+ 'tong-quan':'Với vai trò chuyên gia cố vấn vận hành, hãy viết phân tích tổng quan dạng LỜI VĂN (không liệt kê khô khan), lồng số liệu vào câu. Ví dụ: "Ngày 25/06 GTC đạt 870 đơn, tăng 30 so với 24/06 nhưng giảm 13 so với 23/06...". Bao quát: GTC, Ontime (ODR/OPR), %FD, Aging, Rớt LC, Leadtime KCT 3 kho chuyển tiếp (Volume, Leadtime TB, so sánh từng kho N-1 vs N-2) và BC bất ổn — luôn so N-1 vs N-7. Kết bằng khuyến nghị hành động.',
+ 'hl-ll':'Liệt kê Highlight (điểm sáng) và Lowlight (điểm yếu):\n- HIGHLIGHT 🟢: Ai làm tốt, chỉ số nào ấn tượng? (gồm kho chuyển tiếp có leadtime tốt nhất, volume ổn định)\n- LOWLIGHT 🔴: Ai tụt hậu, vấn đề gì nổi bật? (gồm kho chuyển tiếp leadtime xấu nhất, mốc giờ leadtime cao)\n- Phân tích riêng 3 kho chuyển tiếp: so sánh Volume & Leadtime N-1 vs N-2, chỉ ra kho/mốc giờ cần ưu tiên\n- Gợi ý hành động cụ thể. So sánh N-1 vs N-7.',
  'so-sanh-am':'So sánh hiệu suất từng AM: xếp hạng theo %GTC, tỉ lệ trả, ontime, aging và rớt LC. Ai đang cải thiện? Ai đang giảm? Phân tích nguyên nhân. So sánh N-1 vs N-7.',
  'tra-hang':'Phân tích sâu tỉ lệ trả hàng (%FD) từ nguồn FD: (1) AM/BC nào cao/thấp nhất; (2) Xu hướng N-1 vs N-7; (3) So sánh FD Total vs SME vs TTS vs Shopee; (4) Đề xuất giảm FD.',
  'rot-lc':'Phân tích Rớt LC (nguồn Rot_LC_Raw): (1) Tổng đơn rớt LC hôm qua (N-1) vs 7 ngày trước (N-7); (2) AM/BC/Loại KH nào phát sinh nhiều nhất; (3) Xu hướng 7 ngày; (4) Kiến nghị xử lý.',
@@ -2382,7 +2447,8 @@ const AI_PRESETS={
  'so-sanh-n1-n7':'So sánh toàn diện ngày N-1 (hôm qua) với N-7 trên tất cả chỉ số: %GTC, %FD, Ontime ODR/OPR, Aging, Rớt LC. Chỉ ra AM/BC biến động mạnh nhất và nguyên nhân có thể.',
  'kien-nghi':'Dựa trên toàn bộ dữ liệu, đưa ra 5-7 kiến nghị cải thiện cụ thể. Mỗi kiến nghị: vấn đề → giải pháp → kỳ vọng kết quả. Ưu tiên BC bất ổn và chỉ số xấu nhất N-1.',
  'nhan-su':'Đóng vai trò CHUYÊN GIA NHÂN SỰ vận hành logistics Vùng TNT. Phân tích Data_HRON + Data_Năng_Suất và đề xuất CỤ THỂ cách nâng cao thu nhập cho nhân viên/BC/AM:\n(1) Biến động số nhân sự N-1 vs hôm trước vs tuần trước;\n(2) NS Gán Giao TB, NS GTC, Thu nhập TB (= Tổng lương ÷ Số ngày đi làm) — xu hướng tăng/giảm;\n(3) BC có NV thu nhập <300.000đ/ngày — nguyên nhân và hành động;\n(4) Đối chiếu BC bất ổn (Baton) với năng suất/thu nhập thấp;\n(5) 5-7 kiến nghị nâng thu nhập vùng TNT: gắn với tăng đơn GTC, giảm tồn, tối ưu ca, coaching AM…',
- 'nang-thu-nhap':'Với vai trò CHUYÊN GIA NHÂN SỰ, phân tích thu nhập Vùng TNT từ Data_Năng_Suất (Thu nhập TB = Tổng lương ÷ Ngày đi làm). Liệt kê BC/AM thu nhập thấp nhất, BC có NV <300kđ/ngày, mối liên hệ năng suất–thu nhập. Đề xuất 5-7 giải pháp thực tế để nâng thu nhập bình quân vùng trong 30 ngày tới.'
+ 'nang-thu-nhap':'Với vai trò CHUYÊN GIA NHÂN SỰ, phân tích thu nhập Vùng TNT từ Data_Năng_Suất (Thu nhập TB = Tổng lương ÷ Ngày đi làm). Liệt kê BC/AM thu nhập thấp nhất, BC có NV <300kđ/ngày, mối liên hệ năng suất–thu nhập. Đề xuất 5-7 giải pháp thực tế để nâng thu nhập bình quân vùng trong 30 ngày tới.',
+ 'leadtime-kct':LTKCT_AI_PROMPT
 };
 const AI_DATA_REGISTRY={
  gtcTotal:{tag:'GTC Total',aliases:['gtc total','%gtc total','tổng gtc'],fields:['Vol','%GTC','%Gán','Số đơn GTC']},
@@ -2395,7 +2461,8 @@ const AI_DATA_REGISTRY={
  rotLC:{tag:'Rớt LC',aliases:['rớt lc','rot lc','lấy không thành công','rot_lc'],fields:['Số đơn Rớt LC','Loại KH','Loại hàng']},
  hron:{tag:'Định biên nhân sự',aliases:['hron','định biên','nhân sự','headcount','số lượng nhân sự'],fields:['Số nhân sự','Định biên']},
  nangSuat:{tag:'Năng suất nhân viên',aliases:['năng suất','ns gán giao','ns gtc','thu nhập','lương','data_năng_suất'],fields:['NS Gán Giao TB','NS GTC','Thu nhập TB','NV phát sinh lương']},
- baton:{tag:'Bưu Cục Bất Ổn',aliases:['bất ổn','baton','bc bất ổn','bưu cục bất ổn'],fields:['Tồn LM (tồn đơn hệ thống)','%Tồn LM >5N','Đơn GTC','Lý do','NS Gán Giao TB','NS GTC','GTC TB','Thu nhập TB','Nhân sự']}
+ baton:{tag:'Bưu Cục Bất Ổn',aliases:['bất ổn','baton','bc bất ổn','bưu cục bất ổn'],fields:['Tồn LM (tồn đơn hệ thống)','%Tồn LM >5N','Đơn GTC','Lý do','NS Gán Giao TB','NS GTC','GTC TB','Thu nhập TB','Nhân sự']},
+ ltkct:{tag:'Leadtime KCT',aliases:['leadtime kct','kct','kho chuyển tiếp','network logistics','leadtime kho'],fields:['Volume','Leadtime','Mốc giờ','Total_LT']}
 };
 function aiLoadSaved(){try{return JSON.parse(localStorage.getItem(AI_Q_KEY)||'[]');}catch(_){return[];}}
 function aiRenderSavedQuestions(){
@@ -2431,6 +2498,10 @@ function aiDetectFromQuestion(q){
 function aiIsBatonHRPrompt(q){
  const s=(q||'').toLowerCase();
  return/(bưu cục bất ổn|bc bất ổn|baton)/.test(s)&&/(nhân sự|năng suất|thu nhập|chuyên gia nhân sự|baton cột)/.test(s);
+}
+function aiIsLTKCTPrompt(q){
+ const s=(q||'').toLowerCase();
+ return/(chuyên gia phân tích network logistics|leadtime kct|kho chuyển tiếp.*leadtime)/.test(s);
 }
 /* ===== REGISTRY SHEET NGUỒN — AI tự tìm sheet theo tên/từ khoá rồi TÍNH tỉ lệ ===== */
 // Danh sách sheet nguồn chính (dùng chung init + AI)
@@ -2614,7 +2685,8 @@ function aiCustSuggest(ds,subject){
   rotLC:[`Phân tích số đơn Rớt LC theo ${S}: ai phát sinh nhiều nhất N-1? So sánh với N-7.`,`Xu hướng Rớt LC 7 ngày theo ${S} — có điểm bùng phát không?`,`${S} nào Rớt LC cao đồng thời %GTC thấp? Đề xuất ưu tiên xử lý.`],
   hron:[`Phân tích số nhân sự theo ${S}: biến động N-1 vs hôm trước và vs tuần trước.`,`${S} nào thiếu/thừa nhân sự so với xu hướng 7 ngày?`,`Đối chiếu BC bất ổn với số nhân sự — BC nào thiếu người?`],
   nangSuat:[`Xếp hạng ${S} theo NS Gán Giao TB và NS GTC; ai thấp nhất?`,`${S} nào thu nhập TB thấp nhưng năng suất cao (hoặc ngược lại)?`,`BC bất ổn có năng suất/thu nhập thấp hơn trung bình vùng không?`],
-  baton:[`Phân tích BC bất ổn: liên kết %GTC, năng suất (NS Gán Giao, GTC TB) và thu nhập TB — BC nào rủi ro nhất?`,`BC bất ổn có NV thu nhập <300k/ngày không? Nguyên nhân và giải pháp nâng thu nhập.`,`Đề xuất 5-7 giải pháp cụ thể cho BC bất ổn: bổ sung nhân sự, tăng đơn GTC, coaching AM.`]
+  baton:[`Phân tích BC bất ổn: liên kết %GTC, năng suất (NS Gán Giao, GTC TB) và thu nhập TB — BC nào rủi ro nhất?`,`BC bất ổn có NV thu nhập <300k/ngày không? Nguyên nhân và giải pháp nâng thu nhập.`,`Đề xuất 5-7 giải pháp cụ thể cho BC bất ổn: bổ sung nhân sự, tăng đơn GTC, coaching AM.`],
+  ltkct:[`Phân tích leadtime theo mốc giờ: mốc nào xấu nhất và biến động mạnh nhất N-1 vs N-2?`,`So sánh 3 kho chuyển tiếp: kho nào leadtime tốt/xấu nhất? Nguyên nhân có thể?`,`Điểm nóng kết hợp kho + mốc giờ cần ưu tiên can thiệp trong 48h?`]
  };
  return m[ds]||[];
 }
@@ -2632,9 +2704,9 @@ function aiCustDatasetChange(){
  const subj=document.getElementById('aiCustSubject');
  const loaiOpt=subj?.querySelector('option[value="loai"]');
  if(loaiOpt){const ok=ds==='canNang';loaiOpt.disabled=!ok;if(!ok&&subj.value==='loai')subj.value='am';}
- if(subj){const bcOnly=ds==='aging'||ds==='rotLC'||ds==='baton';subj.querySelectorAll('option').forEach(o=>{if(o.value==='loai')o.disabled=ds!=='canNang';if(o.value==='am'||o.value==='bc')o.disabled=ds==='baton'&&o.value==='am';});if(ds==='baton'&&subj.value==='am')subj.value='bc';}
+ if(subj){const bcOnly=ds==='aging'||ds==='rotLC'||ds==='baton'||ds==='ltkct';subj.querySelectorAll('option').forEach(o=>{if(o.value==='loai')o.disabled=ds!=='canNang';if(o.value==='am'||o.value==='bc')o.disabled=(ds==='baton'&&o.value==='am')||(ds==='ltkct'&&o.value==='am');});if(ds==='baton'&&subj.value==='am')subj.value='bc';if(ds==='ltkct'&&subj.value==='am')subj.value='bc';}
  const hint=document.getElementById('aiCustHint');
- if(hint){const map={gtcTotal:'GTC Total (Vol, %GTC, %Gán)',gtcTTS:'GTC TTS (Vol, %GTC, %Gán)',canNang:'GTC chi tiết theo cân nặng (Vol, %GTC, Tồn, %Cồng kềnh)',fd:'Tỉ lệ trả %FD — header: %Vol, %FD, Trả Total',odr:'ODR Ontime',opr:'OPR Ontime',aging:'Số đơn Aging >5 ngày',rotLC:'Rớt LC — số đơn lấy không thành công',hron:'Định biên nhân sự — Data_HRON (số nhân sự theo ngày/AM/BC)',nangSuat:'Năng suất — Data_Năng_Suất (NS Gán Giao TB, NS GTC, Thu nhập TB)',baton:'BC Bất Ổn (Baton) + Năng suất/Thu nhập/HRON theo từng BC'};hint.textContent='Sẽ gửi: '+(map[ds]||'')+' · so sánh N-1 vs N-7.';}
+ if(hint){const map={gtcTotal:'GTC Total (Vol, %GTC, %Gán)',gtcTTS:'GTC TTS (Vol, %GTC, %Gán)',canNang:'GTC chi tiết theo cân nặng (Vol, %GTC, Tồn, %Cồng kềnh)',fd:'Tỉ lệ trả %FD — header: %Vol, %FD, Trả Total',odr:'ODR Ontime',opr:'OPR Ontime',aging:'Số đơn Aging >5 ngày',rotLC:'Rớt LC — số đơn lấy không thành công',hron:'Định biên nhân sự — Data_HRON (số nhân sự theo ngày/AM/BC)',nangSuat:'Năng suất — Data_Năng_Suất (NS Gán Giao TB, NS GTC, Thu nhập TB)',baton:'BC Bất Ổn (Baton) + Năng suất/Thu nhập/HRON theo từng BC',ltkct:'Leadtime KCT — Volume & Leadtime theo kho chuyển tiếp & mốc giờ (Total_LT/Volume)'};hint.textContent='Sẽ gửi: '+(map[ds]||'')+' · so sánh N-1 vs N-7.';}
  const sug=document.getElementById('aiCustSuggest');if(sug)sug.innerHTML=aiChips(aiCustSuggest(ds,subj?subj.value:'am'));
 }
 function aiLastDateSet(rows,dateIdx,days){const s=[...new Set(rows.map(r=>isoD(r[dateIdx])).filter(Boolean))].sort();return new Set(s.slice(-days));}
@@ -2907,6 +2979,7 @@ function aiCtxAll(days){
  s+=aiHron(days,'am');
  s+=aiNangSuat(days,'am');
  s+=aiBaton(days,'bc');
+ if(window._LTKCT?.rows?.length)s+='\n'+ltkctGatherAICtx(days);
  return s||'(Dữ liệu chưa được tải)';
 }
 function aiCtxCustom(dataset,days,subject){
@@ -2922,9 +2995,10 @@ function aiCtxCustom(dataset,days,subject){
  else if(dataset==='hron')s=aiHron(days,subject==='bc'?'bc':'am');
  else if(dataset==='nangSuat')s=aiNangSuat(days,subject==='bc'?'bc':'am');
  else if(dataset==='baton')s=aiBaton(days,'bc')+aiAging(days,'bc');
+ else if(dataset==='ltkct')s=ltkctGatherAICtx(days);
  return s||'(Dữ liệu chưa được tải hoặc không có)';
 }
-async function aiEnsureData(needCanNang,needAging,needRotLC,needBaton,needHron,needNS){
+async function aiEnsureData(needCanNang,needAging,needRotLC,needBaton,needHron,needNS,needLTKCT){
  const jobs=[];
  if(needHron&&!((window._HRON&&window._HRON.rows&&window._HRON.rows.length))){
   jobs.push((async()=>{try{await loadHRONData();}catch(e){}})());
@@ -2950,6 +3024,9 @@ async function aiEnsureData(needCanNang,needAging,needRotLC,needBaton,needHron,n
  }
  if(needBaton&&(!window._BATON?.rows?.length)){
   jobs.push((async()=>{try{const baton=await fetchSheetById(AGING_SID,'Baton');window._BATON=parseBatonSheet(baton);}catch(e){}})());
+ }
+ if(needLTKCT&&!window._LTKCT?.rows?.length){
+  jobs.push((async()=>{try{await loadLTKCTData();}catch(e){}})());
  }
  if(jobs.length)await Promise.all(jobs);
 }
@@ -2988,6 +3065,7 @@ function gatherDashboardData(){
   lines.push(`\nRớt LC: N-1=${window._ROTLC.filter(r=>r.date===n1).length} đơn, N-7=${n7?window._ROTLC.filter(r=>r.date===n7).length:0} đơn`);
  }
  if(window._BATON?.rows?.length)lines.push(`\nBưu Cục Bất Ổn (Baton): ${window._BATON.rows.length} BC — ${window._BATON.rows.map(r=>r.bc).join(', ')}`);
+ const ltkBrief=ltkctBriefForAI();if(ltkBrief)lines.push(ltkBrief);
  ovHRMetrics().forEach(l=>lines.push('\n'+l));
  return lines.join('\n')||'(Dữ liệu chưa được tải)';
 }
@@ -3003,6 +3081,7 @@ QUY TẮC ĐÁNH GIÁ TỐT/XẤU (TUYỆT ĐỐI KHÔNG ĐƯỢC HIỂU NGƯỢ
 - %FD (tỷ lệ trả hàng): CÀNG CAO CÀNG TỆ (thấp = tốt).
 - Aging >5 ngày: CÀNG CAO CÀNG TỆ (thấp = tốt).
 - Rớt LC: CÀNG CAO CÀNG TỆ (thấp = tốt).
+- Leadtime KCT (Kho chuyển tiếp): CÀNG CAO CÀNG TỆ (thấp = tốt). Công thức = Total_LT/Volume.
 - NS Gán Giao TB / NS GTC: CÀNG THẤP CÀNG TỆ (cao = tốt) — đơn/ngày đi làm.
 - Thu nhập TB: đánh giá theo ngữ cảnh; thường thấp kéo theo năng suất thấp hoặc thiếu đơn.
 - Số nhân sự (HRON): giảm đột ngột tại BC bất ổn có thể là rủi ro vận hành; cần đối chiếu với %GTC và năng suất.
@@ -3035,7 +3114,7 @@ function md2html(text){
 }
 function saveGroqKey(){const k=(document.getElementById('groqKeyInput').value||'').trim();localStorage.setItem('claudeApiKey',k);document.getElementById('groqKeySaved').textContent=k?'✅ Đã lưu':'';}
 function aiEnsureFlags(ds){
- return{canNang:ds==='canNang'||ds==='baton',aging:ds==='aging'||ds==='baton',rotLC:ds==='rotLC',baton:ds==='baton',hron:ds==='hron'||ds==='baton',ns:ds==='nangSuat'||ds==='baton'};
+ return{canNang:ds==='canNang'||ds==='baton',aging:ds==='aging'||ds==='baton',rotLC:ds==='rotLC',baton:ds==='baton',hron:ds==='hron'||ds==='baton',ns:ds==='nangSuat'||ds==='baton',ltkct:ds==='ltkct'};
 }
 async function runAIAnalysis(){
  const key=localStorage.getItem('claudeApiKey')||'';
@@ -3047,8 +3126,9 @@ async function runAIAnalysis(){
  const card=document.getElementById('aiResultCard');card.style.display='block';
  document.getElementById('aiResultArea').innerHTML='<div class="ai-thinking"><div class="ai-thinking-dot"></div><div class="ai-thinking-dot"></div><div class="ai-thinking-dot"></div><span style="margin-left:8px">AI đang phân tích...</span></div>';
  const mode=window._aiMode||'preset';
- let ctx,scopeNote='',forceDS='',maxTokens=4096;
+ let ctx,scopeNote='',forceDS='',maxTokens=4096,systemPrompt=AI_SYSTEM_PROMPT;
  const isBatonHR=aiIsBatonHRPrompt(userQ);
+ const isLTKCT=aiIsLTKCTPrompt(userQ);
  window._AI_ANCHOR=null; // tính lại mốc thời gian chung sau khi nạp dữ liệu cho lần phân tích này
  try{
   if(isBatonHR){
@@ -3059,9 +3139,16 @@ async function runAIAnalysis(){
    const nBC=window._BATON?.rows?.length||0;
    scopeNote=`[CHUYÊN GIA NHÂN SỰ · BATON] Phân tích đủ ${nBC} BC bất ổn · 4 phần I→IV bắt buộc · không bỏ sót BC · không dừng giữa chừng. So sánh N-1 vs N-7.`;
    maxTokens=8192;
+  }else if(isLTKCT){
+   document.getElementById('aiStatus').textContent='⏳ Đang nạp dữ liệu Leadtime KCT...';
+   const days=mode==='custom'?(+(document.getElementById('aiCustDays')?.value)||7):7;
+   await aiEnsureData(false,false,false,false,false,false,true);
+   ctx=ltkctGatherAICtx(days);
+   scopeNote=`[CHUYÊN GIA NETWORK LOGISTICS TNT] Leadtime KCT · Kho chuyển tiếp · theo mốc giờ · ${days} ngày · N-1 vs N-2.`;
+   systemPrompt=LTKCT_AI_SYSTEM;
   }else if(mode==='all'){
    document.getElementById('aiStatus').textContent='⏳ Đang nạp toàn bộ dữ liệu...';
-   await aiEnsureData(true,true,true,true,true,true);
+   await aiEnsureData(true,true,true,true,true,true,true);
    const days=+(document.getElementById('aiAllDays')?.value)||7;
    ctx=aiCtxAll(days);scopeNote=`Phạm vi: TOÀN BỘ dữ liệu (gồm Nhân sự), ${days} ngày gần nhất. So sánh N-1 vs N-7.`;
   }else if(mode==='custom'){
@@ -3074,32 +3161,36 @@ async function runAIAnalysis(){
    document.getElementById('aiStatus').textContent='⏳ Đang đọc sheet nguồn để tính toán...';
    const f=aiEnsureFlags(dataset);
    const needHR=/nhân sự|năng suất|hron|thu nhập|định biên|nâng.*thu nhập|300\.?000/i.test(userQ);
-   await aiEnsureData(f.canNang,f.aging,f.rotLC,f.baton,f.hron||needHR,f.ns||needHR);
+   await aiEnsureData(f.canNang,f.aging,f.rotLC,f.baton,f.hron||needHR,f.ns||needHR,f.ltkct);
    ctx=aiCtxCustom(dataset,days,subject);
    if(needHR&&dataset!=='hron'&&dataset!=='nangSuat'&&dataset!=='baton')ctx+=aiHron(days,'am')+aiNangSuat(days,'am');
-   const dmap={gtcTotal:'GTC Total',gtcTTS:'GTC TTS',canNang:'GTC chi tiết cân nặng',fd:'Tỉ lệ trả FD',odr:'ODR Ontime',opr:'OPR Ontime',aging:'Aging >5 ngày',rotLC:'Rớt LC',hron:'Định biên nhân sự (HRON)',nangSuat:'Năng suất nhân viên',baton:'BC Bất Ổn + Năng suất/Thu nhập'};
+   const dmap={gtcTotal:'GTC Total',gtcTTS:'GTC TTS',canNang:'GTC chi tiết cân nặng',fd:'Tỉ lệ trả FD',odr:'ODR Ontime',opr:'OPR Ontime',aging:'Aging >5 ngày',rotLC:'Rớt LC',hron:'Định biên nhân sự (HRON)',nangSuat:'Năng suất nhân viên',baton:'BC Bất Ổn + Năng suất/Thu nhập',ltkct:'Leadtime KCT (Kho chuyển tiếp)'};
    const smap={am:'AM',bc:'Bưu cục',loai:'Loại hàng'};
-   scopeNote=(scopeNote||'')+(dataset==='baton'?`[CHUYÊN GIA NHÂN SỰ] `:'')+`Phạm vi: ${dmap[dataset]} · ${days} ngày · theo ${smap[subject]||'BC'} · ĐỌC SHEET NGUỒN tính trực tiếp. So sánh N-1 vs N-7.`;
+   scopeNote=(scopeNote||'')+(dataset==='baton'?`[CHUYÊN GIA NHÂN SỰ] `:'')+(dataset==='ltkct'?`[NETWORK LOGISTICS TNT] `:'')+`Phạm vi: ${dmap[dataset]} · ${days} ngày · theo ${smap[subject]||'BC'} · ĐỌC SHEET NGUỒN tính trực tiếp. So sánh N-1 vs N-7.`;
+   if(dataset==='ltkct')systemPrompt=LTKCT_AI_SYSTEM;
    }else{
     const detected=aiDetectFromQuestion(userQ);
     if(detected){
      document.getElementById('aiStatus').textContent='⏳ Tự nhận diện nguồn: '+AI_DATA_REGISTRY[detected].tag+'...';
      const f=aiEnsureFlags(detected);
      const needHR=/nhân sự|năng suất|hron|thu nhập|định biên|nâng.*thu nhập|300\.?000/i.test(userQ);
-     await aiEnsureData(f.canNang,f.aging,f.rotLC,f.baton,f.hron||needHR,f.ns||needHR);
-     ctx=aiCtxCustom(detected,7,detected==='baton'||detected==='aging'||detected==='rotLC'?'bc':'am');
+     await aiEnsureData(f.canNang,f.aging,f.rotLC,f.baton,f.hron||needHR,f.ns||needHR,f.ltkct);
+     ctx=aiCtxCustom(detected,7,detected==='baton'||detected==='aging'||detected==='rotLC'||detected==='ltkct'?'bc':'am');
      if(needHR&&detected!=='hron'&&detected!=='nangSuat'&&detected!=='baton')ctx+=aiHron(7,'am')+aiNangSuat(7,'am');
-     scopeNote=detected==='baton'?`[CHUYÊN GIA NHÂN SỰ] ${AI_DATA_REGISTRY.baton.tag} · liên kết Năng suất/Thu nhập/HRON theo từng BC · N-1 vs N-7.`:`[Tự nhận diện] ${AI_DATA_REGISTRY[detected].tag} · N-1 vs N-7.`;
+     scopeNote=detected==='baton'?`[CHUYÊN GIA NHÂN SỰ] ${AI_DATA_REGISTRY.baton.tag} · liên kết Năng suất/Thu nhập/HRON theo từng BC · N-1 vs N-7.`:detected==='ltkct'?`[NETWORK LOGISTICS TNT] ${AI_DATA_REGISTRY.ltkct.tag} · N-1 vs N-2.`:`[Tự nhận diện] ${AI_DATA_REGISTRY[detected].tag} · N-1 vs N-7.`;
+     if(detected==='ltkct')systemPrompt=LTKCT_AI_SYSTEM;
     }else{
     const needHR=/nhân sự|năng suất|hron|thu nhập|định biên|nâng.*thu nhập|300\.?000/i.test(userQ);
-    await aiEnsureData(false,false,true,false,true,needHR);
+    const needLTKCT=aiNeedsLTKCT(userQ);
+    await aiEnsureData(false,false,true,false,true,needHR,needLTKCT);
     ctx=gatherDashboardData();
+    if(needLTKCT&&window._LTKCT?.rows?.length)ctx+='\n\n'+ltkctGatherAICtx(7);
     if(needHR)ctx+=aiHron(7,'am')+aiNangSuat(7,'am');
-    scopeNote='Phạm vi: dữ liệu nhanh (GTC, FD, ODR, Rớt LC, Baton'+(needHR?', Nhân sự':'')+') · N-1 vs N-7.';
+    scopeNote='Phạm vi: dữ liệu nhanh (GTC, FD, ODR, Rớt LC, Baton'+(needLTKCT?', Leadtime KCT 3 kho':'')+(needHR?', Nhân sự':'')+') · N-1 vs N-7.';
    }
   }
-  // ===== AI tự tìm/đọc sheet nguồn (bỏ qua với Baton+HR để tập trung dữ liệu) =====
-  if(!isBatonHR){
+  // ===== AI tự tìm/đọc sheet nguồn (bỏ qua với Baton+HR và Leadtime KCT để tập trung dữ liệu) =====
+  if(!isBatonHR&&!isLTKCT){
   try{
    const subjForSearch=aiDetectLevelFromQuestion(userQ)||(document.getElementById('aiCustSubject')?.value==='bc'?'bc':'am');
    const daysSearch=+(document.getElementById('aiCustDays')?.value||document.getElementById('aiAllDays')?.value)||7;
@@ -3111,7 +3202,7 @@ async function runAIAnalysis(){
   document.getElementById('aiStatus').textContent='';
  }catch(_){ctx=gatherDashboardData();}
  try{
-  const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:maxTokens,system:AI_SYSTEM_PROMPT,messages:[{role:'user',content:`${scopeNote}\n\nDỮ LIỆU:\n${ctx}\n\nYÊU CẦU:\n${userQ}`}]})});
+  const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:maxTokens,system:systemPrompt,messages:[{role:'user',content:`${scopeNote}\n\nDỮ LIỆU:\n${ctx}\n\nYÊU CẦU:\n${userQ}`}]})});
   if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||`HTTP ${res.status}`);}
   const data=await res.json();const text=(data.content&&data.content[0]&&data.content[0].text)||'(Không có phản hồi)';
   const truncated=data.stop_reason==='max_tokens';
@@ -3198,11 +3289,14 @@ async function init(){
  try{const rotRaw=await fetchSheetById(ROTLC_SID,'Rot_LC_Raw');rotData=normalizeRotLC((rotRaw||[]).slice(1));window._ROTLC=rotData;}catch(e){console.warn('Rot LC lỗi',e.message);}
  // Data_HRON cho Tổng quan + tab Định biên
  try{await loadHRONData();}catch(e){console.warn('HRON lỗi',e.message);}
+ // Leadtime KCT cho Tổng quan + AI
+ try{await loadLTKCTData();}catch(e){console.warn('LTKCT overview lỗi',e.message);}
  window._lastR=R;
  // p0 — Tổng quan vận hành
  try{buildOverviewPage(R,rotData);}catch(e){document.getElementById('p0').innerHTML=errPage('Tổng quan: '+e.message);}
  // Năng suất: nạp nền (~42k dòng) rồi cập nhật Tổng quan
  loadNSData().then(()=>{if(window._curPage==='p0'&&window._lastR)try{buildOverviewPage(window._lastR,window._ROTLC||[]);}catch(_){}}).catch(e=>console.warn('NS nền lỗi',e.message));
+ loadLTKCTData().then(()=>{if(window._curPage==='p0'&&window._lastR)try{buildOverviewPage(window._lastR,window._ROTLC||[]);}catch(_){}}).catch(e=>console.warn('LTKCT nền lỗi',e.message));
  // p8 — GTC Bulky: lazy-load khi mở tab (sheet ~23.7k dòng)
  const p8Active=document.getElementById('p8')?.classList.contains('active');
  window._gtcdLoaded=false;
