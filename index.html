@@ -427,9 +427,10 @@ function bcMatchUnstable(bc){
 }
 function buildBc2AmMap(){
  const m={};
- (window._HRON?.rows||[]).forEach(r=>{if(r.bc&&r.am)m[r.bc]=r.am;});
+ const ok=v=>{const s=(v==null?'':String(v)).trim();return s&&s.toLowerCase()!=='null'&&s.toLowerCase()!=='undefined'?s:'';};
+ (window._HRON?.rows||[]).forEach(r=>{const am=ok(r.am);if(r.bc&&am)m[r.bc]=am;});
  const gbc=window._D?.gtcTotalBC;
- if(gbc)gbc.slice(1).forEach(r=>{const bc=(r[1]||'').trim(),am=(r[0]||'').trim();if(bc&&am)m[bc]=am;});
+ if(gbc)gbc.slice(1).forEach(r=>{const bc=(r[1]||'').trim(),am=ok(r[0]);if(bc&&am)m[bc]=am;});
  return m;
 }
 function nsMetricDelta(cur,prev,unit,isMoney){
@@ -1606,15 +1607,18 @@ function buildOverviewPage(R,rotData){
 /* ===== NHÂN SỰ — ĐỊNH BIÊN (p10) Data_HRON ===== */
 // cols: Ngày thống kê(0), AM(1), Tỉnh(2), Bưu cục(3), Số lượng nhân sự(4)
 window._HRON={rows:[],charts:{}};
+function cleanAmName(v){const s=(v==null?'':String(v)).trim();return(!s||s.toLowerCase()==='null'||s.toLowerCase()==='undefined')?'':s;}
 function normalizeHRONRows(raw){
  let lastDate='';
- const bc2am=buildBc2AmMap(); // AM chuẩn theo BC (ưu tiên cột AM từ GTC Total theo Bưu Cục)
+ const bc2am=buildBc2AmMap(); // chỉ dùng để điền khi HRON thiếu AM
  return(raw||[]).slice(1).map(r=>{
   let d=parseSheetDate(r[0]);
   if(d)lastDate=d; else d=lastDate; // tự điền ngày cho dòng trống / ô gộp (merged cells)
   const bc=(r[3]||'').trim();
+  // Ưu tiên cột AM chuẩn của HRON (vd "KTC Vĩnh Phúc"); thiếu mới lấy AM theo BC; bỏ giá trị rỗng/"null"
+  const am=cleanAmName(r[1])||cleanAmName(bc2am[bc]);
   return{
-   date:d,am:bc2am[bc]||(r[1]||'').trim(),tinh:(r[2]||'').trim(),bc,
+   date:d,am,tinh:(r[2]||'').trim(),bc,
    count:Math.round(parseFloat(String(r[4]||'').replace(/\./g,'').replace(',','.'))||0)
   };
  }).filter(r=>r.date&&r.count>=0);
