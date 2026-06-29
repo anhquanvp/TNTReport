@@ -1383,9 +1383,19 @@ function ltkctSkeleton(rows){
   <div class="chip-row"><span class="chip-label">Mốc giờ</span>${LTKCT_MOC.map(m=>`<span class="chip active" data-moc="${m}" onclick="ltkctToggle(this)">${m}</span>`).join('')}</div>
  </div>
  <div class="kpi-grid" id="ltkct_kpi" style="grid-template-columns:repeat(5,1fr)"></div>
- <div class="chart-box"><h3>Xu hướng Leadtime theo ngày — theo Kho chuyển tiếp</h3><div class="csub">Mỗi đường = 1 kho chuyển tiếp · Leadtime = ΣTotal_LT / ΣVolume theo ngày.</div><div class="chart-canvas-wrap"><canvas id="ltkct_chart"></canvas></div></div>
- <div class="card"><div class="card-header"><div class="card-title"><div class="card-icon">📦</div>Volume theo Mốc giờ</div><div class="card-info">Cột Trend = ngày mới nhất so với ngày trước</div></div><div id="ltkct_volTable"></div></div>
- <div class="card"><div class="card-header"><div class="card-title"><div class="card-icon">⏱️</div>Leadtime theo Mốc giờ</div><div class="card-info">Leadtime = ΣTotal_LT/ΣVol · Cột Trend = ngày mới nhất so với ngày trước</div></div><div id="ltkct_ltTable"></div></div>`;
+ <div class="chart-box"><h3>Xu hướng Leadtime theo ngày — theo Kho chuyển tiếp</h3><div class="csub">Mỗi đường = 1 kho chuyển tiếp · Leadtime = ΣTotal_LT / ΣVolume theo ngày · Nhãn hiển thị trên điểm dữ liệu.</div><div class="chart-canvas-wrap"><canvas id="ltkct_chart"></canvas></div></div>
+ <div class="card"><div class="card-header"><div class="card-title"><div class="card-icon">📦</div>Volume theo Kho & Mốc giờ</div><div class="card-info">Nhóm theo kho chuyển tiếp · Cột Trend = ngày mới nhất so với ngày trước</div></div><div id="ltkct_volTable"></div><div id="ltkct_volNote"></div></div>
+ <div class="card"><div class="card-header"><div class="card-title"><div class="card-icon">⏱️</div>Leadtime theo Kho & Mốc giờ</div><div class="card-info">Leadtime = ΣTotal_LT/ΣVol · Cột Trend = ngày mới nhất so với ngày trước</div></div><div id="ltkct_ltTable"></div><div id="ltkct_ltNote"></div></div>
+ <div class="card"><div class="card-header"><div class="card-title"><div class="card-icon" style="background:linear-gradient(135deg,#7C3AED,#5B21B6)">✨</div>Phân tích AI — Network Logistics TNT</div><div class="card-info">Chuyên gia phân tích Network Logistics vùng TNT</div></div>
+  <div style="padding:14px 18px">
+   <div style="font-size:12px;color:var(--text-sub);margin-bottom:10px;line-height:1.6">AI đọc dữ liệu Leadtime KCT theo bộ lọc hiện tại: volume, leadtime theo kho & mốc giờ, xu hướng N-1 vs N-2 — đưa nhận định và kiến nghị vận hành mạng KCT.</div>
+   <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <button class="ai-run-btn" id="ltkctAiBtn" onclick="runLTKCTAI()" style="margin-top:0"><span>✨</span><span>Phân tích Leadtime KCT</span></button>
+    <span style="font-size:12px;color:var(--text-sub)" id="ltkctAiStatus"></span>
+   </div>
+   <div id="ltkct_aiResult" style="margin-top:14px"></div>
+  </div>
+ </div>`;
 }
 function ltkctToggle(elm){
  elm.classList.toggle('active');
@@ -1400,53 +1410,85 @@ function ltkctFiltered(){
  const bc=document.getElementById('ltkct_bc')?.value||'';
  return G.rows.filter(r=>r.date>=lo&&r.date<=hi&&(!bc||r.bc===bc)&&G.selMoc.has(r.moc));
 }
+function ltkctMocAgg(data,dates){
+ const G=window._LTKCT;
+ const mocs=LTKCT_MOC.filter(m=>G.selMoc.has(m));
+ const bcs=[...new Set(data.map(r=>r.bc))].sort();
+ const byMoc={};mocs.forEach(m=>{byMoc[m]={};dates.forEach(d=>byMoc[m][d]={v:0,t:0});});
+ const byBC={};bcs.forEach(bc=>{byBC[bc]={};mocs.forEach(m=>{byBC[bc][m]={};dates.forEach(d=>byBC[bc][m][d]={v:0,t:0});});});
+ const tot={};dates.forEach(d=>tot[d]={v:0,t:0});
+ data.forEach(r=>{
+  if(!tot[r.date])return;
+  tot[r.date].v+=r.vol;tot[r.date].t+=r.totLT;
+  if(byMoc[r.moc]?.[r.date]){byMoc[r.moc][r.date].v+=r.vol;byMoc[r.moc][r.date].t+=r.totLT;}
+  if(byBC[r.bc]?.[r.moc]?.[r.date]){byBC[r.bc][r.moc][r.date].v+=r.vol;byBC[r.bc][r.moc][r.date].t+=r.totLT;}
+ });
+ return{mocs,bcs,byMoc,byBC,tot};
+}
+function ltkctVal(o,mode){return mode==='vol'?o.v:(o.v?o.t/o.v:0);}
+function ltkctDisp(x,mode){return mode==='vol'?(x>0?fmt(x):'—'):(x>0?x.toFixed(2)+'h':'—');}
+function ltkctMocMini(byMoc,mocs,mode,date){
+ return mocs.map(m=>{
+  const v=ltkctVal(byMoc[m][date]||{v:0,t:0},mode);
+  return`<div style="display:flex;justify-content:space-between;gap:8px;font-size:11px;margin-top:2px"><span style="color:var(--text-sub)">${m}</span><strong>${ltkctDisp(v,mode)}</strong></div>`;
+ }).join('');
+}
+function ltkctMocDeltaMini(byMoc,mocs,mode,n1,n2){
+ if(!n2)return'<span style="font-size:11px;color:var(--text-sub)">—</span>';
+ return mocs.map(m=>{
+  const c=ltkctVal(byMoc[m][n1]||{v:0,t:0},mode),p=ltkctVal(byMoc[m][n2]||{v:0,t:0},mode);
+  const d=c-p;if(!c&&!p)return'';
+  let col,trend;
+  if(mode==='vol'){col=d>0?'var(--green)':d<0?'var(--red)':'var(--text-sub)';trend=d>0?`▲ ${fmt(Math.abs(d))}`:d<0?`▼ ${fmt(Math.abs(d))}`:'—';}
+  else{col=d>0?'var(--red)':d<0?'var(--green)':'var(--text-sub)';trend=d>0?`▲ ${Math.abs(d).toFixed(2)}h`:d<0?`▼ ${Math.abs(d).toFixed(2)}h`:'—';}
+  return`<div style="display:flex;justify-content:space-between;gap:8px;font-size:11px;margin-top:2px"><span style="color:var(--text-sub)">${m}</span><strong style="color:${col}">${trend}</strong></div>`;
+ }).filter(Boolean).join('')||'<span style="font-size:11px;color:var(--text-sub)">—</span>';
+}
 function renderLTKCT(){
  const G=window._LTKCT;if(!G.rows.length)return;
  const data=ltkctFiltered();
  const dates=[...new Set(data.map(r=>r.date))].sort();
  const n1=dates[dates.length-1]||'',n2=dates[dates.length-2]||'';
- const dayAgg=d=>{let v=0,t=0;data.filter(r=>r.date===d).forEach(r=>{v+=r.vol;t+=r.totLT;});return{v,t,lt:v?t/v:0};};
- const a1=dayAgg(n1),a2=dayAgg(n2);
- const volByMoc={};LTKCT_MOC.forEach(m=>volByMoc[m]=0);
- data.filter(r=>r.date===n1).forEach(r=>{if(volByMoc[r.moc]!==undefined)volByMoc[r.moc]+=r.vol;});
- const dVol=a1.v-a2.v,dLT=a1.lt-a2.lt;
- const volDelta=n2?`<span style="color:${dVol>=0?'var(--green)':'var(--red)'}">${dVol>=0?'▲':'▼'} ${fmt(Math.abs(dVol))}</span>`:'—';
- const ltDelta=n2?`<span style="color:${dLT>0?'var(--red)':dLT<0?'var(--green)':'var(--text-sub)'}">${dLT>0?'▲':dLT<0?'▼':'—'} ${Math.abs(dLT).toFixed(2)}h</span>`:'—';
- const mocMini=LTKCT_MOC.filter(m=>G.selMoc.has(m)).map(m=>`<div style="display:flex;justify-content:space-between;gap:8px;font-size:11px;margin-top:2px"><span style="color:var(--text-sub)">${m}</span><strong>${fmt(volByMoc[m])}</strong></div>`).join('');
+ const {mocs,byMoc,tot}=ltkctMocAgg(data,dates);
+ const a1={v:tot[n1]?.v||0,t:tot[n1]?.t||0},a2={v:tot[n2]?.v||0,t:tot[n2]?.t||0};
+ const lt1=a1.v?a1.t/a1.v:0,lt2=a2.v?a2.t/a2.v:0;
+ const dVol=a1.v-a2.v,dLT=lt1-lt2;
+ const volDelta=n2?`<span style="color:${dVol>=0?'var(--green)':'var(--red)'};font-size:22px;font-weight:800">${dVol>=0?'▲':'▼'} ${fmt(Math.abs(dVol))}</span>`:'—';
+ const ltDelta=n2?`<span style="color:${dLT>0?'var(--red)':dLT<0?'var(--green)':'var(--text-sub)'};font-size:22px;font-weight:800">${dLT>0?'▲':dLT<0?'▼':'—'} ${Math.abs(dLT).toFixed(2)}h</span>`:'—';
+ const ltMocMini=ltkctMocMini(byMoc,mocs,'lt',n1);
+ const volDeltaMini=ltkctMocDeltaMini(byMoc,mocs,'vol',n1,n2);
+ const ltDeltaMini=ltkctMocDeltaMini(byMoc,mocs,'lt',n1,n2);
  document.getElementById('ltkct_kpi').innerHTML=`
-  <div class="kpi-card" style="border-top-color:var(--orange)"><div class="kpi-ico" style="background:#FFF0EB">📦</div><div class="kpi-label">Volume ngày ${n1?shortD(n1):'—'}</div><div class="kpi-val" style="color:var(--orange)">${fmt(a1.v)}</div></div>
-  <div class="kpi-card" style="border-top-color:#3B82F6"><div class="kpi-ico" style="background:#EFF6FF">🕐</div><div class="kpi-label">Volume theo Mốc giờ</div><div style="margin-top:4px">${mocMini||'<span style="font-size:11px;color:var(--text-sub)">—</span>'}</div></div>
-  <div class="kpi-card" style="border-top-color:#7C3AED"><div class="kpi-ico" style="background:#FAF5FF">⏱️</div><div class="kpi-label">Leadtime TB ngày ${n1?shortD(n1):'—'}</div><div class="kpi-val" style="color:#7C3AED">${a1.lt.toFixed(2)}<span style="font-size:13px">h</span></div></div>
-  <div class="kpi-card" style="border-top-color:var(--green)"><div class="kpi-ico" style="background:#DCFCE7">📈</div><div class="kpi-label">Δ Volume (vs ${n2?shortD(n2):'—'})</div><div class="kpi-val">${volDelta}</div></div>
-  <div class="kpi-card" style="border-top-color:var(--red)"><div class="kpi-ico" style="background:#FEE2E2">⏲️</div><div class="kpi-label">Δ Leadtime (vs ${n2?shortD(n2):'—'})</div><div class="kpi-val">${ltDelta}</div></div>`;
+  <div class="kpi-card" style="border-top-color:var(--orange)"><div class="kpi-ico" style="background:#FFF0EB">📦</div><div class="kpi-label">Volume ngày ${n1?shortD(n1):'—'}</div><div class="kpi-val" style="color:var(--orange)">${fmt(a1.v)}</div><div style="margin-top:6px;border-top:1px dashed var(--border);padding-top:4px">${ltkctMocMini(byMoc,mocs,'vol',n1)||''}</div></div>
+  <div class="kpi-card" style="border-top-color:#3B82F6"><div class="kpi-ico" style="background:#EFF6FF">🕐</div><div class="kpi-label">Volume theo Mốc giờ</div><div style="margin-top:4px">${ltkctMocMini(byMoc,mocs,'vol',n1)||'<span style="font-size:11px;color:var(--text-sub)">—</span>'}</div></div>
+  <div class="kpi-card" style="border-top-color:#7C3AED"><div class="kpi-ico" style="background:#FAF5FF">⏱️</div><div class="kpi-label">Leadtime TB ngày ${n1?shortD(n1):'—'}</div><div class="kpi-val" style="color:#7C3AED">${lt1.toFixed(2)}<span style="font-size:13px">h</span></div><div style="margin-top:6px;border-top:1px dashed var(--border);padding-top:4px">${ltMocMini||''}</div></div>
+  <div class="kpi-card" style="border-top-color:var(--green)"><div class="kpi-ico" style="background:#DCFCE7">📈</div><div class="kpi-label">Δ Volume (vs ${n2?shortD(n2):'—'})</div><div class="kpi-val">${volDelta}</div><div style="margin-top:6px;border-top:1px dashed var(--border);padding-top:4px">${volDeltaMini}</div></div>
+  <div class="kpi-card" style="border-top-color:var(--red)"><div class="kpi-ico" style="background:#FEE2E2">⏲️</div><div class="kpi-label">Δ Leadtime (vs ${n2?shortD(n2):'—'})</div><div class="kpi-val">${ltDelta}</div><div style="margin-top:6px;border-top:1px dashed var(--border);padding-top:4px">${ltDeltaMini}</div></div>`;
  const bcs=[...new Set(data.map(r=>r.bc))].sort();
  const dIdx=Object.fromEntries(dates.map((d,i)=>[d,i]));
  const perBC={};bcs.forEach(b=>perBC[b]=dates.map(()=>({v:0,t:0})));
  data.forEach(r=>{const i=dIdx[r.date];if(i===undefined)return;const o=perBC[r.bc][i];o.v+=r.vol;o.t+=r.totLT;});
  const labels=dates.map(d=>shortD(d));
- const datasets=bcs.map((b,i)=>({label:b,data:perBC[b].map(o=>o.v?+(o.t/o.v).toFixed(2):null),borderColor:LTKCT_LINEC[i%LTKCT_LINEC.length],backgroundColor:'transparent',tension:.35,borderWidth:2.5,pointRadius:2,fill:false,spanGaps:true}));
+ const datasets=bcs.map((b,i)=>({label:b,data:perBC[b].map(o=>o.v?+(o.t/o.v).toFixed(2):null),borderColor:LTKCT_LINEC[i%LTKCT_LINEC.length],backgroundColor:'transparent',tension:.35,borderWidth:2.5,pointRadius:4,fill:false,spanGaps:true}));
  ltkctDrawChart('ltkct_chart',labels,datasets);
  const last=dates.slice(-7);
  document.getElementById('ltkct_volTable').innerHTML=ltkctMocTable(data,last,'vol');
  document.getElementById('ltkct_ltTable').innerHTML=ltkctMocTable(data,last,'lt');
+ const volNote=document.getElementById('ltkct_volNote');if(volNote)volNote.innerHTML=ltkctTableNote(data,last,'vol');
+ const ltNote=document.getElementById('ltkct_ltNote');if(ltNote)ltNote.innerHTML=ltkctTableNote(data,last,'lt');
 }
 function ltkctMocTable(data,dates,mode){
  if(!dates.length)return'<p style="padding:16px;color:var(--text-sub)">Không có dữ liệu</p>';
- const G=window._LTKCT;
- const mocs=LTKCT_MOC.filter(m=>G.selMoc.has(m));
+ const {mocs,bcs,byBC,tot}=ltkctMocAgg(data,dates);
  const latest=dates[dates.length-1],prev=dates[dates.length-2];
- const agg={};mocs.forEach(m=>{agg[m]={};dates.forEach(d=>agg[m][d]={v:0,t:0});});
- const tot={};dates.forEach(d=>tot[d]={v:0,t:0});
- data.forEach(r=>{if(!agg[r.moc]||!agg[r.moc][r.date])return;agg[r.moc][r.date].v+=r.vol;agg[r.moc][r.date].t+=r.totLT;tot[r.date].v+=r.vol;tot[r.date].t+=r.totLT;});
- const val=o=>mode==='vol'?o.v:(o.v?o.t/o.v:0);
- const disp=x=>mode==='vol'?(x>0?fmt(x):'—'):(x>0?x.toFixed(2)+'h':'—');
  const cs='padding:7px 10px;';
- let h=`<div class="table-wrap" style="overflow-x:auto"><table style="font-size:12px"><thead><tr><th style="${cs}min-width:120px">Mốc giờ</th>`;
+ const colSpan=dates.length+2;
+ let h=`<div class="table-wrap" style="overflow-x:auto"><table style="font-size:12px"><thead><tr><th style="${cs}min-width:200px">Kho / Mốc giờ</th>`;
  dates.forEach((d,i)=>{const isL=i===dates.length-1;h+=`<th style="${cs}text-align:right;white-space:nowrap${isL?';background:#FFE0CC;color:var(--orange-dark)':''}">${shortD(d)}</th>`;});
  h+=`<th style="${cs}text-align:right">Trend</th></tr></thead><tbody>`;
- const rowHtml=(label,getter,isTot)=>{
-  let t=`<tr${isTot?' class="tot"':''}><td style="${cs}font-weight:${isTot?800:700}${isTot?';color:var(--orange)':''}">${label}</td>`;
-  dates.forEach((d,i)=>{const isL=i===dates.length-1;t+=`<td style="${cs}text-align:right${isL?';background:#FFF0EB;font-weight:800;color:var(--orange-dark)':''}">${disp(getter(d))}</td>`;});
+ const rowHtml=(label,getter,isTot,isSub)=>{
+  let t=`<tr${isTot?' class="tot"':''}><td style="${cs}font-weight:${isTot?800:600}${isSub?';padding-left:22px;color:var(--text-sub)':''}${isTot?';color:var(--orange)':''}">${isSub?'└ ':''}${label}</td>`;
+  dates.forEach((d,i)=>{const isL=i===dates.length-1;t+=`<td style="${cs}text-align:right${isL?';background:#FFF0EB;font-weight:800;color:var(--orange-dark)':''}">${ltkctDisp(getter(d),mode)}</td>`;});
   const c=getter(latest),p=prev?getter(prev):0;
   let trend='—',col='var(--text-sub)';
   if(prev&&(c||p)){const d=c-p;
@@ -1456,20 +1498,158 @@ function ltkctMocTable(data,dates,mode){
   t+=`<td style="${cs}text-align:right;font-weight:700;color:${col};white-space:nowrap">${trend}</td></tr>`;
   return t;
  };
- mocs.forEach(m=>{h+=rowHtml(m,d=>val(agg[m][d]),false);});
- h+=rowHtml(mode==='vol'?'Tổng cộng':'Leadtime chung',d=>val(tot[d]),true);
+ bcs.forEach(bc=>{
+  h+=`<tr><td colspan="${colSpan}" style="${cs}background:#F3F4F6;font-weight:800;color:var(--text-main);border-top:2px solid var(--border)">🏭 ${bc}</td></tr>`;
+  mocs.forEach(m=>{h+=rowHtml(m,d=>ltkctVal(byBC[bc][m][d]||{v:0,t:0},mode),false,true);});
+ });
+ h+=rowHtml(mode==='vol'?'Tổng cộng':'Leadtime chung',d=>ltkctVal(tot[d]||{v:0,t:0},mode),true,false);
  h+='</tbody></table></div>';
  return h;
+}
+function ltkctTableNote(data,dates,mode){
+ if(!dates.length)return'';
+ const n1=dates[dates.length-1],n2=dates[dates.length-2];
+ if(!n2)return'';
+ const {mocs,bcs,byBC,byMoc,tot}=ltkctMocAgg(data,dates);
+ const isVol=mode==='vol';
+ const totC=ltkctVal(tot[n1]||{v:0,t:0},mode),totP=ltkctVal(tot[n2]||{v:0,t:0},mode);
+ const totD=totC-totP;
+ let parts=[];
+ if(isVol){
+  const dir=totD>=0?'tăng':'giảm';
+  parts.push(`📦 <strong>Volume ${shortD(n1)}:</strong> Tổng <strong>${fmt(tot[n1]?.v||0)}</strong> đơn, ${dir} <strong>${fmt(Math.abs(totD))}</strong> so với ${shortD(n2)}.`);
+  let bestM=null,bestD=-Infinity,worstM=null,worstD=Infinity;
+  mocs.forEach(m=>{const d=ltkctVal(byMoc[m][n1]||{v:0,t:0},'vol')-ltkctVal(byMoc[m][n2]||{v:0,t:0},'vol');if(d>bestD){bestD=d;bestM=m;}if(d<worstD){worstD=d;worstM=m;}});
+  if(bestM&&bestD>0)parts.push(`Mốc tăng mạnh nhất: <strong>${bestM}</strong> (+${fmt(bestD)}).`);
+  if(worstM&&worstD<0)parts.push(`Mốc giảm nhiều nhất: <strong>${worstM}</strong> (${fmt(worstD)}).`);
+ }else{
+  const dir=totD>0?'tăng':'giảm';
+  const col=totD>0?'var(--red)':'var(--green)';
+  parts.push(`⏱️ <strong>Leadtime ${shortD(n1)}:</strong> TB <strong style="color:${col}">${totC.toFixed(2)}h</strong>, ${dir} <strong>${Math.abs(totD).toFixed(2)}h</strong> so với ${shortD(n2)}.`);
+  let worstM=null,worstD=-Infinity,bestM=null,bestD=Infinity;
+  mocs.forEach(m=>{const d=ltkctVal(byMoc[m][n1]||{v:0,t:0},'lt')-ltkctVal(byMoc[m][n2]||{v:0,t:0},'lt');if(d>worstD){worstD=d;worstM=m;}if(d<bestD){bestD=d;bestM=m;}});
+  if(worstM&&worstD>0.05)parts.push(`Mốc leadtime xấu nhất: <strong>${worstM}</strong> (+${worstD.toFixed(2)}h).`);
+  if(bestM&&bestD<-0.05)parts.push(`Mốc cải thiện tốt nhất: <strong>${bestM}</strong> (${bestD.toFixed(2)}h).`);
+ }
+ const bcNotes=[];
+ bcs.forEach(bc=>{
+  const c=ltkctVal((()=>{let v=0,t=0;mocs.forEach(m=>{v+=(byBC[bc][m][n1]?.v||0);t+=(byBC[bc][m][n1]?.t||0);});return{v,t};})(),mode);
+  const p=ltkctVal((()=>{let v=0,t=0;mocs.forEach(m=>{v+=(byBC[bc][m][n2]?.v||0);t+=(byBC[bc][m][n2]?.t||0);});return{v,t};})(),mode);
+  const d=c-p;
+  if(!c&&!p)return;
+  const short=bc.replace(/^Kho Chuyển Tiếp\s*/i,'');
+  if(isVol&&Math.abs(d)>=100)bcNotes.push(`<strong>${short}</strong>: ${d>0?'▲':'▼'} ${fmt(Math.abs(d))}`);
+  if(!isVol&&Math.abs(d)>=0.1)bcNotes.push(`<strong>${short}</strong>: ${d>0?'▲':'▼'} ${Math.abs(d).toFixed(2)}h`);
+ });
+ if(bcNotes.length)parts.push(`Theo kho: ${bcNotes.join(' · ')}.`);
+ return`<div class="analysis-box" style="margin:10px 16px 4px;font-size:12.5px;line-height:1.7">${parts.join(' ')}</div>`;
+}
+function ltkctGatherAICtx(){
+ const data=ltkctFiltered();
+ const dates=[...new Set(data.map(r=>r.date))].sort();
+ const n1=dates[dates.length-1]||'',n2=dates[dates.length-2]||'';
+ const {mocs,bcs,byBC,byMoc,tot}=ltkctMocAgg(data,dates);
+ const bcF=document.getElementById('ltkct_bc')?.value||'';
+ let s=`## LEADTIME KCT — Dữ liệu phân tích\nCông thức Leadtime = Total_LT / Volume\nKhoảng ngày: ${dates.length?shortD(dates[0])+' → '+shortD(dates[dates.length-1]):'—'}\nBộ lọc kho: ${bcF||'Tất cả'}\nMốc giờ: ${[...window._LTKCT.selMoc].join(', ')}\n\n`;
+ if(n1){
+  const lt=tot[n1]?.v?tot[n1].t/tot[n1].v:0;
+  s+=`### Tổng hợp ngày ${shortD(n1)}\n- Volume: ${fmt(tot[n1]?.v||0)}\n- Leadtime TB: ${lt.toFixed(2)}h\n`;
+  if(n2){const lt2=tot[n2]?.v?tot[n2].t/tot[n2].v:0;s+=`- So với ${shortD(n2)}: ΔVol ${(tot[n1].v-tot[n2].v>=0?'+':'')}${fmt(tot[n1].v-tot[n2].v)}, ΔLT ${(lt-lt2>=0?'+':'')}${(lt-lt2).toFixed(2)}h\n`;}
+  s+=`\n### Theo mốc giờ (ngày ${shortD(n1)})\n`;
+  mocs.forEach(m=>{const v=byMoc[m][n1]?.v||0,lt=v?byMoc[m][n1].t/v:0;const pv=byMoc[m][n2]?.v||0,plt=pv?byMoc[m][n2].t/pv:0;s+=`- ${m}: Vol=${fmt(v)}, LT=${lt.toFixed(2)}h${n2?`, ΔVol=${fmt(v-pv)}, ΔLT=${(lt-plt).toFixed(2)}h`:''}\n`;});
+  s+=`\n### Theo kho chuyển tiếp\n`;
+  bcs.forEach(bc=>{
+   let v=0,t=0,pv=0,pt=0;
+   mocs.forEach(m=>{v+=byBC[bc][m][n1]?.v||0;t+=byBC[bc][m][n1]?.t||0;pv+=byBC[bc][m][n2]?.v||0;pt+=byBC[bc][m][n2]?.t||0;});
+   const lt=v?t/v:0,plt=pv?pt/pv:0;
+   s+=`\n**${bc}** — Vol=${fmt(v)}, LT=${lt.toFixed(2)}h${n2?`, ΔVol=${fmt(v-pv)}, ΔLT=${(lt-plt).toFixed(2)}h`:''}\n`;
+   mocs.forEach(m=>{const o=byBC[bc][m][n1]||{v:0,t:0},po=byBC[bc][m][n2]||{v:0,t:0};const l=o.v?o.t/o.v:0,pl=po.v?po.t/po.v:0;if(o.v||po.v)s+=`  · ${m}: Vol=${fmt(o.v)}, LT=${l.toFixed(2)}h${n2?`, ΔLT=${(l-pl).toFixed(2)}h`:''}\n`;});
+  });
+  s+=`\n### Xu hướng 7 ngày (Leadtime TB theo ngày)\n`;
+  dates.slice(-7).forEach(d=>{const o=tot[d]||{v:0,t:0};s+=`- ${shortD(d)}: Vol=${fmt(o.v)}, LT=${o.v?(o.t/o.v).toFixed(2):'—'}h\n`;});
+ }
+ return s;
+}
+const LTKCT_AI_PROMPT=`Với vai trò là chuyên gia phân tích Network Logistics vùng TNT, hãy phân tích dữ liệu Leadtime KCT (Kho Chuyển Tiếp) và trình bày theo cấu trúc:
+
+**I. Tổng quan mạng KCT**
+- Đánh giá volume & leadtime ngày mới nhất, so sánh N-1 vs N-2
+- Nhận định sức khỏe tổng thể mạng chuyển tiếp TNT
+
+**II. Phân tích theo Mốc giờ**
+- Mốc nào chiếm volume lớn nhất? Leadtime tốt/xấu ở mốc nào?
+- Mốc nào biến động mạnh nhất (tăng/giảm volume hoặc leadtime)?
+
+**III. Phân tích theo Kho chuyển tiếp**
+- So sánh 3 kho: kho nào leadtime tốt nhất/xấu nhất?
+- Kho nào cần ưu tiên can thiệp? Nguyên nhân có thể?
+
+**IV. Rủi ro & Cảnh báo**
+- Điểm nóng: mốc giờ + kho kết hợp xấu nhất
+- Xu hướng xấu đi trong 7 ngày gần nhất
+
+**V. Kiến nghị hành động**
+- 3-5 hành động cụ thể cho AM/Quản lý mạng KCT trong 48h tới
+- Ưu tiên theo impact (volume × leadtime)
+
+Trình bày tiếng Việt, lồng số liệu vào câu văn, không bịa số liệu ngoài dữ liệu cung cấp.`;
+async function runLTKCTAI(){
+ const key=localStorage.getItem('claudeApiKey')||'';
+ const status=document.getElementById('ltkctAiStatus');
+ const result=document.getElementById('ltkct_aiResult');
+ const btn=document.getElementById('ltkctAiBtn');
+ if(!key){if(status)status.textContent='⚠️ Chưa nhập Claude API Key (tab AI)';return;}
+ if(!window._LTKCT?.rows?.length){if(status)status.textContent='⚠️ Chưa có dữ liệu Leadtime KCT';return;}
+ btn.disabled=true;btn.innerHTML='<span>⏳</span><span>Đang phân tích...</span>';
+ if(status)status.textContent='';
+ result.innerHTML='<div class="ai-thinking"><div class="ai-thinking-dot"></div><div class="ai-thinking-dot"></div><div class="ai-thinking-dot"></div><span style="margin-left:8px">AI đang phân tích Network Logistics KCT...</span></div>';
+ const ctx=ltkctGatherAICtx();
+ const system=`Bạn là CHUYÊN GIA PHÂN TÍCH NETWORK LOGISTICS Vùng TNT (GHN), chuyên về vận hành Kho Chuyển Tiếp (KCT), leadtime xử lý theo mốc giờ và tối ưu mạng chuyển tiếp. CHỈ phân tích dựa trên dữ liệu được cung cấp. Trả lời tiếng Việt, chuyên nghiệp, có số liệu cụ thể.`;
+ try{
+  const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:4096,system,messages:[{role:'user',content:`${LTKCT_AI_PROMPT}\n\nDỮ LIỆU:\n${ctx}`}]})});
+  if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||`HTTP ${res.status}`);}
+  const data=await res.json();
+  const text=(data.content&&data.content[0]&&data.content[0].text)||'(Không có phản hồi)';
+  result.innerHTML=`<div class="ai-result">${md2html(text)}</div>`;
+  if(status)status.textContent='✅ Hoàn tất';
+ }catch(e){
+  result.innerHTML=`<div style="color:#f87171;padding:12px;background:rgba(248,113,113,0.08);border-radius:8px">❌ ${e.message}</div>`;
+  if(status)status.textContent='';
+ }
+ btn.disabled=false;btn.innerHTML='<span>✨</span><span>Phân tích Leadtime KCT</span>';
 }
 function ltkctDrawChart(canvasId,labels,datasets){
  const ctx=document.getElementById(canvasId);if(!ctx||!window.Chart)return;
  if(window._LTKCT.charts[canvasId])window._LTKCT.charts[canvasId].destroy();
  window._LTKCT.charts[canvasId]=new Chart(ctx,{type:'line',data:{labels,datasets},options:{
   responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
-  plugins:{legend:{position:'bottom',labels:{usePointStyle:true,boxWidth:8,font:{size:11}}},
-   tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.y==null?'—':c.parsed.y.toFixed(2)+'h'}`}}},
+  layout:{padding:{top:18}},
+  plugins:{
+   legend:{position:'bottom',labels:{usePointStyle:true,boxWidth:8,font:{size:11}}},
+   tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.y==null?'—':c.parsed.y.toFixed(2)+'h'}`}}
+  },
   scales:{y:{beginAtZero:true,ticks:{font:{size:10},callback:v=>v+'h'},grid:{color:'#F0F0F0'}},x:{ticks:{font:{size:10}},grid:{display:false}}}
- }});
+ },plugins:[{
+  id:'ltkctLabels',
+  afterDatasetsDraw(chart){
+   const c=chart.ctx;
+   chart.data.datasets.forEach((ds,di)=>{
+    const meta=chart.getDatasetMeta(di);
+    if(meta.hidden)return;
+    meta.data.forEach((pt,idx)=>{
+     const v=ds.data[idx];
+     if(v==null||v===undefined)return;
+     c.save();
+     c.font='bold 10px Inter,sans-serif';
+     c.fillStyle=ds.borderColor;
+     c.textAlign='center';
+     c.textBaseline='bottom';
+     c.fillText(v.toFixed(2)+'h',pt.x,pt.y-6);
+     c.restore();
+    });
+   });
+  }
+ }]});
 }
 
 /* ===== AGING > 5 NGÀY (p7) — Backupall + Baton ===== */
