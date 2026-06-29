@@ -344,6 +344,7 @@ tr.tot td{background:#F4F8FF;font-weight:700;border-top:2px solid var(--orange-m
  <div class="page" id="p10"><div class="loading"><div class="spinner"></div><div class="loading-text">Đang tải dữ liệu...</div></div></div>
  <div class="page" id="p11"><div class="loading"><div class="spinner"></div><div class="loading-text">Đang tải dữ liệu...</div></div></div>
  <div class="page" id="p12"></div>
+ <div class="page" id="p13"></div>
 </main>
 
 <script>
@@ -357,6 +358,7 @@ const NAV_GROUPS=[
  {id:'g_ag',icon:'⏳',label:'Aging',page:'p7',cap:'Aging Daily'},
  {id:'g_rl',icon:'📉',label:'Rớt LC',page:'p9',cap:'Rớt LC Daily'},
  {id:'g_hr',icon:'👥',label:'Nhân sự',items:[['p10','📋','Định biên'],['p11','📈','Năng suất']]},
+ {id:'g_cs',icon:'🚧',label:'Coming soon',page:'p13',cap:'Sắp ra mắt'},
  {id:'g_ai',icon:'✨',label:'AI',page:'p12',cap:'AI Analysis',cls:'ai'}
 ];
 const PAGE2GRP={};NAV_GROUPS.forEach(g=>{if(g.page)PAGE2GRP[g.page]=g.id;(g.items||[]).forEach(it=>PAGE2GRP[it[0]]=g.id);});
@@ -427,10 +429,9 @@ function bcMatchUnstable(bc){
 }
 function buildBc2AmMap(){
  const m={};
- const ok=v=>{const s=(v==null?'':String(v)).trim();return s&&s.toLowerCase()!=='null'&&s.toLowerCase()!=='undefined'?s:'';};
- (window._HRON?.rows||[]).forEach(r=>{const am=ok(r.am);if(r.bc&&am)m[r.bc]=am;});
+ (window._HRON?.rows||[]).forEach(r=>{if(r.bc&&r.am)m[r.bc]=r.am;});
  const gbc=window._D?.gtcTotalBC;
- if(gbc)gbc.slice(1).forEach(r=>{const bc=(r[1]||'').trim(),am=ok(r[0]);if(bc&&am)m[bc]=am;});
+ if(gbc)gbc.slice(1).forEach(r=>{const bc=(r[1]||'').trim(),am=(r[0]||'').trim();if(bc&&am)m[bc]=am;});
  return m;
 }
 function nsMetricDelta(cur,prev,unit,isMoney){
@@ -1607,22 +1608,13 @@ function buildOverviewPage(R,rotData){
 /* ===== NHÂN SỰ — ĐỊNH BIÊN (p10) Data_HRON ===== */
 // cols: Ngày thống kê(0), AM(1), Tỉnh(2), Bưu cục(3), Số lượng nhân sự(4)
 window._HRON={rows:[],charts:{}};
-function cleanAmName(v){const s=(v==null?'':String(v)).trim();return(!s||s.toLowerCase()==='null'||s.toLowerCase()==='undefined')?'':s;}
-function normHdr(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();}
-// Tìm cột "AM Chuẩn" theo tên header (vị trí cột có thể thay đổi); mặc định cột AM (index 1)
-function hronAmCol(header){const H=(header||[]).map(normHdr);const i=H.indexOf('am chuan');return i>=0?i:1;}
 function normalizeHRONRows(raw){
  let lastDate='';
- const bc2am=buildBc2AmMap(); // chỉ dùng để điền khi cột AM Chuẩn thiếu dữ liệu
- const amCol=hronAmCol(raw&&raw[0]);
  return(raw||[]).slice(1).map(r=>{
   let d=parseSheetDate(r[0]);
   if(d)lastDate=d; else d=lastDate; // tự điền ngày cho dòng trống / ô gộp (merged cells)
-  const bc=(r[3]||'').trim();
-  // Lấy AM theo cột "AM Chuẩn"; thiếu thì dùng cột AM gốc rồi tới AM theo BC; bỏ giá trị rỗng/"null"
-  const am=cleanAmName(r[amCol])||cleanAmName(r[1])||cleanAmName(bc2am[bc]);
   return{
-   date:d,am,tinh:(r[2]||'').trim(),bc,
+   date:d,am:(r[1]||'').trim(),tinh:(r[2]||'').trim(),bc:(r[3]||'').trim(),
    count:Math.round(parseFloat(String(r[4]||'').replace(/\./g,'').replace(',','.'))||0)
   };
  }).filter(r=>r.date&&r.count>=0);
@@ -1961,6 +1953,29 @@ function ovHRMetrics(){
   lines.push(`Năng suất (Data_Năng_Suất) N-1 ${shortD(n1)}: NS Gán Giao TB ${m1.nsGan.toFixed(1)} đơn/ngày${m2?`, ${m1.nsGan>=m2.nsGan?'▲':'▼'} ${Math.abs(m1.nsGan-m2.nsGan).toFixed(1)} vs hôm trước`:''}; Thu nhập TB ${Math.round(m1.thuNhap).toLocaleString('vi-VN')}đ/ngày; ${m1.nvCount} NV phát sinh lương`);
  }
  return lines;
+}
+
+/* ===== COMING SOON (p13) ===== */
+function buildComingSoonPage(){
+ const el=document.getElementById('p13');if(!el)return;
+ const items=[
+  {ic:'⏱️',c:'#2563EB',bg:'#EFF4FE',title:'Leadtime KTC',desc:'Theo dõi lead time khách trả chuyển khoản (KTC) theo AM/bưu cục, so sánh chuẩn vs thực tế và cảnh báo đơn chậm xử lý.'},
+  {ic:'📦',c:'#0EA5E9',bg:'#E8F4FA',title:'FC đơn hàng',desc:'Dự báo khối lượng đơn hàng (forecast) theo ngày/tuần, hỗ trợ lập kế hoạch nhân sự và luân chuyển trước cao điểm.'},
+  {ic:'📣',c:'#7C3AED',bg:'#F3E8FF',title:'Báo cáo Event',desc:'Tổng hợp tác động sự kiện vận hành (sale, lễ, thời tiết…) lên sản lượng, GTC, FD và các chỉ số then chốt vùng TNT.'},
+  {ic:'🔄',c:'#16A34A',bg:'#DCFCE7',title:'Luân chuyển Realtime',desc:'Giám sát tồn luân chuyển theo thời gian thực, phân tích theo loại LC × khách hàng × mốc thời gian tồn đọng.'}
+ ];
+ el.innerHTML=`<div class="page-header"><div class="page-title">🚧 Coming soon — Triển khai trong tương lai</div><div class="page-meta"><span class="tag tag-orange">Các phân hệ đang phát triển · sẽ cập nhật khi có nguồn dữ liệu</span></div></div>
+ <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px">
+ ${items.map(it=>`<div class="card" style="margin-bottom:0;position:relative;overflow:hidden">
+   <div style="position:absolute;top:12px;right:12px;font-size:9.5px;font-weight:800;letter-spacing:.5px;color:#94A3B8;background:#F1F5F9;border:1px solid var(--border);border-radius:6px;padding:3px 9px">SẮP RA MẮT</div>
+   <div style="padding:22px 20px 24px">
+    <div style="width:52px;height:52px;border-radius:14px;background:${it.bg};display:flex;align-items:center;justify-content:center;font-size:26px;margin-bottom:14px">${it.ic}</div>
+    <div style="font-size:16px;font-weight:800;color:${it.c};margin-bottom:8px">${it.title}</div>
+    <div style="font-size:12.5px;line-height:1.65;color:var(--text-sub)">${it.desc}</div>
+    <div style="margin-top:16px;height:8px;border-radius:5px;background:#F1F5F9;overflow:hidden"><div style="height:100%;width:22%;background:linear-gradient(90deg,${it.c},${it.c}88);border-radius:5px"></div></div>
+    <div style="font-size:10.5px;color:#94A3B8;margin-top:6px">Đang chuẩn bị dữ liệu…</div>
+   </div></div>`).join('')}
+ </div>`;
 }
 
 /* ===== AI PAGE ===== */
@@ -2899,6 +2914,8 @@ async function init(){
  const p11Active=document.getElementById('p11')?.classList.contains('active');
  if(p10Active){window._hronLoaded=true;buildHRONPage();}
  if(p11Active){window._nsLoaded=true;buildNSPage();}
+ // p13 — Coming soon
+ buildComingSoonPage();
  // p12 — AI
  buildAIPage();
  btn.classList.remove('spinning');btn.disabled=false;
