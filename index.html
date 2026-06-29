@@ -1608,15 +1608,19 @@ function buildOverviewPage(R,rotData){
 // cols: Ngày thống kê(0), AM(1), Tỉnh(2), Bưu cục(3), Số lượng nhân sự(4)
 window._HRON={rows:[],charts:{}};
 function cleanAmName(v){const s=(v==null?'':String(v)).trim();return(!s||s.toLowerCase()==='null'||s.toLowerCase()==='undefined')?'':s;}
+function normHdr(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();}
+// Tìm cột "AM Chuẩn" theo tên header (vị trí cột có thể thay đổi); mặc định cột AM (index 1)
+function hronAmCol(header){const H=(header||[]).map(normHdr);const i=H.indexOf('am chuan');return i>=0?i:1;}
 function normalizeHRONRows(raw){
  let lastDate='';
- const bc2am=buildBc2AmMap(); // chỉ dùng để điền khi HRON thiếu AM
+ const bc2am=buildBc2AmMap(); // chỉ dùng để điền khi cột AM Chuẩn thiếu dữ liệu
+ const amCol=hronAmCol(raw&&raw[0]);
  return(raw||[]).slice(1).map(r=>{
   let d=parseSheetDate(r[0]);
   if(d)lastDate=d; else d=lastDate; // tự điền ngày cho dòng trống / ô gộp (merged cells)
   const bc=(r[3]||'').trim();
-  // Ưu tiên cột AM chuẩn của HRON (vd "KTC Vĩnh Phúc"); thiếu mới lấy AM theo BC; bỏ giá trị rỗng/"null"
-  const am=cleanAmName(r[1])||cleanAmName(bc2am[bc]);
+  // Lấy AM theo cột "AM Chuẩn"; thiếu thì dùng cột AM gốc rồi tới AM theo BC; bỏ giá trị rỗng/"null"
+  const am=cleanAmName(r[amCol])||cleanAmName(r[1])||cleanAmName(bc2am[bc]);
   return{
    date:d,am,tinh:(r[2]||'').trim(),bc,
    count:Math.round(parseFloat(String(r[4]||'').replace(/\./g,'').replace(',','.'))||0)
