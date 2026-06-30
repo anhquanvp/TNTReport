@@ -504,6 +504,10 @@ function monoCopyBox(title,headers,rows,note){
  const id='mono_'+(_monoId++);
  return`<div class="mono-copy-wrap"><div class="mono-copy-head"><span>📋 ${title}</span><button type="button" class="mono-copy-btn" onclick="copyMonoText('${id}')">copy</button></div><div class="mono-copy-body">${buildCopyTableHTML(id,headers,rows)}</div>${note?`<div class="mono-copy-note">${note}</div>`:''}</div>`;
 }
+function monoCopyPre(title,text,note){
+ const id='mono_'+(_monoId++);
+ return`<div class="mono-copy-wrap"><div class="mono-copy-head"><span>📋 ${title}</span><button type="button" class="mono-copy-btn" onclick="copyMonoText('${id}')">copy</button></div><div class="mono-copy-body"><pre id="${id}" class="mono-copy-pre">${escHtml(text)}</pre></div>${note?`<div class="mono-copy-note">${note}</div>`:''}</div>`;
+}
 function copyMonoText(id){
  const el=document.getElementById(id);if(!el)return;
  navigator.clipboard.writeText(el.value!==undefined?el.value:el.textContent).then(()=>{const s=document.getElementById('aiStatus');if(s){s.textContent='✅ Đã copy bảng!';setTimeout(()=>s.textContent='',2000);}});
@@ -1610,31 +1614,15 @@ function ltkctGroupLabel(lt){if(!lt||!isFinite(lt))return'—';if(lt<=2)return'�
 function ovLTKCTAnalysis(){
  const G=window._LTKCT;
  if(!G?.rows?.length)return'';
- const allDates=[...new Set(G.rows.map(r=>r.date))].sort();
- const d7=allDates.slice(-7);
- const n1=d7[d7.length-1]||'',n7=d7[0]||'';
- const prevSel=G.selMoc;G.selMoc=new Set(LTKCT_MOC);
- const data7=G.rows.filter(r=>d7.includes(r.date));
- const {mocs,bcs,byBC,tot}=ltkctMocAgg(data7,d7);
- G.selMoc=prevSel;
- const wh=bcs.map(bc=>{
-  let v1=0,t1=0,v7=0,t7=0;
-  mocs.forEach(m=>{
-   v1+=byBC[bc][m][n1]?.v||0;t1+=byBC[bc][m][n1]?.t||0;
-   v7+=byBC[bc][m][n7]?.v||0;t7+=byBC[bc][m][n7]?.t||0;
-  });
-  const lt1=v1?t1/v1:0,lt7=v7?t7/v7:0;
-  return{bc,short:bc.replace(/^Kho Chuyển Tiếp\s*/i,''),v1,v7,lt1,lt7,dVol:v1-v7,dLt:lt1-lt7};
- }).sort((a,b)=>a.lt1-b.lt1);
+ const s=ltkctOvSummary();
+ if(!s)return'';
+ const ltk=ovLtkCopyDataN1N2();
+ if(!ltk)return'';
  const dVolStr=(d,cur,prev)=>{if(!cur&&!prev)return'—';if(d===0)return'—';return`${d>0?'▲':'▼'} ${fmt(Math.abs(d))} (${fmt(prev)}→${fmt(cur)})`;};
- const dLtStr=(d,cur,prev)=>{if(!cur&&!prev)return'—';if(d===0)return'—';return`${d>0?'▲':'▼'} ${Math.abs(d).toFixed(2)}h (${prev.toFixed(2)}→${cur.toFixed(2)})`;};
- const headers=['#','Kho','Vol N-1','Δ Vol N-1↔N-7','LT N-1','Δ LT N-1↔N-7','Nhóm'];
- const rows=wh.map((r,i)=>[String(i+1),r.short,fmt(r.v1),dVolStr(r.dVol,r.v1,r.v7),r.lt1>0?r.lt1.toFixed(2)+'h':'—',dLtStr(r.dLt,r.lt1,r.lt7),ltkctGroupLabel(r.lt1)]);
- const tv1=tot[n1]?.v||0,tt1=tot[n1]?.t||0,tv7=tot[n7]?.v||0,tt7=tot[n7]?.t||0;
- const lt1=tv1?tt1/tv1:0,lt7=tv7?tt7/tv7:0;
- let h=`<div class="card" style="margin-top:18px"><div class="card-header"><div class="card-title"><div class="card-icon" style="background:#7C3AED">⏲️</div>Leadtime KCT — Volume &amp; Leadtime 3 Kho</div><div class="card-info">Ngày ${shortD(n1)} · LT = Total_LT/Volume · so với ${shortD(n7)}</div></div>`;
- h+=monoCopyBox('LEADTIME KCT — TỔNG HỢP',headers,rows,'Sắp xếp kho theo leadtime thấp → cao · Chi tiết: tab Leadtime');
- h+=`<div class="analysis-box" style="margin:0 18px 14px">📦 <strong>Tổng mạng KCT ngày ${shortD(n1)}:</strong> Volume <strong>${fmt(tv1)}</strong> · Leadtime TB <strong>${lt1.toFixed(2)}h</strong> (${ltkctGroupLabel(lt1)}) · ΔVol ${dVolStr(tv1-tv7,tv1,tv7)} · ΔLT ${dLtStr(lt1-lt7,lt1,lt7)}</div>`;
+ const dLtStr=(d,cur,prev)=>{if(!cur&&!prev)return'—';if(Math.abs(d)<0.01)return'—';return`${d>0?'▲':'▼'} ${Math.abs(d).toFixed(2)}h (${prev.toFixed(2)}→${cur.toFixed(2)})`;};
+ let h=`<div class="card" style="margin-top:18px"><div class="card-header"><div class="card-title"><div class="card-icon" style="background:#7C3AED">⏲️</div>Leadtime KCT — Chi tiết 3 Kho</div><div class="card-info">N-1: ${shortD(s.n1)} vs N-2: ${shortD(s.n2)} · LT = Total_LT/Volume</div></div>`;
+ h+=monoCopyBox('LEADTIME KCT — COPY BÁO CÁO',ltk.headers,ltk.rows,'Càng cao càng tệ · Chi tiết: tab Leadtime KCT');
+ h+=`<div class="analysis-box" style="margin:0 18px 14px">📦 <strong>Tổng mạng KCT N-1 (${shortD(s.n1)}):</strong> Volume <strong>${fmt(s.total.vol)}</strong> · Leadtime TB <strong>${s.total.lt.toFixed(2)}h</strong> (${ltkctGroupLabel(s.total.lt)}) · ΔVol ${dVolStr(s.total.dVol,s.total.vol,s.total.vol-s.total.dVol)} · ΔLT ${dLtStr(s.total.dLt,s.total.lt,s.total.lt-s.total.dLt)}</div>`;
  h+=`</div>`;
  return h;
 }
@@ -1885,9 +1873,312 @@ function ovAmOnt(sheet){
  });
  return m;
 }
+function ovDeltaBadge(n1,n2,higherBetter,suffix='%',dec=1){
+ if(n1==null||n2==null||!isFinite(n1)||!isFinite(n2))return{txt:'—',col:'var(--text-sub)',worse:false};
+ const d=n1-n2;
+ if(Math.abs(d)<(suffix==='%'?0.05:0.5))return{txt:'—',col:'var(--text-sub)',worse:false};
+ const worse=higherBetter?d<0:d>0;
+ return{txt:`${d>0?'▲':'▼'} ${Math.abs(d).toFixed(dec)}${suffix}`,col:worse?'var(--red)':'var(--green)',worse,d};
+}
+function ovBuildBcMaps(gBC){
+ const bc2tinh={},bc2am={};
+ (gBC||[]).slice(1).forEach(r=>{
+  const bc=(r[1]||'').trim(),am=(r[0]||'').trim(),t=(r[7]||'').trim();
+  if(bc){if(t)bc2tinh[bc]=t;if(am)bc2am[bc]=am;}
+ });
+ return{bc2tinh,bc2am};
+}
+function ovTinhMetricsForDate(gBC,odrBC,oprBC,fdBC,rotData,agRows,bc2tinh,dt){
+ const m={};
+ TNT_TINH.forEach(t=>m[t]={gan:null,gtc:null,odr:null,opr:null,fd:null,aging:0,rot:0,vol:0,ganW:0,ngtc:0});
+ (gBC||[]).slice(1).forEach(r=>{
+  if(isoD(r[2])!==dt)return;
+  const t=(r[7]||'').trim();if(!m[t])return;
+  const v=Math.round(parseFloat(r[3])||0),n=Math.round(parseFloat(r[6])||0),g=(parseFloat(r[4])||0)*100;
+  m[t].vol+=v;m[t].ganW+=v*g;m[t].ngtc+=n;
+ });
+ TNT_TINH.forEach(t=>{const a=m[t];if(a.vol>0){a.gan=a.ganW/a.vol;a.gtc=a.ngtc/a.vol*100;}delete a.ganW;delete a.ngtc;});
+ const odrM={},oprM={};
+ TNT_TINH.forEach(t=>{odrM[t]={v:0,ok:0};oprM[t]={v:0,ok:0};});
+ (odrBC||[]).slice(1).forEach(r=>{
+  if(isoD(r[2])!==dt)return;
+  const t=bc2tinh[(r[1]||'').trim()];if(!t||!odrM[t])return;
+  odrM[t].v+=Math.round(parseFloat(r[3])||0);odrM[t].ok+=Math.round(parseFloat(r[5])||0);
+ });
+ (oprBC||[]).slice(1).forEach(r=>{
+  if(isoD(r[2])!==dt)return;
+  const t=bc2tinh[(r[1]||'').trim()];if(!t||!oprM[t])return;
+  oprM[t].v+=Math.round(parseFloat(r[3])||0);oprM[t].ok+=Math.round(parseFloat(r[5])||0);
+ });
+ const fdM={};TNT_TINH.forEach(t=>fdM[t]={tra:0,vol:0});
+ (fdBC||[]).slice(1).forEach(r=>{
+  if(isoD(r[1])!==dt)return;
+  const t=bc2tinh[(r[0]||'').trim()];if(!t||!fdM[t])return;
+  fdM[t].tra+=ovPf(r[4]);fdM[t].vol+=ovPf(r[2]);
+ });
+ TNT_TINH.forEach(t=>{
+  if(odrM[t].v>0)m[t].odr=odrM[t].ok/odrM[t].v*100;
+  if(oprM[t].v>0)m[t].opr=oprM[t].ok/oprM[t].v*100;
+  if(fdM[t].vol>0)m[t].fd=fdM[t].tra/fdM[t].vol*100;
+ });
+ (agRows||[]).filter(r=>r.date===dt).forEach(r=>{const t=bc2tinh[r.bc];if(t&&m[t])m[t].aging++;});
+ (rotData||[]).filter(r=>r.date===dt).forEach(r=>{if(r.tinh&&m[r.tinh])m[r.tinh].rot++;});
+ return m;
+}
+function ovNsByTinh(n1,n2,bc2tinh){
+ const init=()=>{const o={};TNT_TINH.forEach(t=>o[t]={gan:0,gtc:0,giaoTB:0,ngay:0,luong:0});return o;};
+ const m1=init(),m2=init();
+ (window._NS?.rows||[]).forEach(r=>{
+  const t=bc2tinh[r.bc];if(!t)return;
+  const b=r.date===n1?m1:r.date===n2?m2:null;if(!b||!b[t])return;
+  b[t].gan+=r.ganGiao;b[t].gtc+=r.gtc;b[t].giaoTB+=r.giaoTB;b[t].ngay+=r.ngayLam;b[t].luong+=r.luong;
+ });
+ const out={};
+ TNT_TINH.forEach(t=>{
+  const a=m1[t],b=m2[t];
+  const mk=x=>x.ngay>0?{nsG:x.gan/x.ngay,nsGtc:x.gtc/x.ngay,gtcTB:x.giaoTB/x.ngay,thu:x.luong/x.ngay}:{nsG:null,nsGtc:null,gtcTB:null,thu:null};
+  out[t]={n1:mk(a),n2:mk(b)};
+ });
+ return out;
+}
+function ovFmtOV(v,sfx,dec){
+ if(v==null||!isFinite(v))return'—';
+ if(sfx==='%')return v.toFixed(dec)+'%';
+ if(sfx==='h')return v.toFixed(dec)+'h';
+ if(sfx==='đ')return Math.round(v).toLocaleString('vi-VN')+'đ';
+ if(sfx==='n')return fmt(v);
+ return v.toFixed(dec);
+}
+function ovDeltaStr(n1,n2,hb,sfx,dec){
+ return ovDeltaBadge(n1,n2,hb,sfx,dec).txt;
+}
+function ovRegionCopyData(gBC,odrBC,oprBC,fdBC,rotData,agRows,n1,n2){
+ const{bc2tinh}=ovBuildBcMaps(gBC);
+ const m1=ovTinhMetricsForDate(gBC,odrBC,oprBC,fdBC,rotData,agRows,bc2tinh,n1);
+ const m2=ovTinhMetricsForDate(gBC,odrBC,oprBC,fdBC,rotData,agRows,bc2tinh,n2);
+ const ns=ovNsByTinh(n1,n2,bc2tinh);
+ const cols=[
+  {k:'gan',lb:'%Gán',hb:true,sfx:'%',dec:1,get:a=>a.gan},
+  {k:'gtc',lb:'%GTC',hb:true,sfx:'%',dec:1,get:a=>a.gtc},
+  {k:'odr',lb:'ODR',hb:true,sfx:'%',dec:1,get:a=>a.odr},
+  {k:'opr',lb:'OPR',hb:true,sfx:'%',dec:1,get:a=>a.opr},
+  {k:'fd',lb:'%FD',hb:false,sfx:'%',dec:2,get:a=>a.fd},
+  {k:'aging',lb:'Aging',hb:false,sfx:'n',dec:0,get:a=>a.aging},
+  {k:'rot',lb:'Rớt LC',hb:false,sfx:'n',dec:0,get:a=>a.rot},
+  {k:'nsG',lb:'NS Gán',hb:true,sfx:'',dec:1,get:(a,t)=>ns[t]?.n1?.nsG},
+  {k:'nsGtc',lb:'NS GTC',hb:true,sfx:'',dec:1,get:(a,t)=>ns[t]?.n1?.nsGtc},
+  {k:'thu',lb:'Thu nhập TB',hb:true,sfx:'đ',dec:0,get:(a,t)=>ns[t]?.n1?.thu}
+ ];
+ const headers=['Tỉnh',...cols.flatMap(c=>[`${c.lb} N-1`,`${c.lb} Δ`])];
+ const rows=TNT_TINH.map(tinh=>{
+  const a=m1[tinh]||{},b=m2[tinh]||{};
+  const row=[tinh];
+  cols.forEach(c=>{
+   const v1=c.k==='nsG'||c.k==='nsGtc'||c.k==='thu'?c.get(a,tinh):c.get(a);
+   const v2=c.k==='nsG'||c.k==='nsGtc'||c.k==='thu'?c.get(b,tinh):c.get(b);
+   if(c.k==='nsG'||c.k==='nsGtc'||c.k==='thu'){
+    const vn1=ns[tinh]?.n1?.[c.k==='nsG'?'nsG':c.k==='nsGtc'?'nsGtc':'thu'];
+    const vn2=ns[tinh]?.n2?.[c.k==='nsG'?'nsG':c.k==='nsGtc'?'nsGtc':'thu'];
+    row.push(ovFmtOV(vn1,c.sfx,c.dec),ovDeltaStr(vn1,vn2,c.hb,c.sfx,c.dec));
+   }else{
+    row.push(ovFmtOV(v1,c.sfx,c.dec),ovDeltaStr(v1,v2,c.hb,c.sfx,c.dec));
+   }
+  });
+  return row;
+ });
+ return{headers,rows};
+}
+function ovLtkCopyDataN1N2(){
+ const s=ltkctOvSummary();if(!s||!s.n2)return null;
+ const headers=['#','Kho','Vol N-1','Vol N-2','Δ Vol','LT N-1','LT N-2','Δ LT','Nhóm'];
+ const rows=s.warehouses.map((w,i)=>{
+  const volN2=w.vol-w.dVol,ltN2=w.lt-w.dLt;
+  const dVolStr=w.dVol===0?'—':`${w.dVol>0?'▲':'▼'} ${fmt(Math.abs(w.dVol))}`;
+  const dLtStr=Math.abs(w.dLt)<0.01?'—':`${w.dLt>0?'▲':'▼'} ${Math.abs(w.dLt).toFixed(2)}h`;
+  return[String(i+1),w.short,fmt(w.vol),fmt(volN2),dVolStr,w.lt>0?w.lt.toFixed(2)+'h':'—',ltN2>0?ltN2.toFixed(2)+'h':'—',dLtStr,ltkctGroupLabel(w.lt)];
+ });
+ const tot=s.total;
+ rows.push(['','TỔNG',fmt(tot.vol),fmt(tot.vol-tot.dVol),tot.dVol===0?'—':`${tot.dVol>0?'▲':'▼'} ${fmt(Math.abs(tot.dVol))}`,tot.lt>0?tot.lt.toFixed(2)+'h':'—',(tot.lt-tot.dLt)>0?(tot.lt-tot.dLt).toFixed(2)+'h':'—',Math.abs(tot.dLt)<0.01?'—':`${tot.dLt>0?'▲':'▼'} ${Math.abs(tot.dLt).toFixed(2)}h`,ltkctGroupLabel(tot.lt)]);
+ return{headers,rows,n1:s.n1,n2:s.n2};
+}
+function ovRegionN1N2HTML(gBC,odrBC,oprBC,fdBC,rotData,agRows,n1,n2){
+ if(!n1||!n2)return'';
+ const reg=ovRegionCopyData(gBC,odrBC,oprBC,fdBC,rotData,agRows,n1,n2);
+ const ltk=ovLtkCopyDataN1N2();
+ let h=`<div class="card" style="margin-top:18px"><div class="card-header"><div class="card-title"><div class="card-icon">📊</div>Tổng hợp chỉ số N-1 vs N-2 — Vùng TNT</div><div class="card-info">N-1: ${shortD(n1)} · N-2: ${shortD(n2)} · Bấm <strong>copy</strong> để dán báo cáo</div></div>`;
+ h+=monoCopyBox('CHỈ SỐ VẬN HÀNH THEO VÙNG (6 TỈNH)',reg.headers,reg.rows,'Gồm GTC · Ontime · FD · Aging · Rớt LC · Năng suất');
+ if(ltk)h+=monoCopyBox('LEADTIME KCT — 3 KHO CHUYỂN TIẾP',ltk.headers,ltk.rows,`LT = Total_LT/Volume · N-1: ${shortD(ltk.n1)} vs N-2: ${shortD(ltk.n2)}`);
+ h+=`</div>`;
+ return h;
+}
+function ovCollectBCBadPoints(gBC,odrBC,oprBC,fdBC,rotData,agRows,n1,n2){
+ if(!n1||!n2)return[];
+ const{bc2tinh,bc2am}=ovBuildBcMaps(gBC);
+ const store={};
+ const get=(bc,am)=>{if(!store[bc])store[bc]={bc,am:am||bc2am[bc]||'—',n1:{},n2:{}};return store[bc];};
+ (gBC||[]).slice(1).forEach(r=>{
+  const bc=(r[1]||'').trim(),am=(r[0]||'').trim(),d=isoD(r[2]);
+  if(!bc||d!==n1&&d!==n2)return;
+  const row=get(bc,am),v=Math.round(parseFloat(r[3])||0),n=Math.round(parseFloat(r[6])||0),g=(parseFloat(r[4])||0)*100;
+  if(!v)return;
+  const slot=d===n1?'n1':'n2';
+  row[slot].gan=g;row[slot].gtc=n/v*100;
+ });
+ (odrBC||[]).slice(1).forEach(r=>{
+  const bc=(r[1]||'').trim(),am=(r[0]||'').trim(),d=isoD(r[2]);
+  if(!bc||d!==n1&&d!==n2)return;
+  const v=Math.round(parseFloat(r[3])||0);if(!v)return;
+  const row=get(bc,am),slot=d===n1?'n1':'n2';
+  row[slot].odr=(parseFloat(r[4])||0)*100;
+ });
+ (oprBC||[]).slice(1).forEach(r=>{
+  const bc=(r[1]||'').trim(),am=(r[0]||'').trim(),d=isoD(r[2]);
+  if(!bc||d!==n1&&d!==n2)return;
+  const v=Math.round(parseFloat(r[3])||0);if(!v)return;
+  const row=get(bc,am),slot=d===n1?'n1':'n2';
+  row[slot].opr=(parseFloat(r[4])||0)*100;
+ });
+ (fdBC||[]).slice(1).forEach(r=>{
+  const bc=(r[0]||'').trim(),d=isoD(r[1]);
+  if(!bc||d!==n1&&d!==n2)return;
+  const row=get(bc,''),slot=d===n1?'n1':'n2';
+  row[slot].fd=parsePct(r[3]);
+ });
+ const agBC={};
+ (agRows||[]).forEach(r=>{
+  if(r.date!==n1&&r.date!==n2)return;
+  if(!agBC[r.bc])agBC[r.bc]={n1:0,n2:0};
+  agBC[r.bc][r.date===n1?'n1':'n2']++;
+ });
+ Object.entries(agBC).forEach(([bc,c])=>{const row=get(bc,'');row.n1.aging=c.n1;row.n2.aging=c.n2;});
+ const rotBC={};
+ (rotData||[]).forEach(r=>{
+  if(r.date!==n1&&r.date!==n2)return;
+  const bc=r.bc||'';if(!bc)return;
+  if(!rotBC[bc])rotBC[bc]={n1:0,n2:0,am:r.am||''};
+  rotBC[bc][r.date===n1?'n1':'n2']++;
+  if(r.am)rotBC[bc].am=r.am;
+ });
+ Object.entries(rotBC).forEach(([bc,c])=>{const row=get(bc,c.am);row.n1.rot=c.n1;row.n2.rot=c.n2;});
+ const nsAgg={};
+ (window._NS?.rows||[]).forEach(r=>{
+  if(r.date!==n1&&r.date!==n2)return;
+  const bc=r.bc;if(!bc)return;
+  if(!nsAgg[bc])nsAgg[bc]={bc,am:r.am||bc2am[bc]||'—',n1:{gan:0,gtc:0,giaoTB:0,ngay:0,luong:0},n2:{gan:0,gtc:0,giaoTB:0,ngay:0,luong:0}};
+  const slot=r.date===n1?'n1':'n2',b=nsAgg[bc];
+  b[slot].gan+=r.ganGiao;b[slot].gtc+=r.gtc;b[slot].giaoTB+=r.giaoTB;b[slot].ngay+=r.ngayLam;b[slot].luong+=r.luong;
+  if(r.am)b.am=r.am;
+ });
+ Object.values(nsAgg).forEach(agg=>{
+  const row=get(agg.bc,agg.am);
+  ['n1','n2'].forEach(slot=>{
+   const b=agg[slot];
+   if(b.ngay>0){row[slot].nsG=b.gan/b.ngay;row[slot].nsGtc=b.gtc/b.ngay;row[slot].thu=b.luong/b.ngay;}
+  });
+ });
+ const defs=[
+  {k:'gan',label:'Gán giao giảm',ic:'🔗',hb:true,fmt:v=>v.toFixed(1)+'%'},
+  {k:'gtc',label:'%GTC giảm',ic:'🎯',hb:true,fmt:v=>v.toFixed(1)+'%'},
+  {k:'odr',label:'ODR TTS giảm',ic:'🛰️',hb:true,fmt:v=>v.toFixed(1)+'%'},
+  {k:'opr',label:'OPR TTS giảm',ic:'🚀',hb:true,fmt:v=>v.toFixed(1)+'%'},
+  {k:'fd',label:'FD tăng',ic:'↩️',hb:false,fmt:v=>v.toFixed(2)+'%'},
+  {k:'aging',label:'Aging >5N tăng',ic:'⏳',hb:false,fmt:v=>fmt(v)+' đơn'},
+  {k:'rot',label:'Rớt LC tăng',ic:'📉',hb:false,fmt:v=>fmt(v)+' đơn'},
+  {k:'nsG',label:'NS Gán Giao giảm',ic:'📦',hb:true,fmt:v=>v.toFixed(1)},
+  {k:'nsGtc',label:'NS GTC giảm',ic:'⚡',hb:true,fmt:v=>v.toFixed(1)},
+  {k:'thu',label:'Thu nhập TB giảm',ic:'💰',hb:true,fmt:v=>Math.round(v).toLocaleString('vi-VN')+'đ'}
+ ];
+ return defs.map(def=>{
+  const items=[];
+  Object.values(store).forEach(row=>{
+   const v1=row.n1[def.k],v2=row.n2[def.k];
+   if(v1==null||v2==null||!isFinite(v1)||!isFinite(v2))return;
+   const worse=def.hb?v1<v2-0.05:v1>v2+0.05;
+   if(!worse)return;
+   items.push({am:row.am,bc:row.bc,v1,v2,d:Math.abs(v1-v2)});
+  });
+  items.sort((a,b)=>b.d-a.d);
+  return{...def,items:items.slice(0,12)};
+ }).filter(s=>s.items.length);
+}
+function ovCollectLtkBadPoints(){
+ const s=ltkctOvSummary();
+ if(!s||!s.n2)return[];
+ const items=s.warehouses.filter(w=>w.dLt>0.05).map(w=>({am:'KCT',bc:w.short,v1:w.lt,v2:w.lt-w.dLt,d:w.dLt}));
+ if(!items.length)return[];
+ return[{k:'ltk',label:'Leadtime KCT tăng',ic:'⏲️',hb:false,fmt:v=>v.toFixed(2)+'h',items:items.sort((a,b)=>b.d-a.d)}];
+}
+function ovCollectAllBadPoints(gBC,odrBC,oprBC,fdBC,rotData,agRows,n1,n2){
+ return[...ovCollectBCBadPoints(gBC,odrBC,oprBC,fdBC,rotData,agRows,n1,n2),...ovCollectLtkBadPoints()];
+}
+function ovBadPointsCopyRows(sections){
+ const headers=['Chỉ số','Bưu Cục / Kho','AM','N-1','N-2'];
+ const rows=[];
+ sections.forEach(s=>{s.items.forEach(it=>{rows.push([s.label,it.bc,it.am,s.fmt(it.v1),s.fmt(it.v2)]);});});
+ return{headers,rows};
+}
+function ovFullReportCopyText(gBC,odrBC,oprBC,fdBC,rotData,agRows,n1,n2,badSections){
+ const parts=[`=== BÁO CÁO TỔNG HỢP VẬN HÀNH VÙNG TNT ===`,`N-1: ${shortD(n1)} | N-2: ${shortD(n2)}`,''];
+ const reg=ovRegionCopyData(gBC,odrBC,oprBC,fdBC,rotData,agRows,n1,n2);
+ parts.push('--- CHỈ SỐ THEO VÙNG (6 TỈNH) ---',buildMonoTableText(reg.headers,reg.rows));
+ const ltk=ovLtkCopyDataN1N2();
+ if(ltk){parts.push('','--- LEADTIME KCT (3 KHO) ---',buildMonoTableText(ltk.headers,ltk.rows));}
+ if(badSections.length){
+  const bad=ovBadPointsCopyRows(badSections);
+  parts.push('','--- ĐIỂM TỆ (N-1 TỆ HƠN N-2) ---',buildMonoTableText(bad.headers,bad.rows));
+ }
+ return parts.join('\n');
+}
+function ovFullReportCopyHTML(gBC,odrBC,oprBC,fdBC,rotData,agRows,n1,n2,badSections){
+ if(!n1||!n2)return'';
+ const text=ovFullReportCopyText(gBC,odrBC,oprBC,fdBC,rotData,agRows,n1,n2,badSections);
+ return`<div class="card" style="margin-top:18px;border-color:#86EFAC"><div class="card-header" style="background:linear-gradient(135deg,#F0FDF4,#DCFCE7);border-bottom:1px solid #86EFAC"><div class="card-title"><div class="card-icon" style="background:#166534">📋</div>Báo cáo tổng hợp — Copy toàn bộ</div><div class="card-info">GTC · Ontime · FD · Năng suất · Leadtime KCT · Điểm tệ</div></div>${monoCopyPre('COPY BÁO CÁO TỔNG HỢP',text,'Dán vào Zalo / Email / Google Doc · hoặc copy từng bảng phía trên')}</div>`;
+}
+function ovBadPointsHTML(sections,n1,n2){
+ if(!sections.length)return`<div class="card" style="margin-top:18px;background:#F0FDF4;border-color:#BBF7D0"><div class="card-header" style="background:transparent;border-bottom:1px solid #BBF7D0"><div class="card-title"><div class="card-icon" style="background:#16A34A">✅</div>Điểm tệ — N-1 vs N-2</div></div><div style="padding:14px 18px;font-size:13px;color:var(--green)">Không có chỉ số nào tệ hơn N-2 trên toàn vùng.</div></div>`;
+ const copy=ovBadPointsCopyRows(sections);
+ let h=`<div class="card" style="margin-top:18px;background:#FFF5F5;border-color:#FECACA"><div class="card-header" style="background:transparent;border-bottom:1px solid #FECACA"><div class="card-title"><div class="card-icon" style="background:var(--red)">🔴</div>Điểm tệ — chỉ số N-1 tệ hơn N-2 (BC · AM · KCT)</div><div class="card-info">N-1: ${shortD(n1)} vs N-2: ${shortD(n2)}</div></div>`;
+ h+=monoCopyBox('ĐIỂM TỆ — COPY BÁO CÁO',copy.headers,copy.rows,'Gồm vận hành BC · Năng suất · Leadtime KCT');
+ h+=`<div style="padding:0 14px 14px">`;
+ sections.forEach(s=>{
+  h+=`<div style="margin-bottom:14px"><div style="font-size:12px;font-weight:800;color:var(--red);margin-bottom:6px">${s.ic} ${s.label} <span style="color:var(--text-sub);font-weight:600">(${s.items.length})</span></div>`;
+  s.items.forEach(it=>{
+   h+=`<div style="font-size:12px;line-height:1.55;padding:6px 10px;background:#fff;border:1px solid #FECACA;border-radius:8px;margin-bottom:5px">• <b>${it.bc}</b> <span style="color:var(--text-sub)">· ${it.am==='KCT'?'KCT':'AM '+it.am}</span> — N-1 <b style="color:var(--red)">${s.fmt(it.v1)}</b> vs N-2 ${s.fmt(it.v2)}</div>`;
+  });
+  h+=`</div>`;
+ });
+ h+=`</div></div>`;
+ return h;
+}
+function ovRegionSummaryForAI(gBC,odrBC,oprBC,fdBC,rotData,agRows,n1,n2){
+ if(!n1||!n2)return'';
+ const{bc2tinh}=ovBuildBcMaps(gBC);
+ const m1=ovTinhMetricsForDate(gBC,odrBC,oprBC,fdBC,rotData,agRows,bc2tinh,n1);
+ const m2=ovTinhMetricsForDate(gBC,odrBC,oprBC,fdBC,rotData,agRows,bc2tinh,n2);
+ const ns=ovNsByTinh(n1,n2,bc2tinh);
+ const lines=[`\n### Chỉ số vận hành theo vùng — N-1 (${shortD(n1)}) vs N-2 (${shortD(n2)})`];
+ TNT_TINH.forEach(t=>{
+  const a=m1[t],b=m2[t],n=ns[t];
+  lines.push(`${t}: %Gán ${a.gan!=null?a.gan.toFixed(1):'—'}% (Δ${a.gan!=null&&b.gan!=null?(a.gan-b.gan).toFixed(1):'—'}), %GTC ${a.gtc!=null?a.gtc.toFixed(1):'—'}% (Δ${a.gtc!=null&&b.gtc!=null?(a.gtc-b.gtc).toFixed(1):'—'}), ODR ${a.odr!=null?a.odr.toFixed(1):'—'}%, OPR ${a.opr!=null?a.opr.toFixed(1):'—'}%, FD ${a.fd!=null?a.fd.toFixed(2):'—'}%, Aging ${a.aging}, Rớt LC ${a.rot}, NS Gán ${n.n1.nsG!=null?n.n1.nsG.toFixed(1):'—'}, NS GTC ${n.n1.nsGtc!=null?n.n1.nsGtc.toFixed(1):'—'}, Thu nhập TB ${n.n1.thu!=null?Math.round(n.n1.thu).toLocaleString('vi-VN'):'—'}đ`);
+ });
+ const ltk=ovLtkCopyDataN1N2();
+ if(ltk){
+  lines.push(`\n### Leadtime KCT N-1 vs N-2:`);
+  ltk.rows.slice(0,-1).forEach(r=>lines.push(`  ${r[1]}: Vol N-1=${r[2]}, LT N-1=${r[5]}, ΔLT=${r[7]}`));
+ }
+ const bad=ovCollectAllBadPoints(gBC,odrBC,oprBC,fdBC,rotData,agRows,n1,n2);
+ if(bad.length){
+  lines.push('\n### Điểm tệ — N-1 tệ hơn N-2:');
+  bad.forEach(s=>{
+   lines.push(`${s.label}:`);
+   s.items.slice(0,8).forEach(it=>lines.push(`  ${it.bc} (${it.am==='KCT'?'KCT':'AM '+it.am}): N-1 ${s.fmt(it.v1)} vs N-2 ${s.fmt(it.v2)}`));
+  });
+ }
+ return lines.join('\n');
+}
 function buildOverviewPage(R,rotData){
  const el=document.getElementById('p0');
- const gAM=R['GTC Total theo AM'],gBC=R['GTC Total theo Bưu Cục'],fdAM=R['FD Total theo AM'];
+ const gAM=R['GTC Total theo AM'],gBC=R['GTC Total theo Bưu Cục'],fdAM=R['FD Total theo AM'],fdBC=R['FD Total theo Bưu Cục'];
  const odrBC=R['ODR TTS - Bưu Cục'],oprBC=R['OPR TTS - Bưu Cục'];
  const latest=ovDatesDesc(gAM,1)[0]||'',prev=ovDatesDesc(gAM,1)[1]||'';
  // ===== KPI tổng =====
@@ -1971,8 +2262,16 @@ function buildOverviewPage(R,rotData){
  const hasRec=recSections.length>0;
  const recHTML=hasRec?recSections.map(s=>`<div style="margin-bottom:12px"><div style="font-size:12px;font-weight:800;color:${s.c};margin-bottom:5px">${s.ic} ${s.t} <span style="color:var(--text-sub);font-weight:600">(${s.items.length} AM)</span></div>${s.items.map(it=>`<div style="font-size:12px;line-height:1.55;padding:5px 10px;background:#fff;border:1px solid var(--border);border-radius:8px;margin-bottom:5px">• ${it}</div>`).join('')}</div>`).join(''):'✅ Không có AM nào dưới ngưỡng cảnh báo trong ngày.';
  // ===== Render =====
- let h=`<div class="page-header"><div class="page-title">Tổng Quan Vận Hành TNT</div><div class="page-meta"><span class="tag tag-orange">🗺️ N-1: ${shortD(latest)} · So sánh N-7: ${shortD(ovDatesDesc(gAM,1)[6]||'')}</span><span>${TNT_TINH.join(' · ')}</span></div></div>`;
+ let h=`<div class="page-header"><div class="page-title">Tổng Quan Vận Hành TNT</div><div class="page-meta"><span class="tag tag-orange">🗺️ N-1: ${shortD(latest)} · N-2: ${shortD(prev)} · So sánh N-7: ${shortD(ovDatesDesc(gAM,1)[6]||'')}</span><span>${TNT_TINH.join(' · ')}</span></div></div>`;
  h+=`<div class="kpi-grid">${kAttr.map(k=>`<div class="kpi-card" style="border-top:none"><div class="kpi-ico" style="background:${k.bg}">${k.ic}</div><div class="kpi-label">${k.label}</div><div class="kpi-val" style="color:${k.c}">${k.val}</div><div style="font-size:10.5px;color:var(--text-sub);margin-top:4px">${k.tgt}</div>${k.d?`<div style="font-size:11px;font-weight:700;color:${k.d.col};margin-top:3px">${k.d.txt}</div>`:''}${k.sub?`<div style="display:flex;gap:6px;margin-top:8px">${k.sub.map(s=>`<div style="flex:1;background:#F8FAFC;border-radius:7px;padding:5px 4px;text-align:center"><div style="font-size:9px;font-weight:700;color:var(--text-sub)">${s.l}</div><div style="font-size:12px;font-weight:800;color:${s.c}">${s.v}</div></div>`).join('')}</div>`:''}</div>`).join('')}</div>`;
+ const agRows=window._AGING?.rows||[];
+ const ovBad=prev?ovCollectAllBadPoints(gBC,odrBC,oprBC,fdBC,rotData,agRows,latest,prev):[];
+ window._OV_SUMMARY={n1:latest,n2:prev,bad:ovBad};
+ if(prev){
+  h+=ovRegionN1N2HTML(gBC,odrBC,oprBC,fdBC,rotData,agRows,latest,prev);
+  h+=ovBadPointsHTML(ovBad,latest,prev);
+  h+=ovFullReportCopyHTML(gBC,odrBC,oprBC,fdBC,rotData,agRows,latest,prev,ovBad);
+ }
  h+=ovLTKCTAnalysis();
  h+=`<div style="display:flex;align-items:center;justify-content:space-between;margin:18px 0 12px"><div style="font-size:15px;font-weight:800">📍 6 tỉnh Vùng TNT</div><div style="font-size:11.5px;color:var(--text-sub)">Bấm tab phía trên để xem phân tích chi tiết từng chỉ số</div></div>`;
  h+=`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px">${tinhCards}</div>`;
@@ -2369,6 +2668,7 @@ function buildAIPage(){
    <div style="margin-bottom:8px;font-size:12px;color:var(--text-sub)">Chọn nhanh:</div>
    <div class="ai-preset-row">
     <button class="ai-preset-btn" onclick="setAIPrompt('tong-quan')">📊 Tổng quan vận hành</button>
+    <button class="ai-preset-btn" onclick="setAIPrompt('hanh-dong-nhanh')">⚡ Gợi ý hành động nhanh</button>
     <button class="ai-preset-btn" onclick="setAIPrompt('hl-ll')">🏆 Highlight / Lowlight</button>
     <button class="ai-preset-btn" onclick="setAIPrompt('so-sanh-am')">👤 So sánh AM</button>
     <button class="ai-preset-btn" onclick="setAIPrompt('tra-hang')">🔄 Phân tích tỉ lệ trả</button>
@@ -2384,7 +2684,7 @@ function buildAIPage(){
   <div id="aiAllBlock" style="display:none">
    <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:8px">
     <div class="ai-cust-field"><label style="display:block;margin-bottom:3px">Khoảng thời gian</label>
-     <select id="aiAllDays"><option value="3">3 ngày gần nhất</option><option value="7" selected>7 ngày gần nhất</option><option value="14">14 ngày gần nhất</option><option value="30">30 ngày gần nhất</option></select></div>
+     <select id="aiAllDays"><option value="1">1 ngày (N-1 vs N-2)</option><option value="3">3 ngày gần nhất</option><option value="7" selected>7 ngày gần nhất</option><option value="14">14 ngày gần nhất</option><option value="30">30 ngày gần nhất</option></select></div>
    </div>
    <div style="font-size:11px;color:var(--text-sub);background:#FFF7ED;border-left:3px solid var(--orange);padding:8px 12px;border-radius:6px;margin-bottom:10px">Sẽ gửi cho AI: GTC Total · GTC TTS · GTC chi tiết · FD · ODR · OPR · Aging · Rớt LC · Leadtime KCT 3 kho · Nhân sự (HRON/Năng suất) · Baton (BC bất ổn) — so sánh N-1 vs N-7.</div>
    <div style="font-size:12px;color:var(--text-sub);margin-bottom:6px">Gợi ý câu hỏi:</div>
@@ -2439,6 +2739,7 @@ function buildAIPage(){
 const AI_Q_KEY='tnt_ai_saved_questions';
 const AI_PRESETS={
  'tong-quan':'Với vai trò chuyên gia cố vấn vận hành, hãy viết phân tích tổng quan dạng LỜI VĂN (không liệt kê khô khan), lồng số liệu vào câu. Ví dụ: "Ngày 25/06 GTC đạt 870 đơn, tăng 30 so với 24/06 nhưng giảm 13 so với 23/06...". Bao quát: GTC, Ontime (ODR/OPR), %FD, Aging, Rớt LC, Leadtime KCT 3 kho chuyển tiếp (Volume, Leadtime TB, so sánh từng kho N-1 vs N-2) và BC bất ổn — luôn so N-1 vs N-7. Kết bằng khuyến nghị hành động.',
+ 'hanh-dong-nhanh':'Phân tích NHANH dữ liệu vận hành Vùng TNT dựa trên phần "Chỉ số theo vùng N-1 vs N-2" và "Điểm tệ" (nếu có trong dữ liệu):\n(1) Tóm tắt 3-5 dòng tình hình N-1 so N-2 theo 6 tỉnh — tỉnh/chỉ số nào tụt mạnh nhất;\n(2) Từ danh sách ĐIỂM TỆ (BC có N-1 tệ hơn N-2), nhóm theo AM và chỉ số — chỉ ra pattern (vd: nhiều BC cùng AM tụt Gán giao);\n(3) Đề xuất 5-7 HÀNH ĐỘNG ƯU TIÊN trong 48h, mỗi hành động: AM/BC cụ thể → việc làm → kỳ vọng cải thiện chỉ số nào;\n(4) Xếp hạng mức độ khẩn cấp 🔴/🟡/🟢.\nTrình bày ngắn gọn, thực chiến, không lan man.',
  'hl-ll':'Liệt kê Highlight (điểm sáng) và Lowlight (điểm yếu):\n- HIGHLIGHT 🟢: Ai làm tốt, chỉ số nào ấn tượng? (gồm kho chuyển tiếp có leadtime tốt nhất, volume ổn định)\n- LOWLIGHT 🔴: Ai tụt hậu, vấn đề gì nổi bật? (gồm kho chuyển tiếp leadtime xấu nhất, mốc giờ leadtime cao)\n- Phân tích riêng 3 kho chuyển tiếp: so sánh Volume & Leadtime N-1 vs N-2, chỉ ra kho/mốc giờ cần ưu tiên\n- Gợi ý hành động cụ thể. So sánh N-1 vs N-7.',
  'so-sanh-am':'So sánh hiệu suất từng AM: xếp hạng theo %GTC, tỉ lệ trả, ontime, aging và rớt LC. Ai đang cải thiện? Ai đang giảm? Phân tích nguyên nhân. So sánh N-1 vs N-7.',
  'tra-hang':'Phân tích sâu tỉ lệ trả hàng (%FD) từ nguồn FD: (1) AM/BC nào cao/thấp nhất; (2) Xu hướng N-1 vs N-7; (3) So sánh FD Total vs SME vs TTS vs Shopee; (4) Đề xuất giảm FD.',
@@ -2662,6 +2963,7 @@ function aiFillPrompt(t){const a=document.getElementById('aiPromptArea');a.value
 function aiChips(list){return list.map(t=>`<button class="ai-preset-btn" onclick="aiFillPrompt(this.dataset.q)" data-q="${t.replace(/"/g,'&quot;')}">${t}</button>`).join('');}
 const AI_ALL_SUGGEST=[
  'Tổng quan toàn cảnh vận hành Vùng TNT: nêu 3 điểm sáng (highlight) và 3 điểm yếu (lowlight) quan trọng nhất, kèm số liệu minh chứng. So sánh N-1 vs N-7.',
+ 'Phân tích nhanh N-1 vs N-2 theo 6 tỉnh và Điểm tệ (BC tụt chỉ số): đề xuất 5 việc ưu tiên làm ngay trong 48h, gắn AM/BC cụ thể.',
  'AM nào đang là điểm nghẽn của Vùng? Đối chiếu chéo %GTC, %FD, Ontime (ODR/OPR), Aging và Rớt LC để chỉ ra AM cần ưu tiên.',
  'Phân tích %FD Total trong nguồn dữ liệu FD: AM/BC nào cao nhất? Xu hướng N-1 vs N-7?',
  'Phân tích Rớt LC: BC/AM nào phát sinh nhiều đơn rớt nhất? So sánh N-1 vs N-7 và đề xuất xử lý.',
@@ -2742,7 +3044,9 @@ function getAIAnchor(){
 /* Trả về mốc cho 1 nhóm dữ liệu cụ thể, canh theo anchor chung.
    datesRaw: mảng ngày (chuỗi) của nhóm dữ liệu đó; days: số ngày cửa sổ phân tích. */
 function aiDatasetDates(datesRaw,days){
- days=days||7;const A=getAIAnchor();const n1=A.n1,n7=A.n7;
+ days=days||7;const A=getAIAnchor();const n1=A.n1;
+ // 1 ngày: mốc so sánh là ngày trước đó (N-2); còn lại canh theo N-7 chung
+ const n7=days<=1?(n1?aiShiftISO(n1,-1):''):A.n7;
  const uniq=[...new Set((datesRaw||[]).map(d=>isoD(d)).filter(Boolean))].sort();
  const winStart=n1?aiShiftISO(n1,-(days-1)):'';
  const leN1=uniq.filter(d=>!n1||d<=n1);const dN1=leN1.length?leN1[leN1.length-1]:'';
@@ -3066,6 +3370,13 @@ function gatherDashboardData(){
  }
  if(window._BATON?.rows?.length)lines.push(`\nBưu Cục Bất Ổn (Baton): ${window._BATON.rows.length} BC — ${window._BATON.rows.map(r=>r.bc).join(', ')}`);
  const ltkBrief=ltkctBriefForAI();if(ltkBrief)lines.push(ltkBrief);
+ const D2=window._D||{};
+ const gBC=D2.gtcTotalBC;
+ if(gBC&&gBC.length>1){
+  const ds=ovDatesDesc(gBC,2);
+  const regBrief=ovRegionSummaryForAI(gBC,D2.odrBC,D2.oprBC,D2.fdTotalBC,window._ROTLC||[],window._AGING?.rows||[],ds[0],ds[1]);
+  if(regBrief)lines.push(regBrief);
+ }
  ovHRMetrics().forEach(l=>lines.push('\n'+l));
  return lines.join('\n')||'(Dữ liệu chưa được tải)';
 }
@@ -3150,7 +3461,8 @@ async function runAIAnalysis(){
    document.getElementById('aiStatus').textContent='⏳ Đang nạp toàn bộ dữ liệu...';
    await aiEnsureData(true,true,true,true,true,true,true);
    const days=+(document.getElementById('aiAllDays')?.value)||7;
-   ctx=aiCtxAll(days);scopeNote=`Phạm vi: TOÀN BỘ dữ liệu (gồm Nhân sự), ${days} ngày gần nhất. So sánh N-1 vs N-7.`;
+   const cmpNote=days<=1?'So sánh N-1 vs N-2 (ngày trước đó).':'So sánh N-1 vs N-7.';
+   ctx=aiCtxAll(days);scopeNote=`Phạm vi: TOÀN BỘ dữ liệu (gồm Nhân sự), ${days<=1?'ngày mới nhất':days+' ngày gần nhất'}. ${cmpNote}`;
   }else if(mode==='custom'){
    let dataset=document.getElementById('aiCustDataset')?.value||'gtcTotal';
    const days=+(document.getElementById('aiCustDays')?.value)||7;
