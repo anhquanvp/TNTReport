@@ -2111,44 +2111,141 @@ function ovCollectLtkBadPoints(){
 function ovCollectAllBadPoints(gBC,odrBC,oprBC,fdBC,rotData,agRows,n1,n2){
  return[...ovCollectBCBadPoints(gBC,odrBC,oprBC,fdBC,rotData,agRows,n1,n2),...ovCollectLtkBadPoints()];
 }
-function ovBadPointsCopyRows(sections){
- const headers=['Chỉ số','Bưu Cục / Kho','AM','N-1','N-2'];
+function ovRegionTotals(gBC,odrBC,oprBC,fdBC,rotData,agRows,bc2tinh,dt){
+ const tinh=ovTinhMetricsForDate(gBC,odrBC,oprBC,fdBC,rotData,agRows,bc2tinh,dt);
+ let vol=0,ganW=0,ngtc=0,aging=0,rot=0,odrV=0,odrOk=0,oprV=0,oprOk=0,fdTra=0,fdVol=0;
+ TNT_TINH.forEach(t=>{
+  const a=tinh[t]||{};vol+=a.vol||0;
+  if(a.gan!=null&&a.vol)ganW+=a.gan*a.vol;
+  if(a.gtc!=null&&a.vol)ngtc+=a.gtc/100*a.vol;
+  aging+=a.aging||0;rot+=a.rot||0;
+ });
+ (odrBC||[]).slice(1).forEach(r=>{
+  if(isoD(r[2])!==dt)return;
+  odrV+=Math.round(parseFloat(r[3])||0);odrOk+=Math.round(parseFloat(r[5])||0);
+ });
+ (oprBC||[]).slice(1).forEach(r=>{
+  if(isoD(r[2])!==dt)return;
+  oprV+=Math.round(parseFloat(r[3])||0);oprOk+=Math.round(parseFloat(r[5])||0);
+ });
+ (fdBC||[]).slice(1).forEach(r=>{
+  if(isoD(r[1])!==dt)return;
+  fdTra+=ovPf(r[4]);fdVol+=ovPf(r[2]);
+ });
+ let nsGan=0,nsGtc=0,giaoTB=0,ngay=0,luong=0;
+ (window._NS?.rows||[]).filter(r=>r.date===dt).forEach(r=>{
+  nsGan+=r.ganGiao;nsGtc+=r.gtc;giaoTB+=r.giaoTB;ngay+=r.ngayLam;luong+=r.luong;
+ });
+ const G=window._LTKCT;let lt=null;
+ if(G?.rows?.length){
+  const prevSel=G.selMoc;G.selMoc=new Set(LTKCT_MOC);
+  const {tot}=ltkctMocAgg(G.rows.filter(r=>r.date===dt),[dt]);
+  G.selMoc=prevSel;
+  const t=tot[dt];lt=t?.v?t.t/t.v:null;
+ }
+ return{
+  gan:vol?ganW/vol:null,gtc:vol?ngtc/vol*100:null,
+  odr:odrV?odrOk/odrV*100:null,opr:oprV?oprOk/oprV*100:null,
+  fd:fdVol?fdTra/fdVol*100:null,aging,rot,
+  nsG:ngay?nsGan/ngay:null,nsGtc:ngay?nsGtc/ngay:null,thu:ngay?luong/ngay:null,ltk:lt
+ };
+}
+function ovRegionHlLl(gBC,odrBC,oprBC,fdBC,rotData,agRows,n1,n2){
+ if(!n1||!n2)return null;
+ const{bc2tinh}=ovBuildBcMaps(gBC);
+ const m1=ovRegionTotals(gBC,odrBC,oprBC,fdBC,rotData,agRows,bc2tinh,n1);
+ const m2=ovRegionTotals(gBC,odrBC,oprBC,fdBC,rotData,agRows,bc2tinh,n2);
+ const m1t=ovTinhMetricsForDate(gBC,odrBC,oprBC,fdBC,rotData,agRows,bc2tinh,n1);
+ const m2t=ovTinhMetricsForDate(gBC,odrBC,oprBC,fdBC,rotData,agRows,bc2tinh,n2);
+ const ns=ovNsByTinh(n1,n2,bc2tinh);
+ const defs=[
+  {k:'gan',lb:'%Gán',hb:true,sfx:'%',dec:1},
+  {k:'gtc',lb:'%GTC',hb:true,sfx:'%',dec:1},
+  {k:'odr',lb:'ODR',hb:true,sfx:'%',dec:1},
+  {k:'opr',lb:'OPR',hb:true,sfx:'%',dec:1},
+  {k:'fd',lb:'%FD',hb:false,sfx:'%',dec:2},
+  {k:'aging',lb:'Aging',hb:false,sfx:'n',dec:0},
+  {k:'rot',lb:'Rớt LC',hb:false,sfx:'n',dec:0},
+  {k:'nsG',lb:'NS Gán',hb:true,sfx:'',dec:1},
+  {k:'nsGtc',lb:'NS GTC',hb:true,sfx:'',dec:1},
+  {k:'thu',lb:'Thu nhập TB',hb:true,sfx:'đ',dec:0},
+  {k:'ltk',lb:'Leadtime KCT',hb:false,sfx:'h',dec:2}
+ ];
+ const good=[],bad=[];
+ defs.forEach(d=>{
+  const v1=m1[d.k],v2=m2[d.k];
+  if(v1==null||v2==null||!isFinite(v1)||!isFinite(v2))return;
+  const delta=v1-v2;
+  if(Math.abs(delta)<(d.sfx==='%'?0.05:d.sfx==='h'?0.05:0.5))return;
+  const worse=d.hb?delta<0:delta>0;
+  const item={...d,v1,v2,delta:Math.abs(delta),dTxt:ovDeltaStr(v1,v2,d.hb,d.sfx,d.dec)};
+  (worse?bad:good).push(item);
+ });
+ const tinhBad=[];
+ TNT_TINH.forEach(t=>{
+  const tags=[];
+  defs.filter(d=>d.k!=='ltk').forEach(d=>{
+   let v1,v2;
+   if(d.k==='nsG'||d.k==='nsGtc'||d.k==='thu'){v1=ns[t]?.n1?.[d.k==='nsG'?'nsG':d.k==='nsGtc'?'nsGtc':'thu'];v2=ns[t]?.n2?.[d.k==='nsG'?'nsG':d.k==='nsGtc'?'nsGtc':'thu'];}
+   else{v1=m1t[t]?.[d.k];v2=m2t[t]?.[d.k];}
+   if(v1==null||v2==null||!isFinite(v1)||!isFinite(v2))return;
+   const delta=v1-v2;
+   if(Math.abs(delta)<(d.sfx==='%'?0.05:0.5))return;
+   const worse=d.hb?delta<0:delta>0;
+   if(!worse)return;
+   tags.push(d.lb+ovDeltaStr(v1,v2,d.hb,d.sfx,d.dec));
+  });
+  if(tags.length)tinhBad.push({tinh:t,tags});
+ });
+ return{n1,n2,good,bad,tinhBad};
+}
+function ovHlLlCopyRows(hl){
+ const headers=['Loại','Chỉ số','N-1','N-2','Δ'];
  const rows=[];
- sections.forEach(s=>{s.items.forEach(it=>{rows.push([s.label,it.bc,it.am,s.fmt(it.v1),s.fmt(it.v2)]);});});
+ hl.good.forEach(d=>rows.push(['🟢 Tốt',d.lb,ovFmtOV(d.v1,d.sfx,d.dec),ovFmtOV(d.v2,d.sfx,d.dec),d.dTxt]));
+ hl.bad.forEach(d=>rows.push(['🔴 Tệ',d.lb,ovFmtOV(d.v1,d.sfx,d.dec),ovFmtOV(d.v2,d.sfx,d.dec),d.dTxt]));
+ if(hl.tinhBad.length){
+  rows.push(['','—','—','—','—']);
+  hl.tinhBad.forEach(t=>rows.push(['🔴 Tỉnh',t.tinh,t.tags.join(' · '),'','']));
+ }
  return{headers,rows};
 }
-function ovFullReportCopyText(gBC,odrBC,oprBC,fdBC,rotData,agRows,n1,n2,badSections){
+function ovHlLlHTML(hl){
+ if(!hl)return'';
+ const ok=!hl.bad.length&&!hl.tinhBad.length;
+ if(ok&&!hl.good.length)return`<div class="card" style="margin-top:18px;background:#F1F5F9;border-color:#E2E8F0"><div class="card-header" style="background:transparent;border-bottom:1px solid #E2E8F0"><div class="card-title"><div class="card-icon" style="background:#64748B">📊</div>Tóm tắt tốt / tệ — Vùng TNT</div><div class="card-info">N-1: ${shortD(hl.n1)} vs N-2: ${shortD(hl.n2)}</div></div><div style="padding:14px 18px;font-size:13px;color:var(--text-sub)">Chưa đủ dữ liệu so sánh.</div></div>`;
+ const copy=ovHlLlCopyRows(hl);
+ const line=(items,ic,col)=>items.length?`<div style="font-size:12.5px;line-height:1.65;margin-bottom:8px"><span style="font-weight:800;color:${col}">${ic}</span> ${items.map(d=>`<span style="white-space:nowrap"><b>${d.lb}</b> ${ovFmtOV(d.v1,d.sfx,d.dec)} <span style="color:${col};font-weight:700">${d.dTxt}</span></span>`).join(' · ')}</div>`:'';
+ let h=`<div class="card" style="margin-top:18px;background:${hl.bad.length?'#FFFBEB':'#F0FDF4'};border-color:${hl.bad.length?'#FDE68A':'#BBF7D0'}"><div class="card-header" style="background:transparent;border-bottom:1px solid ${hl.bad.length?'#FDE68A':'#BBF7D0'}"><div class="card-title"><div class="card-icon" style="background:${hl.bad.length?'#D97706':'#16A34A'}">${hl.bad.length?'⚖️':'✅'}</div>Tóm tắt tốt / tệ — Vùng TNT</div><div class="card-info">N-1: ${shortD(hl.n1)} vs N-2: ${shortD(hl.n2)} · Tổng hợp cả vùng</div></div>`;
+ h+=monoCopyBox('TỐT / TỆ — COPY BÁO CÁO',copy.headers,copy.rows,'Tóm tắt cấp vùng · không liệt kê từng BC');
+ h+=`<div style="padding:0 16px 14px">`;
+ h+=line(hl.good,'🟢 Tốt','var(--green)');
+ h+=line(hl.bad,'🔴 Tệ','var(--red)');
+ if(hl.tinhBad.length){
+  h+=`<div style="font-size:11px;font-weight:700;color:var(--text-sub);margin:10px 0 4px;text-transform:uppercase;letter-spacing:.4px">Tỉnh có chỉ số tệ</div>`;
+  h+=`<div style="font-size:12px;line-height:1.6;color:var(--text-main)">${hl.tinhBad.map(t=>`<div style="margin-bottom:4px"><b>${t.tinh}</b>: ${t.tags.join(' · ')}</div>`).join('')}</div>`;
+ }else if(!hl.bad.length&&!hl.good.length){
+  h+=`<div style="font-size:13px;color:var(--green)">✅ Không có biến động đáng kể so N-2.</div>`;
+ }
+ h+=`</div></div>`;
+ return h;
+}
+function ovFullReportCopyText(gBC,odrBC,oprBC,fdBC,rotData,agRows,n1,n2,hl){
  const parts=[`=== BÁO CÁO TỔNG HỢP VẬN HÀNH VÙNG TNT ===`,`N-1: ${shortD(n1)} | N-2: ${shortD(n2)}`,''];
  const reg=ovRegionCopyData(gBC,odrBC,oprBC,fdBC,rotData,agRows,n1,n2);
  parts.push('--- CHỈ SỐ THEO VÙNG (6 TỈNH) ---',buildMonoTableText(reg.headers,reg.rows));
  const ltk=ovLtkCopyDataN1N2();
  if(ltk){parts.push('','--- LEADTIME KCT (3 KHO) ---',buildMonoTableText(ltk.headers,ltk.rows));}
- if(badSections.length){
-  const bad=ovBadPointsCopyRows(badSections);
-  parts.push('','--- ĐIỂM TỆ (N-1 TỆ HƠN N-2) ---',buildMonoTableText(bad.headers,bad.rows));
+ if(hl&&(hl.good.length||hl.bad.length||hl.tinhBad.length)){
+  const copy=ovHlLlCopyRows(hl);
+  parts.push('','--- TÓM TẮT TỐT / TỆ (CẢ VÙNG) ---',buildMonoTableText(copy.headers,copy.rows));
  }
  return parts.join('\n');
 }
-function ovFullReportCopyHTML(gBC,odrBC,oprBC,fdBC,rotData,agRows,n1,n2,badSections){
+function ovFullReportCopyHTML(gBC,odrBC,oprBC,fdBC,rotData,agRows,n1,n2,hl){
  if(!n1||!n2)return'';
- const text=ovFullReportCopyText(gBC,odrBC,oprBC,fdBC,rotData,agRows,n1,n2,badSections);
- return`<div class="card" style="margin-top:18px;border-color:#86EFAC"><div class="card-header" style="background:linear-gradient(135deg,#F0FDF4,#DCFCE7);border-bottom:1px solid #86EFAC"><div class="card-title"><div class="card-icon" style="background:#166534">📋</div>Báo cáo tổng hợp — Copy toàn bộ</div><div class="card-info">GTC · Ontime · FD · Năng suất · Leadtime KCT · Điểm tệ</div></div>${monoCopyPre('COPY BÁO CÁO TỔNG HỢP',text,'Dán vào Zalo / Email / Google Doc · hoặc copy từng bảng phía trên')}</div>`;
-}
-function ovBadPointsHTML(sections,n1,n2){
- if(!sections.length)return`<div class="card" style="margin-top:18px;background:#F0FDF4;border-color:#BBF7D0"><div class="card-header" style="background:transparent;border-bottom:1px solid #BBF7D0"><div class="card-title"><div class="card-icon" style="background:#16A34A">✅</div>Điểm tệ — N-1 vs N-2</div></div><div style="padding:14px 18px;font-size:13px;color:var(--green)">Không có chỉ số nào tệ hơn N-2 trên toàn vùng.</div></div>`;
- const copy=ovBadPointsCopyRows(sections);
- let h=`<div class="card" style="margin-top:18px;background:#FFF5F5;border-color:#FECACA"><div class="card-header" style="background:transparent;border-bottom:1px solid #FECACA"><div class="card-title"><div class="card-icon" style="background:var(--red)">🔴</div>Điểm tệ — chỉ số N-1 tệ hơn N-2 (BC · AM · KCT)</div><div class="card-info">N-1: ${shortD(n1)} vs N-2: ${shortD(n2)}</div></div>`;
- h+=monoCopyBox('ĐIỂM TỆ — COPY BÁO CÁO',copy.headers,copy.rows,'Gồm vận hành BC · Năng suất · Leadtime KCT');
- h+=`<div style="padding:0 14px 14px">`;
- sections.forEach(s=>{
-  h+=`<div style="margin-bottom:14px"><div style="font-size:12px;font-weight:800;color:var(--red);margin-bottom:6px">${s.ic} ${s.label} <span style="color:var(--text-sub);font-weight:600">(${s.items.length})</span></div>`;
-  s.items.forEach(it=>{
-   h+=`<div style="font-size:12px;line-height:1.55;padding:6px 10px;background:#fff;border:1px solid #FECACA;border-radius:8px;margin-bottom:5px">• <b>${it.bc}</b> <span style="color:var(--text-sub)">· ${it.am==='KCT'?'KCT':'AM '+it.am}</span> — N-1 <b style="color:var(--red)">${s.fmt(it.v1)}</b> vs N-2 ${s.fmt(it.v2)}</div>`;
-  });
-  h+=`</div>`;
- });
- h+=`</div></div>`;
- return h;
+ const text=ovFullReportCopyText(gBC,odrBC,oprBC,fdBC,rotData,agRows,n1,n2,hl);
+ return`<div class="card" style="margin-top:18px;border-color:#86EFAC"><div class="card-header" style="background:linear-gradient(135deg,#F0FDF4,#DCFCE7);border-bottom:1px solid #86EFAC"><div class="card-title"><div class="card-icon" style="background:#166534">📋</div>Báo cáo tổng hợp — Copy toàn bộ</div><div class="card-info">GTC · Ontime · FD · Năng suất · Leadtime KCT · Tốt/Tệ</div></div>${monoCopyPre('COPY BÁO CÁO TỔNG HỢP',text,'Dán vào Zalo / Email / Google Doc · hoặc copy từng bảng phía trên')}</div>`;
 }
 function ovRegionSummaryForAI(gBC,odrBC,oprBC,fdBC,rotData,agRows,n1,n2){
  if(!n1||!n2)return'';
@@ -2166,13 +2263,11 @@ function ovRegionSummaryForAI(gBC,odrBC,oprBC,fdBC,rotData,agRows,n1,n2){
   lines.push(`\n### Leadtime KCT N-1 vs N-2:`);
   ltk.rows.slice(0,-1).forEach(r=>lines.push(`  ${r[1]}: Vol N-1=${r[2]}, LT N-1=${r[5]}, ΔLT=${r[7]}`));
  }
- const bad=ovCollectAllBadPoints(gBC,odrBC,oprBC,fdBC,rotData,agRows,n1,n2);
- if(bad.length){
-  lines.push('\n### Điểm tệ — N-1 tệ hơn N-2:');
-  bad.forEach(s=>{
-   lines.push(`${s.label}:`);
-   s.items.slice(0,8).forEach(it=>lines.push(`  ${it.bc} (${it.am==='KCT'?'KCT':'AM '+it.am}): N-1 ${s.fmt(it.v1)} vs N-2 ${s.fmt(it.v2)}`));
-  });
+ const hl=ovRegionHlLl(gBC,odrBC,oprBC,fdBC,rotData,agRows,n1,n2);
+ if(hl){
+  if(hl.good.length){lines.push('\n### Tốt (N-1 cải thiện):');hl.good.forEach(d=>lines.push(`  ${d.lb}: N-1 ${ovFmtOV(d.v1,d.sfx,d.dec)} (${d.dTxt})`));}
+  if(hl.bad.length){lines.push('\n### Tệ (N-1 xấu đi):');hl.bad.forEach(d=>lines.push(`  ${d.lb}: N-1 ${ovFmtOV(d.v1,d.sfx,d.dec)} (${d.dTxt})`));}
+  if(hl.tinhBad.length){lines.push('\n### Tỉnh có chỉ số tệ:');hl.tinhBad.forEach(t=>lines.push(`  ${t.tinh}: ${t.tags.join(', ')}`));}
  }
  return lines.join('\n');
 }
@@ -2264,15 +2359,7 @@ function buildOverviewPage(R,rotData){
  // ===== Render =====
  let h=`<div class="page-header"><div class="page-title">Tổng Quan Vận Hành TNT</div><div class="page-meta"><span class="tag tag-orange">🗺️ N-1: ${shortD(latest)} · N-2: ${shortD(prev)} · So sánh N-7: ${shortD(ovDatesDesc(gAM,1)[6]||'')}</span><span>${TNT_TINH.join(' · ')}</span></div></div>`;
  h+=`<div class="kpi-grid">${kAttr.map(k=>`<div class="kpi-card" style="border-top:none"><div class="kpi-ico" style="background:${k.bg}">${k.ic}</div><div class="kpi-label">${k.label}</div><div class="kpi-val" style="color:${k.c}">${k.val}</div><div style="font-size:10.5px;color:var(--text-sub);margin-top:4px">${k.tgt}</div>${k.d?`<div style="font-size:11px;font-weight:700;color:${k.d.col};margin-top:3px">${k.d.txt}</div>`:''}${k.sub?`<div style="display:flex;gap:6px;margin-top:8px">${k.sub.map(s=>`<div style="flex:1;background:#F8FAFC;border-radius:7px;padding:5px 4px;text-align:center"><div style="font-size:9px;font-weight:700;color:var(--text-sub)">${s.l}</div><div style="font-size:12px;font-weight:800;color:${s.c}">${s.v}</div></div>`).join('')}</div>`:''}</div>`).join('')}</div>`;
- const agRows=window._AGING?.rows||[];
- const ovBad=prev?ovCollectAllBadPoints(gBC,odrBC,oprBC,fdBC,rotData,agRows,latest,prev):[];
- window._OV_SUMMARY={n1:latest,n2:prev,bad:ovBad};
- if(prev){
-  h+=ovRegionN1N2HTML(gBC,odrBC,oprBC,fdBC,rotData,agRows,latest,prev);
-  h+=ovBadPointsHTML(ovBad,latest,prev);
-  h+=ovFullReportCopyHTML(gBC,odrBC,oprBC,fdBC,rotData,agRows,latest,prev,ovBad);
- }
- h+=ovLTKCTAnalysis();
+ window._OV_SUMMARY={n1:latest,n2:prev};
  h+=`<div style="display:flex;align-items:center;justify-content:space-between;margin:18px 0 12px"><div style="font-size:15px;font-weight:800">📍 6 tỉnh Vùng TNT</div><div style="font-size:11.5px;color:var(--text-sub)">Bấm tab phía trên để xem phân tích chi tiết từng chỉ số</div></div>`;
  h+=`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px">${tinhCards}</div>`;
  h+=ovUnstableBCAnalysis(gBC,window._GTCD?.rows||[]);
