@@ -1146,11 +1146,11 @@
     <div class="chip-row"><span class="chip-label">Khối lượng</span>${GTCD_KL.map(k=>`<span class="chip active" data-kl="${k.id}" onclick="gtcdToggle(this,'kl')">${k.label}</span>`).join('')}</div>
   </div>
   <div class="kpi-grid" id="gtcd_kpi"></div>
-  <div class="chart-box"><h3>Xu hướng Volume theo Loại hàng</h3><div class="chart-canvas-wrap"><canvas id="gtcd_chartVol"></canvas></div><div id="gtcd_volNote"></div></div>
-  <div class="chart-box"><h3>Xu hướng %GTC theo Loại hàng</h3><div class="chart-canvas-wrap"><canvas id="gtcd_chartGTC"></canvas></div><div id="gtcd_gtcNote"></div></div>
   <div class="card"><div class="card-header"><div class="card-title"><div class="card-icon">👤</div>Theo AM</div></div><div id="gtcd_amTable"></div></div>
   <div class="card"><div class="card-header"><div class="card-title"><div class="card-icon">🏪</div>Theo Bưu Cục</div></div><div id="gtcd_bcTable"></div></div>
-  <div id="gtcd_analysis"></div>`;
+  <div id="gtcd_analysis"></div>
+  <div class="chart-box"><h3>Xu hướng Volume theo Loại hàng</h3><div class="chart-canvas-wrap"><canvas id="gtcd_chartVol"></canvas></div><div id="gtcd_volNote"></div></div>
+  <div class="chart-box"><h3>Xu hướng %GTC theo Loại hàng</h3><div class="chart-canvas-wrap"><canvas id="gtcd_chartGTC"></canvas></div><div id="gtcd_gtcNote"></div></div>`;
   }
   // Ghi chú phân tích GTC Bulky — N-1 vs N-2, bôi đỏ khi Vol Ca2 / cồng kềnh tăng
   function gtcdAnalysisHTML(data){
@@ -2335,7 +2335,7 @@
     return{vol:v,ok:c,pct:p!=null?p:(parseFloat(r?.[4])||0)*100};
   }
   if(am){
-    const r=(amSheet||[]).slice(1).find(x=>(x[0]||'').trim()===am&&isoD(x[1])===date);
+    const r=(amSheet||[]).slice(1).find(x=>aiAmEquals(x[0],am)&&isoD(x[1])===date);
     const v=Math.round(parseFloat(r?.[2])||0),c=Math.round(parseFloat(r?.[4])||0);
     const p=normOntimePct(r?.[3]);
     return{vol:v,ok:c,pct:p!=null?p:(parseFloat(r?.[3])||0)*100};
@@ -2987,9 +2987,9 @@ if(q===AI_PROMPT_TONG_QUAN_YEU_TOT||q===AI_PROMPT_DIEM_MANH_YEU)return true;
 const s=(q||'').toLowerCase();
 return/điểm mạnh.*điểm yếu|tổng quan yếu|tong quan yeu|yếu\/tốt|yeu\/tot|diem manh.*diem yeu|điểm mạnh.*n-2|điểm yếu.*n-2/.test(s);
 }
-  const AI_PROMPT_AM_TONG_QUAN=`Phân tích TỔNG QUAN tất cả chỉ số vận hành của AM cụ thể — so sánh N-1 vs N-2.
+  const AI_PROMPT_AM_TONG_QUAN=`Phân tích TỔNG QUAN AM "Họ Tên AM" — so sánh N-1 vs N-2.
 
-  ⚠️ Ghi tên AM trong nháy kép, ví dụ: Phân tích tổng quan AM "Phạm Tiến Bình"
+⚠️ BẮT BUỘC thay "Họ Tên AM" bằng tên AM thật trong nháy kép, ví dụ: Phân tích TỔNG QUAN AM "Phan Văn Quân"
 
   ## I. BẢNG TỔNG QUAN CHỈ SỐ (BẮT BUỘC — đặt đầu tiên)
   Trình bày bảng markdown với các cột:
@@ -3007,16 +3007,26 @@ return/điểm mạnh.*điểm yếu|tổng quan yếu|tong quan yeu|yếu\/tố
 
   QUY TẮC: Phần I PHẢI có bảng pipe. Phần II–III dùng text bullet. Chỉ dùng số trong DỮ LIỆU (ưu tiên bảng hệ thống đã tính sẵn).`;
   const AI_SYSTEM_PROMPT_AM_APPEND=`\n\n[FORMAT TỔNG QUAN AM]
-  - Phân tích đúng AM được chỉ định (tên trong nháy kép).
+  - Phân tích ĐÚNG MỘT AM được chỉ định (tên trong nháy kép hoặc block "TỔNG QUAN AM: ...").
+  - TUYỆT ĐỐI KHÔNG phân tích toàn vùng, Grand Total, hay so sánh/xếp hạng các AM khác.
+  - CHỈ dùng số liệu trong block "TỔNG QUAN AM" và "Bưu cục thuộc AM" — bỏ qua mọi block toàn vùng / danh sách tất cả AM nếu có.
   - PHẦN I BẮT BUỘC: bảng pipe Chỉ số | N-1 | N-2 | Δ | Kiểm soát — đánh dấu 🔴 Tệ nhất / 🟠 Nhì / 🟡 Ba cho 3 chỉ số cần kiểm soát.
-  - Phần II–III: text bullet, không bảng dài.
+  - Phần II–III: text bullet, không bảng dài — chỉ BC thuộc AM đang phân tích.
   - Quy tắc tốt/xấu: %GTC/%Gán/ODR/OPR/NS ↑ tốt · %FD/Aging/Rớt LC ↑ tệ.`;
   function aiIsAmTongQuanPrompt(q){
   if(!q)return false;
   if(q===AI_PROMPT_AM_TONG_QUAN)return true;
   const s=(q||'').toLowerCase();
-  return/tổng quan.*am|phân tích.*am cụ thể|theo am|am cụ thể|chi tiết am/.test(s)&&!/so sánh.*am|so-sanh-am|từng am|mỗi am|xếp hạng am/.test(s);
+  if(/so sánh.*am|so-sanh-am|từng am|mỗi am|xếp hạng am|tất cả am|các am/.test(s))return false;
+  const am=aiDetectAmFromQuestion(q);
+  if(am){
+    if(aiExtractQuotedTerms(q).some(t=>aiMatchAmName(t)))return true;
+    if(/phân tích|tổng quan|đánh giá|chỉ số|hiệu suất|vận hành|rủi ro|kiểm soát|bưu cục thuộc/.test(s))return true;
   }
+  return/tổng quan.*am|phân tích.*am cụ thể|theo am|am cụ thể|chi tiết am/.test(s);
+  }
+  function aiNormName(s){return(s||'').trim().toLowerCase().replace(/\s+/g,' ');}
+  function aiAmEquals(a,b){return aiNormName(a)===aiNormName(b);}
   function aiListAmNames(){
   const sh=window._D?.gtcTotalAM;
   if(!sh||sh.length<2)return[];
@@ -3025,10 +3035,10 @@ return/điểm mạnh.*điểm yếu|tổng quan yếu|tong quan yeu|yếu\/tố
   function aiMatchAmName(term){
   const t=(term||'').trim();if(!t)return null;
   const list=aiListAmNames();
-  const tl=t.toLowerCase();
+  const tl=aiNormName(t);
   let best=null,score=0;
   list.forEach(a=>{
-    const al=a.toLowerCase();
+    const al=aiNormName(a);
     let sc=0;
     if(al===tl)sc=100;
     else if(al.includes(tl)||tl.includes(al))sc=80;
@@ -3039,23 +3049,23 @@ return/điểm mạnh.*điểm yếu|tổng quan yếu|tong quan yeu|yếu\/tố
   }
   function aiDetectAmFromQuestion(q){
   for(const term of aiExtractQuotedTerms(q)){const am=aiMatchAmName(term);if(am)return am;}
-  const s=(q||'').toLowerCase();
+  const s=aiNormName(q);
   return aiListAmNames().find(a=>{
-    const al=a.toLowerCase();
+    const al=aiNormName(a);
     return s.includes(al)||al.split(/\s+/).filter(w=>w.length>2).every(w=>s.includes(w));
   })||null;
   }
   function aiAmGtcRow(sheet,am,dt){
-  const r=(sheet||[]).slice(1).find(x=>(x[0]||'').trim()===am&&isoD(x[1])===dt&&!isGrandRow(x[0]));
+  const r=(sheet||[]).slice(1).find(x=>aiAmEquals(x[0],am)&&isoD(x[1])===dt&&!isGrandRow(x[0]));
   if(!r)return null;
   return{vol:Math.round(parseFloat(r[2])||0),gan:(parseFloat(r[3])||0)*100,gtc:(parseFloat(r[4])||0)*100,cnt:Math.round(parseFloat(r[5])||0)};
   }
   function aiAmFdPct(sheet,am,dt){
-  const r=(sheet||[]).slice(1).find(x=>(x[0]||'').trim()===am&&isoD(x[1])===dt&&!isGrandRow(x[0]));
+  const r=(sheet||[]).slice(1).find(x=>aiAmEquals(x[0],am)&&isoD(x[1])===dt&&!isGrandRow(x[0]));
   return r?parsePct(r[3]):null;
   }
   function aiAmBcGtcOnDate(gBC,am,dt){
-  return(gBC||[]).slice(1).filter(r=>(r[0]||'').trim()===am&&isoD(r[2])===dt&&!isGrandRow(r[1])).map(r=>{
+  return(gBC||[]).slice(1).filter(r=>aiAmEquals(r[0],am)&&isoD(r[2])===dt&&!isGrandRow(r[1])).map(r=>{
     const v=Math.round(parseFloat(r[3])||0),n=Math.round(parseFloat(r[6])||0);
     return{bc:(r[1]||'').trim(),vol:v,gan:(parseFloat(r[4])||0)*100,gtc:v?n/v*100:0,unstable:getUnstableSet().has((r[1]||'').trim())};
   }).sort((a,b)=>a.gtc-b.gtc);
@@ -3107,9 +3117,9 @@ return/điểm mạnh.*điểm yếu|tổng quan yếu|tong quan yeu|yếu\/tố
   const opr1=ovOntimeScoped(D.oprAM,D.oprBC,n1,am,''),opr2=ovOntimeScoped(D.oprAM,D.oprBC,n2,am,'');
   const agRows=window._AGING?.rows||[],rotData=window._ROTLC||[];
   const NS=window._NS?.rows||[],HR=window._HRON?.rows||[];
-  const nsN1=NS.filter(r=>r.date===n1&&(r.am||'').trim()===am),nsN2=NS.filter(r=>r.date===n2&&(r.am||'').trim()===am);
+  const nsN1=NS.filter(r=>r.date===n1&&aiAmEquals(r.am,am)),nsN2=NS.filter(r=>r.date===n2&&aiAmEquals(r.am,am));
   const m1=nsN1.length?nsComputeMetrics(nsN1):null,m2=nsN2.length?nsComputeMetrics(nsN2):null;
-  const hN1=HR.filter(r=>r.date===n1&&r.am===am).reduce((a,r)=>a+r.count,0),hN2=HR.filter(r=>r.date===n2&&r.am===am).reduce((a,r)=>a+r.count,0);
+  const hN1=HR.filter(r=>r.date===n1&&aiAmEquals(r.am,am)).reduce((a,r)=>a+r.count,0),hN2=HR.filter(r=>r.date===n2&&aiAmEquals(r.am,am)).reduce((a,r)=>a+r.count,0);
   const list=[
     {label:'%Gán GTC Total',n1:g1?.gan,n2:g2?.gan,hb:true,type:'pct',target:95},
     {label:'%GTC Total',n1:g1?.gtc,n2:g2?.gtc,hb:true,type:'pct',target:80},
@@ -3120,8 +3130,8 @@ return/điểm mạnh.*điểm yếu|tổng quan yếu|tong quan yeu|yếu\/tố
     {label:'FD TTS',n1:aiAmFdPct(F.ttsAM,am,n1),n2:aiAmFdPct(F.ttsAM,am,n2),hb:false,type:'pct2',target:5},
     {label:'FD SME',n1:aiAmFdPct(F.smeAM,am,n1),n2:aiAmFdPct(F.smeAM,am,n2),hb:false,type:'pct2',target:10},
     {label:'FD Shopee',n1:aiAmFdPct(F.shopeeAM,am,n1),n2:aiAmFdPct(F.shopeeAM,am,n2),hb:false,type:'pct2',target:5},
-    {label:'Aging >5N',n1:agRows.filter(r=>r.date===n1&&r.am===am).length,n2:agRows.filter(r=>r.date===n2&&r.am===am).length,hb:false,type:'cnt',target:0},
-    {label:'Rớt LC',n1:rotData.filter(r=>r.date===n1&&r.am===am).length,n2:rotData.filter(r=>r.date===n2&&r.am===am).length,hb:false,type:'cnt',target:0}
+    {label:'Aging >5N',n1:agRows.filter(r=>r.date===n1&&aiAmEquals(r.am,am)).length,n2:agRows.filter(r=>r.date===n2&&aiAmEquals(r.am,am)).length,hb:false,type:'cnt',target:0},
+    {label:'Rớt LC',n1:rotData.filter(r=>r.date===n1&&aiAmEquals(r.am,am)).length,n2:rotData.filter(r=>r.date===n2&&aiAmEquals(r.am,am)).length,hb:false,type:'cnt',target:0}
   ];
   if(m1)list.push(
     {label:'NS Gán Giao TB',n1:m1.nsGan,n2:m2?.nsGan??null,hb:true,type:'num',target:null},
@@ -3173,7 +3183,7 @@ return/điểm mạnh.*điểm yếu|tổng quan yếu|tong quan yeu|yếu\/tố
   const gAM=D.gtcTotalAM,gBC=D.gtcTotalBC,ttsAM=D.gtcTTSAM,ttsBC=D.gtcTTSBC;
   const ds=ovDatesDesc(gAM,8);
   const n1=ds[0]||'',n2=ds[1]||'',n7=ds[6]||ds[ds.length-1]||'';
-  let s=`=== TỔNG QUAN AM: ${am} ===\n[Mốc: N-1=${shortD(n1)}, N-2=${shortD(n2)}, N-7=${shortD(n7)} · cửa sổ ${days} ngày]\n`;
+  let s=`=== TỔNG QUAN AM: ${am} ===\n⚠️ PHẠM VI: CHỈ phân tích AM "${am}" — KHÔNG dùng Grand Total / số toàn vùng / chỉ số AM khác.\n[Mốc: N-1=${shortD(n1)}, N-2=${shortD(n2)}, N-7=${shortD(n7)} · cửa sổ ${days} ngày]\n`;
   const ov=aiAmOverviewTable(am);
   if(ov.table)s+=`\n${ov.table}\n`;
   const g1=aiAmGtcRow(gAM,am,n1),g2=aiAmGtcRow(gAM,am,n2),g7=aiAmGtcRow(gAM,am,n7);
@@ -3187,13 +3197,13 @@ return/điểm mạnh.*điểm yếu|tổng quan yếu|tong quan yeu|yếu\/tố
   s+=`\n### Tỉ lệ trả FD (AM)\n`;
   fdCh.forEach(ch=>{const f1=aiAmFdPct(ch.sh,am,n1),f2=aiAmFdPct(ch.sh,am,n2),f7=aiAmFdPct(ch.sh,am,n7);if(f1!=null)s+=`- ${ch.lb} N-1: ${f1.toFixed(2)}% · Δ N-2: ${aiFmtDelta(f1,f2,'%',false)} · Δ N-7: ${aiFmtDelta(f1,f7,'%',false)}\n`;});
   const agRows=window._AGING?.rows||[],rotData=window._ROTLC||[];
-  const agN1=agRows.filter(r=>r.date===n1&&r.am===am).length,agN2=agRows.filter(r=>r.date===n2&&r.am===am).length,agN7=agRows.filter(r=>r.date===n7&&r.am===am).length;
-  const rotN1=rotData.filter(r=>r.date===n1&&r.am===am).length,rotN2=rotData.filter(r=>r.date===n2&&r.am===am).length,rotN7=rotData.filter(r=>r.date===n7&&r.am===am).length;
+  const agN1=agRows.filter(r=>r.date===n1&&aiAmEquals(r.am,am)).length,agN2=agRows.filter(r=>r.date===n2&&aiAmEquals(r.am,am)).length,agN7=agRows.filter(r=>r.date===n7&&aiAmEquals(r.am,am)).length;
+  const rotN1=rotData.filter(r=>r.date===n1&&aiAmEquals(r.am,am)).length,rotN2=rotData.filter(r=>r.date===n2&&aiAmEquals(r.am,am)).length,rotN7=rotData.filter(r=>r.date===n7&&aiAmEquals(r.am,am)).length;
   s+=`\n### Aging & Rớt LC (AM)\n- Aging >5N: N-1=${agN1} đơn · Δ N-2: ${aiFmtDelta(agN1,agN2,'',false)} · Δ N-7: ${aiFmtDelta(agN1,agN7,'',false)}\n- Rớt LC: N-1=${rotN1} đơn · Δ N-2: ${aiFmtDelta(rotN1,rotN2,'',false)} · Δ N-7: ${aiFmtDelta(rotN1,rotN7,'',false)}\n`;
   const NS=window._NS?.rows||[],HR=window._HRON?.rows||[];
-  const nsN1=NS.filter(r=>r.date===n1&&(r.am||'').trim()===am),nsN2=NS.filter(r=>r.date===n2&&(r.am||'').trim()===am);
+  const nsN1=NS.filter(r=>r.date===n1&&aiAmEquals(r.am,am)),nsN2=NS.filter(r=>r.date===n2&&aiAmEquals(r.am,am));
   if(nsN1.length){const m1=nsComputeMetrics(nsN1),m2=nsN2.length?nsComputeMetrics(nsN2):null;s+=`\n### Nhân sự & Năng suất (AM)\n- NS Gán Giao TB N-1: ${m1.nsGan.toFixed(1)} · NS GTC: ${m1.nsGtc.toFixed(1)} · GTC TB: ${m1.gtcTB.toFixed(1)} · Thu nhập TB: ${Math.round(m1.thuNhap).toLocaleString('vi-VN')}đ/ngày · NV: ${m1.nvCount}\n`;if(m2)s+=`- So N-2: NS Gán ${aiFmtDelta(m1.nsGan,m2.nsGan,'',true)}, Thu nhập ${aiFmtDelta(m1.thuNhap,m2.thuNhap,'đ',true)}\n`;}
-  const hN1=HR.filter(r=>r.date===n1&&r.am===am).reduce((a,r)=>a+r.count,0),hN2=HR.filter(r=>r.date===n2&&r.am===am).reduce((a,r)=>a+r.count,0);
+  const hN1=HR.filter(r=>r.date===n1&&aiAmEquals(r.am,am)).reduce((a,r)=>a+r.count,0),hN2=HR.filter(r=>r.date===n2&&aiAmEquals(r.am,am)).reduce((a,r)=>a+r.count,0);
   if(hN1||hN2)s+=`- Nhân sự HRON N-1: ${hN1}${hN2?` (Δ N-2: ${hN1-hN2>=0?'+':''}${hN1-hN2})`:''}\n`;
   const bcs=aiAmBcGtcOnDate(gBC,am,n1);
   if(bcs.length){
@@ -3204,8 +3214,9 @@ return/điểm mạnh.*điểm yếu|tổng quan yếu|tong quan yeu|yếu\/tố
   }
   const batonBCs=(window._BATON?.rows||[]).filter(r=>{const bc2am=ovBuildBcMaps(gBC).bc2am;return bc2am[r.bc]===am;});
   if(batonBCs.length){s+=`\n### BC bất ổn thuộc AM:\n`;batonBCs.forEach(r=>s+=`- ${r.bc}: Tồn LM=${fmt(r.blLmTong)}, Lý do=${r.lyDo||'—'}\n`);}
-  const A=aiDatasetDates((gBC||[]).slice(1).filter(r=>(r[0]||'').trim()===am).map(r=>isoD(r[2])),days);
+  const A=aiDatasetDates((gBC||[]).slice(1).filter(r=>aiAmEquals(r[0],am)).map(r=>isoD(r[2])),days);
   if(A.winArr.length>1){s+=`\n### Xu hướng ${days} ngày (GTC Total AM):\n`;A.winArr.forEach(d=>{const g=aiAmGtcRow(gAM,am,d);if(g)s+=`- ${shortD(d)}: Vol=${g.vol}, %GTC=${g.gtc.toFixed(1)}%\n`;});}
+  if(!g1&&!t1&&!bcs.length)s+=`\n⚠️ Không tìm thấy dữ liệu GTC/BC cho AM "${am}" tại N-1 — kiểm tra tên AM trong nháy kép khớp sheet "GTC Total theo AM".\n`;
   return s;
   }
   const AI_PRESETS={
@@ -4129,6 +4140,8 @@ return/điểm mạnh.*điểm yếu|tổng quan yếu|tong quan yeu|yếu\/tố
   let ctx,scopeNote='',forceDS='',maxTokens=4096,systemPrompt=AI_SYSTEM_PROMPT;
   const isBatonHR=aiIsBatonHRPrompt(userQ);
   const isLTKCT=aiIsLTKCTPrompt(userQ);
+  const isAmAnalysis=aiIsAmTongQuanPrompt(userQ);
+  const amTarget=aiDetectAmFromQuestion(userQ);
   window._AI_ANCHOR=null; // tính lại mốc thời gian chung sau khi nạp dữ liệu cho lần phân tích này
   try{
     await aiEnsureCoreSheets();
@@ -4154,15 +4167,16 @@ return/điểm mạnh.*điểm yếu|tổng quan yếu|tong quan yeu|yếu\/tố
     scopeNote=`[TỔNG QUAN YẾU/TỐT N-1] So sánh N-1 vs N-2 · chỉ số tệ nhất vùng + top 5 BC kém nhất · chỉ text, không bảng.`;
     systemPrompt=AI_SYSTEM_PROMPT+AI_SYSTEM_PROMPT_MANH_YEU_APPEND;
     maxTokens=8192;
-    }else if(aiIsAmTongQuanPrompt(userQ)){
-    const am=aiDetectAmFromQuestion(userQ);
-    document.getElementById('aiStatus').textContent='⏳ Đang nạp dữ liệu AM'+(am?': '+am:'')+'...';
+    }else if(isAmAnalysis){
+    const am=amTarget;
+    document.getElementById('aiStatus').textContent='⏳ Đang nạp dữ liệu AM'+(am?': '+am:' — cần tên AM trong nháy kép')+'...';
     await aiEnsureData(false,true,true,true,true,true,false);
     const days=7;
     ctx=aiCtxForAM(am,days);
-    scopeNote=`[TỔNG QUAN AM] ${am||'(cần tên AM trong nháy kép)'} · bảng chỉ số N-1 vs N-2 + 🔴🟠🟡 kiểm soát.`;
-    systemPrompt=AI_SYSTEM_PROMPT+AI_SYSTEM_PROMPT_AM_APPEND;
+    scopeNote=`[TỔNG QUAN AM] ${am||'(CHƯA có tên AM — thêm AM "Họ Tên" vào câu hỏi)'} · CHỈ phân tích AM này, không toàn vùng · bảng N-1 vs N-2 + 🔴🟠🟡.`;
+    systemPrompt=AI_SYSTEM_PROMPT+AI_SYSTEM_PROMPT_AM_APPEND+(am?`\n\n[AM MỤC TIÊU] "${am}" — mọi nhận định chỉ áp dụng cho AM này và các BC thuộc AM.`:'');
     maxTokens=6144;
+    if(!am)document.getElementById('aiStatus').textContent='⚠️ Chưa nhận diện tên AM — thêm AM "Họ Tên" vào ô câu hỏi rồi chạy lại';
     }else if(mode==='all'){
     document.getElementById('aiStatus').textContent='⏳ Đang nạp toàn bộ dữ liệu...';
     await aiEnsureData(true,true,true,true,true,true,true);
@@ -4219,8 +4233,8 @@ return/điểm mạnh.*điểm yếu|tổng quan yếu|tong quan yeu|yếu\/tố
       scopeNote='Phạm vi: dữ liệu nhanh (GTC, FD, ODR, Rớt LC, Baton'+(needLTKCT?', Leadtime KCT 3 kho':'')+(needHR?', Nhân sự':'')+') · N-1 vs N-7.';
     }
     }
-    // ===== AI tự tìm/đọc sheet nguồn (bỏ qua với Baton+HR và Leadtime KCT để tập trung dữ liệu) =====
-    if(!isBatonHR&&!isLTKCT){
+    // ===== AI tự tìm/đọc sheet nguồn (bỏ qua Baton+HR, LTKCT, và phân tích AM để tránh nhiễu dữ liệu toàn vùng) =====
+    if(!isBatonHR&&!isLTKCT&&!isAmAnalysis){
     try{
     const subjForSearch=aiDetectLevelFromQuestion(userQ)||(document.getElementById('aiCustSubject')?.value==='bc'?'bc':'am');
     const daysSearch=+(document.getElementById('aiCustDays')?.value||document.getElementById('aiAllDays')?.value)||7;
