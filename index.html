@@ -1643,7 +1643,7 @@ function aiNeedsLTKCT(q){
  const s=(q||'').toLowerCase();
  if(/highlight|lowlight|điểm sáng|điểm yếu/.test(s))return true;
  if(/leadtime kct|kho chuyển tiếp|network logistics/.test(s))return true;
- if(q===AI_PRESETS['hl-ll']||q===AI_PRESETS['tong-quan'])return true;
+ if(q===AI_PRESETS['hl-ll']||q===AI_PRESETS['tong-quan']||q===AI_PROMPT_TONG_QUAN)return true;
  return false;
 }
 const LTKCT_AI_PROMPT=`Với vai trò là chuyên gia phân tích Network Logistics vùng TNT, hãy phân tích dữ liệu Leadtime KCT (Kho Chuyển Tiếp) và trình bày theo cấu trúc:
@@ -2856,9 +2856,9 @@ function buildAIPage(){
   <div id="aiPresetBlock">
    <div style="margin-bottom:8px;font-size:12px;color:var(--text-sub)">Chọn nhanh:</div>
    <div class="ai-preset-row">
-    <button class="ai-preset-btn" onclick="setAIPrompt('tong-quan')">📊 Tổng quan vận hành</button>
+    <button class="ai-preset-btn" onclick="setAIPrompt('tong-quan')">📊 Báo cáo tổng quan Vùng</button>
     <button class="ai-preset-btn" onclick="setAIPrompt('hanh-dong-nhanh')">⚡ Gợi ý hành động nhanh</button>
-    <button class="ai-preset-btn" onclick="setAIPrompt('hl-ll')">🏆 Highlight / Lowlight</button>
+    <button class="ai-preset-btn" onclick="setAIPrompt('hl-ll')">🏆 Highlight / Lowlight (ngắn)</button>
     <button class="ai-preset-btn" onclick="setAIPrompt('so-sanh-am')">👤 So sánh AM</button>
     <button class="ai-preset-btn" onclick="setAIPrompt('tra-hang')">🔄 Phân tích tỉ lệ trả</button>
     <button class="ai-preset-btn" onclick="setAIPrompt('rot-lc')">📉 Phân tích Rớt LC</button>
@@ -2926,10 +2926,38 @@ function buildAIPage(){
  aiRenderSavedQuestions();
 }
 const AI_Q_KEY='tnt_ai_saved_questions';
+const AI_PROMPT_TONG_QUAN=`Viết BÁO CÁO VẬN HÀNH VÙNG TNT — [ngày N-1] theo format NGẮN GỌN (tối đa ~80 dòng), so sánh N-1 vs N-7. KHÔNG viết lời văn dài, KHÔNG mở đầu "Bức tranh tổng thể", KHÔNG liệt kê quá 3 highlight và 3 lowlight dạng đoạn văn.
+
+CẤU TRÚC BẮT BUỘC (phải hoàn thành đủ 3 phần, không dừng giữa chừng):
+
+## 1. Toàn vùng
+Mỗi chỉ số 1 dòng bullet, format: \`- [Chỉ số]: [giá trị/Δ N-7→N-1] => tốt|tệ|kém\`
+Bắt buộc có: GTC (bq 3N + 2 BC bất ổn nếu kéo tụt), FD TTS, FD SME, FD Total, Aging >5N (tổng + % từ 2 BC bất ổn), Rớt LC (3N + BC/AM bất thường), Ontime TTS (ODR tốt/xấu nhất + OPR thấp nhất), Leadtime KCT (TB + lưu ý kho/mốc xấu).
+Lồng ngắn 2-3 điểm sáng và 2-3 điểm yếu quan trọng nhất vào các dòng trên (không tách section HL/LL dài).
+
+## 2. Điểm tệ (chỉ số TĂNG so N-7 = xấu)
+**FD TTS tăng** — top 5-6 BC: \`Tên BC (AM): N-7%→N-1% (+Xpp) => việc cần làm ngắn\`
+**FD Total tăng** — top 4-5 BC tương tự
+=> 1 dòng trọng tâm: AM nào xuất hiện nhiều BC tệ nhất → ưu tiên họp rà soát
+
+## 3. Bưu cục bất ổn — tổng quan
+Mỗi BC bất ổn (🔴): 3-4 bullet — GTC 3N + so N-7, Aging, FD Total/TTS Δ, tóm 1 dòng
+Kết: 1-2 câu tổng quan 2 BC (chiếm bao nhiêu % aging/GTC vùng)
+
+QUY TẮC: chỉ dùng số trong DỮ LIỆU; mỗi dòng súc tích; không lặp số liệu; kết thúc đủ phần 3.`;
+const AI_SYSTEM_PROMPT_TONG_QUAN_APPEND=`\n\n[FORMAT BÁO CÁO TỔNG QUAN — GHI ĐÈ "LỜI VĂN"]
+Khi yêu cầu là báo cáo tổng quan/toàn cảnh Vùng TNT: KHÔNG viết narrative dài, KHÔNG section "Bức tranh tổng thể", KHÔNG liệt kê 6+ highlight/lowlight chi tiết.
+Trình bày bullet ngắn, mỗi dòng kết => tốt/tệ/kém. Đủ 3 phần: (1) Toàn vùng, (2) Điểm tệ FD tăng, (3) BC bất ổn. Tối đa ~80 dòng. PHẢI kết thúc đủ 3 phần.`;
+function aiIsBaoCaoTongQuan(q){
+ if(!q)return false;
+ if(q===AI_PROMPT_TONG_QUAN)return true;
+ const s=(q||'').toLowerCase();
+ return/báo cáo vận hành vùng|tổng quan toàn cảnh|highlight.*lowlight|điểm sáng.*điểm yếu|hl\/ll/.test(s);
+}
 const AI_PRESETS={
- 'tong-quan':'Với vai trò chuyên gia cố vấn vận hành, hãy viết phân tích tổng quan dạng LỜI VĂN (không liệt kê khô khan), lồng số liệu vào câu. Ví dụ: "Ngày 25/06 GTC đạt 870 đơn, tăng 30 so với 24/06 nhưng giảm 13 so với 23/06...". Bao quát: GTC, Ontime (ODR/OPR), %FD, Aging, Rớt LC, Leadtime KCT 3 kho chuyển tiếp (Volume, Leadtime TB, so sánh từng kho N-1 vs N-2) và BC bất ổn — luôn so N-1 vs N-7. Kết bằng khuyến nghị hành động.',
+ 'tong-quan':AI_PROMPT_TONG_QUAN,
  'hanh-dong-nhanh':'Phân tích NHANH dữ liệu vận hành Vùng TNT dựa trên phần "Chỉ số theo vùng N-1 vs N-2" và "Điểm tệ" (nếu có trong dữ liệu):\n(1) Tóm tắt 3-5 dòng tình hình N-1 so N-2 theo 6 tỉnh — tỉnh/chỉ số nào tụt mạnh nhất;\n(2) Từ danh sách ĐIỂM TỆ (BC có N-1 tệ hơn N-2), nhóm theo AM và chỉ số — chỉ ra pattern (vd: nhiều BC cùng AM tụt Gán giao);\n(3) Đề xuất 5-7 HÀNH ĐỘNG ƯU TIÊN trong 48h, mỗi hành động: AM/BC cụ thể → việc làm → kỳ vọng cải thiện chỉ số nào;\n(4) Xếp hạng mức độ khẩn cấp 🔴/🟡/🟢.\nTrình bày ngắn gọn, thực chiến, không lan man.',
- 'hl-ll':'Liệt kê Highlight (điểm sáng) và Lowlight (điểm yếu):\n- HIGHLIGHT 🟢: Ai làm tốt, chỉ số nào ấn tượng? (gồm kho chuyển tiếp có leadtime tốt nhất, volume ổn định)\n- LOWLIGHT 🔴: Ai tụt hậu, vấn đề gì nổi bật? (gồm kho chuyển tiếp leadtime xấu nhất, mốc giờ leadtime cao)\n- Phân tích riêng 3 kho chuyển tiếp: so sánh Volume & Leadtime N-1 vs N-2, chỉ ra kho/mốc giờ cần ưu tiên\n- Gợi ý hành động cụ thể. So sánh N-1 vs N-7.',
+ 'hl-ll':AI_PROMPT_TONG_QUAN,
  'so-sanh-am':'So sánh hiệu suất từng AM: xếp hạng theo %GTC, tỉ lệ trả, ontime, aging và rớt LC. Ai đang cải thiện? Ai đang giảm? Phân tích nguyên nhân. So sánh N-1 vs N-7.',
  'tra-hang':'Phân tích sâu tỉ lệ trả hàng (%FD) từ nguồn FD: (1) AM/BC nào cao/thấp nhất; (2) Xu hướng N-1 vs N-7; (3) So sánh FD Total vs SME vs TTS vs Shopee; (4) Đề xuất giảm FD.',
  'rot-lc':'Phân tích Rớt LC (nguồn Rot_LC_Raw): (1) Tổng đơn rớt LC hôm qua (N-1) vs 7 ngày trước (N-7); (2) AM/BC/Loại KH nào phát sinh nhiều nhất; (3) Xu hướng 7 ngày; (4) Kiến nghị xử lý.',
@@ -3196,9 +3224,16 @@ async function aiAutoSourceContext(userQ,subject,days,forceDataset){
 function setAIPrompt(key){document.getElementById('aiPromptArea').value=AI_PRESETS[key]||'';}
 /* ===== AI: chế độ Tổng quan toàn bộ & Custom ===== */
 function aiFillPrompt(t){const a=document.getElementById('aiPromptArea');a.value=t;a.focus();}
-function aiChips(list){return list.map(t=>`<button class="ai-preset-btn" onclick="aiFillPrompt(this.dataset.q)" data-q="${t.replace(/"/g,'&quot;')}">${t}</button>`).join('');}
+function aiChips(list){
+ return list.map(item=>{
+  const isObj=typeof item==='object'&&item&&item.prompt;
+  const q=isObj?item.prompt:item;
+  const label=isObj?item.label:(item.length>72?item.slice(0,72)+'…':item);
+  return`<button class="ai-preset-btn" onclick="aiFillPrompt(this.dataset.q)" data-q="${q.replace(/"/g,'&quot;')}">${label}</button>`;
+ }).join('');
+}
 const AI_ALL_SUGGEST=[
- 'Tổng quan toàn cảnh vận hành Vùng TNT: nêu 3 điểm sáng (highlight) và 3 điểm yếu (lowlight) quan trọng nhất, kèm số liệu minh chứng. So sánh N-1 vs N-7.',
+ {label:'📊 Báo cáo tổng quan Vùng (HL/LL ngắn)',prompt:AI_PROMPT_TONG_QUAN},
  'Phân tích nhanh N-1 vs N-2 theo 6 tỉnh và Điểm tệ (BC tụt chỉ số): đề xuất 5 việc ưu tiên làm ngay trong 48h, gắn AM/BC cụ thể.',
  'AM nào đang là điểm nghẽn của Vùng? Đối chiếu chéo %GTC, %FD, Ontime (ODR/OPR), Aging và Rớt LC để chỉ ra AM cần ưu tiên.',
  'Phân tích %FD Total trong nguồn dữ liệu FD: AM/BC nào cao nhất? Xu hướng N-1 vs N-7?',
@@ -3731,6 +3766,7 @@ async function runAIAnalysis(){
    const days=+(document.getElementById('aiAllDays')?.value)||7;
    const cmpNote=days<=1?'So sánh N-1 vs N-2 (ngày trước đó).':'So sánh N-1 vs N-7.';
    ctx=aiCtxAll(days);scopeNote=`Phạm vi: TOÀN BỘ dữ liệu (gồm Nhân sự), ${days<=1?'ngày mới nhất':days+' ngày gần nhất'}. ${cmpNote}`;
+   if(aiIsBaoCaoTongQuan(userQ)){systemPrompt=AI_SYSTEM_PROMPT+AI_SYSTEM_PROMPT_TONG_QUAN_APPEND;maxTokens=6144;scopeNote+=' · [FORMAT: báo cáo ngắn bullet ~80 dòng, đủ 3 phần]';}
   }else if(mode==='custom'){
    let dataset=document.getElementById('aiCustDataset')?.value||'gtcTotal';
    const days=+(document.getElementById('aiCustDays')?.value)||7;
@@ -3750,6 +3786,14 @@ async function runAIAnalysis(){
    const cmpNote=days<=1?'So sánh N-1 vs ngày trước đó (N-2).':'So sánh N-1 vs N-7.';
    scopeNote=(scopeNote||'')+(dataset==='baton'?`[CHUYÊN GIA NHÂN SỰ] `:'')+(dataset==='ltkct'?`[NETWORK LOGISTICS TNT] `:'')+`Phạm vi: ${dmap[dataset]} · ${days<=1?'ngày mới nhất':days+' ngày'} · theo ${smap[subject]||'BC'} · ĐỌC SHEET NGUỒN tính trực tiếp. ${cmpNote}`;
    if(dataset==='ltkct')systemPrompt=LTKCT_AI_SYSTEM;
+   }else if(aiIsBaoCaoTongQuan(userQ)){
+   document.getElementById('aiStatus').textContent='⏳ Đang nạp toàn bộ dữ liệu báo cáo tổng quan...';
+   await aiEnsureData(true,true,true,true,true,true,true);
+   const days=7;
+   ctx=aiCtxAll(days);
+   scopeNote=`Phạm vi: TOÀN BỘ dữ liệu báo cáo tổng quan · ${days} ngày · So sánh N-1 vs N-7. · [FORMAT: báo cáo ngắn bullet ~80 dòng, đủ 3 phần]`;
+   systemPrompt=AI_SYSTEM_PROMPT+AI_SYSTEM_PROMPT_TONG_QUAN_APPEND;
+   maxTokens=6144;
    }else{
     const quotedDS=aiExtractQuotedTerms(userQ).map(aiTermToDataset).find(Boolean);
     const detected=quotedDS||aiDetectFromQuestion(userQ);
