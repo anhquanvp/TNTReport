@@ -2859,7 +2859,7 @@
       <button class="ai-preset-btn" onclick="setAIPrompt('tong-quan')">📊 Báo cáo tổng quan Vùng</button>
       <button class="ai-preset-btn" onclick="setAIPrompt('hanh-dong-nhanh')">⚡ Gợi ý hành động nhanh</button>
       <button class="ai-preset-btn" onclick="setAIPrompt('hl-ll')">🏆 Highlight / Lowlight (ngắn)</button>
-      <button class="ai-preset-btn" onclick="setAIPrompt('diem-manh-yeu')">💪 Điểm mạnh / yếu N-1 vs N-2</button>
+      <button class="ai-preset-btn" onclick="setAIPrompt('tong-quan-yeu-tot')">📊 Tổng quan yếu/tốt N-1</button>
       <button class="ai-preset-btn" onclick="setAIPrompt('am-tong-quan')">👤 Tổng quan AM cụ thể</button>
       <button class="ai-preset-btn" onclick="setAIPrompt('so-sanh-am')">📊 So sánh các AM</button>
       <button class="ai-preset-btn" onclick="setAIPrompt('tra-hang')">🔄 Phân tích tỉ lệ trả</button>
@@ -2956,31 +2956,37 @@
   const s=(q||'').toLowerCase();
   return/báo cáo vận hành vùng|tổng quan toàn cảnh|highlight.*lowlight|điểm sáng.*điểm yếu|hl\/ll/.test(s);
   }
-  const AI_PROMPT_DIEM_MANH_YEU=`Phân tích điểm mạnh, điểm yếu của ngày N-1 so với N-2 (ngày liền trước).
+const AI_PROMPT_TONG_QUAN_YEU_TOT=`Tổng quan yếu/tốt N-1: Phân tích điểm mạnh, điểm yếu của ngày N-1 so với N-2 (ngày liền trước).
 
-  ## I. ĐIỂM MẠNH
-  Chỉ ghi tên chỉ số và tỷ lệ/số liệu N-1 (có thể kèm Δ so N-2 ngắn). Mỗi chỉ số 1 dòng, không giải thích dài.
-  Ví dụ: \`FD TTS: 4,52% (giảm 0,95pp so N-2)\` · \`ODR vùng: 96,1%\`
+Tiêu đề: # PHÂN TÍCH ĐIỂM MẠNH / ĐIỂM YẾU — N-1 (ngày) vs N-2 (ngày)
+Thêm dòng ⚠️ *Lưu ý* nếu dữ liệu ghi sheet FD/GTC chỉ đến N-1.
 
-  ## II. ĐIỂM YẾU — Top 5 bưu cục nghiêm trọng nhất
-  Xác định chỉ số nào biến động xấu đột biến nhất toàn vùng N-1 vs N-2 (%GTC giảm, FD tăng, Aging tăng, Rớt LC tăng, OPR giảm…).
-  Liệt kê đúng 5 bưu cục: Tên BC (AM) — chỉ số tệ nhất — N-2 → N-1 — mức độ nghiêm trọng (1 câu).
+## I. ĐIỂM MẠNH
+Chỉ ghi tên chỉ số và tỷ lệ/số liệu N-1 (kèm Δ so N-2 ngắn). Mỗi chỉ số 1 dòng bullet, không giải thích dài.
+Dùng block "PHẦN I — Điểm mạnh vùng" trong DỮ LIỆU. Ví dụ: - **%GTC toàn vùng:** 68,8% (▲ 0,7pp so N-2)
 
-  ## III. NGUYÊN NHÂN & PHƯƠNG ÁN
-  Với từng BC trong top 5: nguyên nhân có thể (2-3 câu) + 2-3 phương án xử lý cụ thể (gắn AM/BC).
+## II. ĐIỂM YẾU — Top 5 bưu cục nghiêm trọng nhất
+Bước 1 — Xác định chỉ số TỆ NHẤT toàn vùng N-1 vs N-2 (block "Chỉ số TỆ NHẤT toàn vùng").
+Bước 2 — Liệt kê đúng 5 bưu cục có tỷ lệ/chỉ số đó KÉM NHẤT vùng (block "Top 5 BC kém nhất theo chỉ số tệ nhất vùng").
+Format mỗi BC: **BC N — Tên BC (AM: ...)** · chỉ số chính N-2 → N-1 · các chỉ số liên quan khác nếu cùng xấu · → **Mức độ:** 1 câu.
+Ưu tiên BC có nhiều chỉ số xấu đồng thời (GTC↓ + FD↑ + NS↓ + thu nhập↓); bổ sung từ "Hồ sơ BC top 5".
 
-  QUY TẮC: CHỈ dùng văn bản thuần (bullet/đoạn ngắn), KHÔNG dùng bảng markdown (không dùng | cột |). Hoàn thành đủ 3 phần. Chỉ dùng số trong DỮ LIỆU.`;
-  const AI_SYSTEM_PROMPT_MANH_YEU_APPEND=`\n\n[FORMAT ĐIỂM MẠNH / ĐIỂM YẾU N-1 vs N-2]
-  - TUYỆT ĐỐI KHÔNG dùng bảng pipe-separated (|), KHÔNG format RANK | Tên | ...
-  - Điểm Mạnh: chỉ tên chỉ số + tỷ lệ/số liệu, 1 dòng/chỉ số.
-  - Điểm Yếu: chọn đúng 5 bưu cục nghiêm trọng nhất dựa trên biến động đột biến N-1 vs N-2 trong dữ liệu BC.
-  - Phần III bắt buộc: nguyên nhân + phương án cho cả 5 BC.`;
-  function aiIsDiemManhYeuPrompt(q){
-  if(!q)return false;
-  if(q===AI_PROMPT_DIEM_MANH_YEU)return true;
-  const s=(q||'').toLowerCase();
-  return/điểm mạnh.*điểm yếu|diem manh.*diem yeu|điểm mạnh.*n-2|điểm yếu.*n-2/.test(s);
-  }
+## III. NGUYÊN NHÂN & PHƯƠNG ÁN
+Với từng BC trong top 5: nguyên nhân có thể (2-3 câu) + 2-3 phương án xử lý cụ thể (gắn AM/BC).
+
+QUY TẮC: CHỈ văn bản thuần (bullet/đoạn ngắn), KHÔNG bảng markdown (|). Hoàn thành đủ 3 phần. Chỉ dùng số trong DỮ LIỆU.`;
+const AI_PROMPT_DIEM_MANH_YEU=AI_PROMPT_TONG_QUAN_YEU_TOT;
+const AI_SYSTEM_PROMPT_MANH_YEU_APPEND=`\n\n[FORMAT TỔNG QUAN YẾU/TỐT N-1 vs N-2]
+- TUYỆT ĐỐI KHÔNG dùng bả | cột |, KHÔNG format RANK | Tên | ...
+- Phần I: bullet chỉ số + tỷ lệ N-1, 1 dòng/chỉ số — lấy từ block điểm mạnh vùng.
+- Phần II: mở đầu nêu rõ chỉ số tệ nhất vùng; top 5 BC = 5 BC kém nhất theo chỉ số đó (ưu tiên dữ liệu "Top 5 BC kém nhất" hệ thống đã tính).
+- Phần III bắt buộc: nguyên nhân + phương án cho cả 5 BC.`;
+function aiIsDiemManhYeuPrompt(q){
+if(!q)return false;
+if(q===AI_PROMPT_TONG_QUAN_YEU_TOT||q===AI_PROMPT_DIEM_MANH_YEU)return true;
+const s=(q||'').toLowerCase();
+return/điểm mạnh.*điểm yếu|tổng quan yếu|tong quan yeu|yếu\/tốt|yeu\/tot|diem manh.*diem yeu|điểm mạnh.*n-2|điểm yếu.*n-2/.test(s);
+}
   const AI_PROMPT_AM_TONG_QUAN=`Phân tích TỔNG QUAN tất cả chỉ số vận hành của AM cụ thể — so sánh N-1 vs N-2.
 
   ⚠️ Ghi tên AM trong nháy kép, ví dụ: Phân tích tổng quan AM "Phạm Tiến Bình"
@@ -3206,7 +3212,8 @@
   'tong-quan':AI_PROMPT_TONG_QUAN,
   'hanh-dong-nhanh':'Phân tích NHANH dữ liệu vận hành Vùng TNT dựa trên phần "Chỉ số theo vùng N-1 vs N-2" và "Điểm tệ" (nếu có trong dữ liệu):\n(1) Tóm tắt 3-5 dòng tình hình N-1 so N-2 theo 6 tỉnh — tỉnh/chỉ số nào tụt mạnh nhất;\n(2) Từ danh sách ĐIỂM TỆ (BC có N-1 tệ hơn N-2), nhóm theo AM và chỉ số — chỉ ra pattern (vd: nhiều BC cùng AM tụt Gán giao);\n(3) Đề xuất 5-7 HÀNH ĐỘNG ƯU TIÊN trong 48h, mỗi hành động: AM/BC cụ thể → việc làm → kỳ vọng cải thiện chỉ số nào;\n(4) Xếp hạng mức độ khẩn cấp 🔴/🟡/🟢.\nTrình bày ngắn gọn, thực chiến, không lan man.',
   'hl-ll':AI_PROMPT_TONG_QUAN,
-  'diem-manh-yeu':AI_PROMPT_DIEM_MANH_YEU,
+  'tong-quan-yeu-tot':AI_PROMPT_TONG_QUAN_YEU_TOT,
+  'diem-manh-yeu':AI_PROMPT_TONG_QUAN_YEU_TOT,
   'am-tong-quan':AI_PROMPT_AM_TONG_QUAN,
   'so-sanh-am':'So sánh hiệu suất từng AM: xếp hạng theo %GTC, tỉ lệ trả, ontime, aging và rớt LC. Ai đang cải thiện? Ai đang giảm? Phân tích nguyên nhân. So sánh N-1 vs N-7.',
   'tra-hang':'Phân tích sâu tỉ lệ trả hàng (%FD) từ nguồn FD: (1) AM/BC nào cao/thấp nhất; (2) Xu hướng N-1 vs N-7; (3) So sánh FD Total vs SME vs TTS vs Shopee; (4) Đề xuất giảm FD.',
@@ -3484,7 +3491,7 @@
   }
   const AI_ALL_SUGGEST=[
   {label:'📊 Báo cáo tổng quan Vùng (HL/LL ngắn)',prompt:AI_PROMPT_TONG_QUAN},
-  {label:'💪 Điểm mạnh / yếu N-1 vs N-2',prompt:AI_PROMPT_DIEM_MANH_YEU},
+  {label:'📊 Tổng quan yếu/tốt N-1',prompt:AI_PROMPT_TONG_QUAN_YEU_TOT},
   {label:'👤 Tổng quan AM cụ thể (ghi tên trong nháy kép)',prompt:AI_PROMPT_AM_TONG_QUAN},
   'Phân tích nhanh N-1 vs N-2 theo 6 tỉnh và Điểm tệ (BC tụt chỉ số): đề xuất 5 việc ưu tiên làm ngay trong 48h, gắn AM/BC cụ thể.',
   'AM nào đang là điểm nghẽn của Vùng? Đối chiếu chéo %GTC, %FD, Ontime (ODR/OPR), Aging và Rớt LC để chỉ ra AM cần ưu tiên.',
@@ -3814,6 +3821,74 @@
   if(window._LTKCT?.rows?.length)s+='\n'+ltkctGatherAICtx(days);
   return s||'(Dữ liệu chưa được tải)';
   }
+  function aiAllBadSects(gBC,odrBC,oprBC,fdBC,fdTTSBC,fdSMEBC,rotData,agRows,n1,n2){
+  const sects=ovCollectBCBadPoints(gBC,odrBC,oprBC,fdBC,rotData,agRows,n1,n2);
+  const fdTTS=ovCollectBCBadPoints(gBC,odrBC,oprBC,fdTTSBC,rotData,agRows,n1,n2).find(x=>x.k==='fd');
+  const fdSME=ovCollectBCBadPoints(gBC,odrBC,oprBC,fdSMEBC,rotData,agRows,n1,n2).find(x=>x.k==='fd');
+  if(fdTTS)sects.push({...fdTTS,label:'FD TTS tăng',k:'fdTTS'});
+  if(fdSME)sects.push({...fdSME,label:'FD SME tăng',k:'fdSME'});
+  return sects;
+  }
+  const AI_HL_SECT_KEY={'%Gán':'gan','%GTC':'gtc','ODR':'odr','OPR':'opr','%FD':'fd','Aging':'aging','Rớt LC':'rot','NS Gán':'nsG','NS GTC':'nsGtc','Thu nhập TB':'thu','Leadtime KCT':'ltk'};
+  function aiRegionLabel(lb){
+  const m={'%Gán':'%Gán toàn vùng','%GTC':'%GTC toàn vùng','ODR':'ODR toàn vùng','OPR':'OPR toàn vùng','%FD':'%FD Total toàn vùng','Aging':'Aging >5N toàn vùng','Rớt LC':'Rớt LC toàn vùng','NS Gán':'NS Gán Giao TB','NS GTC':'NS GTC TB','Thu nhập TB':'Thu nhập TB','Leadtime KCT':'Leadtime KCT TB'};
+  return m[lb]||lb;
+  }
+  function aiPickWorstRegionSect(hlBad,sects){
+  if(!hlBad?.length||!sects.length)return null;
+  const sorted=[...hlBad].sort((a,b)=>b.delta-a.delta);
+  for(const w of sorted){
+    const k=AI_HL_SECT_KEY[w.lb];
+    if(k==='fd'){
+    const cands=sects.filter(s=>s.k==='fd'||s.k==='fdTTS'||s.k==='fdSME');
+    if(cands.length)return cands.reduce((best,s)=>!best||((s.items[0]?.d||0)>(best.items[0]?.d||0))?s:best,cands[0]);
+    }
+    const s=sects.find(x=>x.k===k);
+    if(s?.items.length)return s;
+  }
+  return sects.filter(s=>s.items.length).sort((a,b)=>(b.items[0]?.d||0)-(a.items[0]?.d||0))[0]||null;
+  }
+  function aiBcChannelMetrics(bc,n1,n2){
+  const out={};
+  const getFd=(sh,key)=>{
+    if(!sh)return;
+    const g=dt=>{const r=sh.slice(1).find(x=>(x[0]||'').trim()===bc&&isoD(x[1])===dt);return r?parsePct(r[3]):null;};
+    out[key]={n1:g(n1),n2:g(n2)};
+  };
+  getFd(window._D?.fdTTSBC,'fdTTS');getFd(window._D?.fdSMEBC,'fdSME');getFd(window._D?.fdTotalBC,'fdTotal');
+  const gtcTTS=window._D?.gtcTTSBC;
+  if(gtcTTS){
+    const g=dt=>{const r=gtcTTS.slice(1).find(x=>(x[1]||'').trim()===bc&&isoD(x[2])===dt);if(!r)return null;const v=Math.round(parseFloat(r[3])||0),n=Math.round(parseFloat(r[6])||0);return{gtc:v?n/v*100:null,gan:(parseFloat(r[4])||0)*100};};
+    out.gtcTTS={n1:g(n1),n2:g(n2)};
+  }
+  const odrBC=window._D?.odrBC,oprBC=window._D?.oprBC;
+  if(odrBC){
+    const g=dt=>{const r=odrBC.slice(1).find(x=>(x[1]||'').trim()===bc&&isoD(x[2])===dt);return r&&parseFloat(r[3])?(parseFloat(r[4])||0)*100:null;};
+    out.odrTTS={n1:g(n1),n2:g(n2)};
+  }
+  if(oprBC){
+    const g=dt=>{const r=oprBC.slice(1).find(x=>(x[1]||'').trim()===bc&&isoD(x[2])===dt);return r&&parseFloat(r[3])?(parseFloat(r[4])||0)*100:null;};
+    out.oprTTS={n1:g(n1),n2:g(n2)};
+  }
+  return out;
+  }
+  function aiBcProfileLines(bc,am,sects,n1,n2,skipLabel){
+  const lines=[];
+  sects.forEach(sec=>{
+    const it=sec.items.find(x=>x.bc===bc);
+    if(!it||sec.label===skipLabel)return;
+    lines.push(`${sec.label}: N-2=${sec.fmt(it.v2)} → N-1=${sec.fmt(it.v1)}`);
+  });
+  const ch=aiBcChannelMetrics(bc,n1,n2);
+  if(ch.gtcTTS?.n1?.gtc!=null&&ch.gtcTTS?.n2?.gtc!=null&&!lines.some(l=>l.includes('GTC TTS')))lines.push(`%GTC TTS: N-2=${ch.gtcTTS.n2.gtc.toFixed(2)}% → N-1=${ch.gtcTTS.n1.gtc.toFixed(2)}%`);
+  if(ch.gtcTTS?.n1?.gan!=null&&ch.gtcTTS?.n2?.gan!=null)lines.push(`%Gán TTS: N-2=${ch.gtcTTS.n2.gan.toFixed(1)}% → N-1=${ch.gtcTTS.n1.gan.toFixed(1)}%`);
+  if(ch.fdTTS?.n1!=null&&ch.fdTTS?.n2!=null&&!lines.some(l=>l.includes('FD TTS')))lines.push(`FD TTS: N-2=${ch.fdTTS.n2.toFixed(2)}% → N-1=${ch.fdTTS.n1.toFixed(2)}%`);
+  if(ch.fdSME?.n1!=null&&ch.fdSME?.n2!=null&&!lines.some(l=>l.includes('FD SME')))lines.push(`FD SME: N-2=${ch.fdSME.n2.toFixed(2)}% → N-1=${ch.fdSME.n1.toFixed(2)}%`);
+  if(ch.fdTotal?.n1!=null&&ch.fdTotal?.n2!=null&&!lines.some(l=>l.includes('FD Total')))lines.push(`FD Total: N-2=${ch.fdTotal.n2.toFixed(2)}% → N-1=${ch.fdTotal.n1.toFixed(2)}%`);
+  if(ch.odrTTS?.n1!=null&&ch.odrTTS?.n2!=null&&!lines.some(l=>l.includes('ODR')))lines.push(`ODR TTS: N-2=${ch.odrTTS.n2.toFixed(1)}% → N-1=${ch.odrTTS.n1.toFixed(1)}%`);
+  if(ch.oprTTS?.n1!=null&&ch.oprTTS?.n2!=null&&!lines.some(l=>l.includes('OPR')))lines.push(`OPR TTS: N-2=${ch.oprTTS.n2.toFixed(1)}% → N-1=${ch.oprTTS.n1.toFixed(1)}%`);
+  return lines;
+  }
   function aiCtxN1N2ManhYeu(){
   const D=window._D||{};
   const gBC=D.gtcTotalBC,odrBC=D.odrBC,oprBC=D.oprBC;
@@ -3822,31 +3897,55 @@
   const ds=ovDatesDesc(gBC,2);
   const n1=ds[0],n2=ds[1];
   if(!n1||!n2)return'(Chưa đủ dữ liệu N-1 và N-2)';
-  let s=`=== PHÂN TÍCH ĐIỂM MẠNH / ĐIỂM YẾU — N-1: ${shortD(n1)} vs N-2: ${shortD(n2)} ===\n`;
+  let s=`=== TỔNG QUAN YẾU/TỐT N-1 — ${shortD(n1)} vs ${shortD(n2)} ===\n`;
   s+=ovRegionSummaryForAI(gBC,odrBC,oprBC,fdBC,rotData,agRows,n1,n2);
   const hl=ovRegionHlLl(gBC,odrBC,oprBC,fdBC,rotData,agRows,n1,n2);
-  if(hl){
-    if(hl.good.length){s+='\n### Điểm mạnh vùng (N-1 tốt hơn N-2):\n';hl.good.forEach(d=>s+=`- ${d.lb}: N-1=${ovFmtOV(d.v1,d.sfx,d.dec)}, N-2=${ovFmtOV(d.v2,d.sfx,d.dec)} (${d.dTxt})\n`);}
-    if(hl.bad.length){s+='\n### Điểm yếu vùng (N-1 xấu hơn N-2):\n';hl.bad.forEach(d=>s+=`- ${d.lb}: N-1=${ovFmtOV(d.v1,d.sfx,d.dec)}, N-2=${ovFmtOV(d.v2,d.sfx,d.dec)} (${d.dTxt})\n`);}
+  if(hl?.good?.length){
+    s+='\n### PHẦN I — Điểm mạnh vùng (copy bullet, mỗi chỉ số 1 dòng):\n';
+    hl.good.forEach(d=>s+=`- ${aiRegionLabel(d.lb)}: N-1=${ovFmtOV(d.v1,d.sfx,d.dec)} (${d.dTxt} so N-2)\n`);
   }
-  const sects=ovCollectBCBadPoints(gBC,odrBC,oprBC,fdBC,rotData,agRows,n1,n2);
-  const fdTTSsect=ovCollectBCBadPoints(gBC,odrBC,oprBC,fdTTSBC,rotData,agRows,n1,n2).find(x=>x.k==='fd');
-  const fdSMEsect=ovCollectBCBadPoints(gBC,odrBC,oprBC,fdSMEBC,rotData,agRows,n1,n2).find(x=>x.k==='fd');
-  if(fdTTSsect){fdTTSsect.label='FD TTS tăng';sects.push(fdTTSsect);}
-  if(fdSMEsect){fdSMEsect.label='FD SME tăng';sects.push(fdSMEsect);}
-  if(sects.length){
-    s+='\n### BC có chỉ số xấu đi (N-1 so N-2) — dùng để chọn top 5 nghiêm trọng:\n';
-    sects.forEach(sec=>{
-    s+=`\n— ${sec.label}:\n`;
-    sec.items.forEach((it,i)=>{if(i>=15)return;s+=`  ${it.bc} (${it.am}): N-2=${sec.fmt(it.v2)} → N-1=${sec.fmt(it.v1)}\n`;});
+  const ltk=ovLtkCopyDataN1N2();
+  if(ltk){
+    ltk.rows.slice(0,-1).forEach(r=>{
+    const dLt=parseFloat(String(r[7]||'').replace(/[^\d.-]/g,''));
+    if(isFinite(dLt)&&dLt<=-0.05)s+=`- Leadtime KCT ${r[1]}: N-1=${r[5]} (${r[7]} so N-2)\n`;
+    });
+  }
+  const sects=aiAllBadSects(gBC,odrBC,oprBC,fdBC,fdTTSBC,fdSMEBC,rotData,agRows,n1,n2);
+  if(hl?.bad?.length){
+    s+='\n### PHẦN II — Chỉ số TỆ NHẤT toàn vùng (N-1 xấu hơn N-2, xếp theo |Δ|):\n';
+    [...hl.bad].sort((a,b)=>b.delta-a.delta).forEach((d,i)=>s+=`${i+1}. ${d.lb}: N-1=${ovFmtOV(d.v1,d.sfx,d.dec)}, N-2=${ovFmtOV(d.v2,d.sfx,d.dec)} (${d.dTxt})\n`);
+  }
+  const worstSect=aiPickWorstRegionSect(hl?.bad||[],sects);
+  const topBcList=[];
+  if(worstSect){
+    s+=`\n### PHẦN II — Top 5 BC kém nhất theo chỉ số tệ nhất vùng: "${worstSect.label}"\n`;
+    worstSect.items.slice(0,5).forEach((it,i)=>{
+    topBcList.push(it.bc);
+    s+=`\nBC ${i+1} — ${it.bc} (AM: ${it.am})\n`;
+    s+=`- ${worstSect.label} (chính): N-2=${worstSect.fmt(it.v2)} → N-1=${worstSect.fmt(it.v1)}\n`;
+    aiBcProfileLines(it.bc,it.am,sects,n1,n2,worstSect.label).slice(0,8).forEach(l=>s+=`- ${l}\n`);
     });
   }
   const bcScore={};
   sects.forEach(sec=>{sec.items.forEach((it,i)=>{const sc=(12-i)*it.d;if(!bcScore[it.bc])bcScore[it.bc]={bc:it.bc,am:it.am,score:0,issues:[]};bcScore[it.bc].score+=sc;bcScore[it.bc].issues.push(`${sec.label} ${sec.fmt(it.v2)}→${sec.fmt(it.v1)}`);});});
-  const topBC=Object.values(bcScore).sort((a,b)=>b.score-a.score).slice(0,8);
-  if(topBC.length){s+='\n### Gợi ý top BC biến động xấu nhất (hệ thống xếp hạng):\n';topBC.forEach((x,i)=>s+=`${i+1}. ${x.bc} (${x.am}): ${x.issues.slice(0,4).join(' · ')}\n`);}
+  const compositeTop=Object.values(bcScore).sort((a,b)=>b.score-a.score).slice(0,8);
+  if(compositeTop.length){
+    s+='\n### Hồ sơ BC top 5 (nhiều chỉ số xấu đồng thời — dùng bổ sung Phần II & III):\n';
+    compositeTop.slice(0,5).forEach((x,i)=>{
+    s+=`\nBC ${i+1} — ${x.bc} (AM: ${x.am})\n`;
+    s+=`- Chỉ số xấu: ${x.issues.slice(0,6).join(' · ')}\n`;
+    aiBcProfileLines(x.bc,x.am,sects,n1,n2,null).slice(0,6).forEach(l=>s+=`- ${l}\n`);
+    });
+  }
+  if(sects.length){
+    s+='\n### Chi tiết BC theo từng loại chỉ số xấu (tham khảo):\n';
+    sects.forEach(sec=>{
+    s+=`\n— ${sec.label}:\n`;
+    sec.items.slice(0,8).forEach((it,i)=>{s+=`  ${i+1}. ${it.bc} (${it.am}): N-2=${sec.fmt(it.v2)} → N-1=${sec.fmt(it.v1)}\n`;});
+    });
+  }
   if(window._BATON?.rows?.length){s+='\n### BC bất ổn (Baton):\n';window._BATON.rows.forEach(r=>s+=`- ${r.bc} (${r.tinh||'—'}): Tồn LM=${fmt(r.blLmTong)}, %Tồn>5N=${r.pctBlLmOver5.toFixed(1)}%, Lý do=${r.lyDo||'—'}\n`);}
-  const ltk=ovLtkCopyDataN1N2();
   if(ltk){s+='\n### Leadtime KCT N-1 vs N-2:\n';ltk.rows.slice(0,-1).forEach(r=>s+=`- ${r[1]}: Vol N-1=${r[2]}, LT N-1=${r[5]}, ΔLT=${r[7]}\n`);}
   return s;
   }
@@ -4052,9 +4151,9 @@
     document.getElementById('aiStatus').textContent='⏳ Đang nạp dữ liệu N-1 vs N-2...';
     await aiEnsureData(false,true,true,true,true,true,true);
     ctx=aiCtxN1N2ManhYeu();
-    scopeNote=`[ĐIỂM MẠNH / ĐIỂM YẾU] So sánh N-1 vs N-2 · toàn vùng + chi tiết BC · chỉ text, không bảng.`;
+    scopeNote=`[TỔNG QUAN YẾU/TỐT N-1] So sánh N-1 vs N-2 · chỉ số tệ nhất vùng + top 5 BC kém nhất · chỉ text, không bảng.`;
     systemPrompt=AI_SYSTEM_PROMPT+AI_SYSTEM_PROMPT_MANH_YEU_APPEND;
-    maxTokens=6144;
+    maxTokens=8192;
     }else if(aiIsAmTongQuanPrompt(userQ)){
     const am=aiDetectAmFromQuestion(userQ);
     document.getElementById('aiStatus').textContent='⏳ Đang nạp dữ liệu AM'+(am?': '+am:'')+'...';
