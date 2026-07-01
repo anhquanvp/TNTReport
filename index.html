@@ -2975,8 +2975,44 @@ function aiExportSavedQuestions(){
  const data=JSON.stringify({saved_at:new Date().toISOString(),questions:aiLoadSaved(),frequent:aiLoadSaved().slice(0,10)},null,2);
  const blob=new Blob([data],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='tnt-ai-questions.json';a.click();
 }
+// Chỉ số trong nháy kép — vd: Phân tích "GTC TTS" theo bưu cục → tìm đúng sheet nguồn
+function aiExtractQuotedTerms(q){
+ const terms=[],re=/"([^"]+)"/g;let m;
+ while((m=re.exec(q||''))){const t=m[1].trim();if(t)terms.push(t);}
+ return terms;
+}
+function aiTermToDataset(term){
+ const t=(term||'').toLowerCase().trim();if(!t)return null;
+ let best=null,score=0;
+ Object.entries(AI_DATA_REGISTRY).forEach(([id,meta])=>{
+  let sc=0;const tag=meta.tag.toLowerCase();
+  if(tag===t)sc+=12;else if(t.includes(tag)||tag.includes(t))sc+=7;
+  meta.aliases.forEach(a=>{if(t===a)sc+=9;else if(t.includes(a)||a.includes(t))sc+=5;});
+  if(sc>score){score=sc;best=id;}
+ });
+ return score>=5?best:null;
+}
+function aiSheetsFromQuoted(terms,level){
+ const hits=[],seen=new Set();
+ (terms||[]).forEach(term=>{
+  const t=(term||'').toLowerCase().trim();
+  SHEET_REGISTRY.forEach(def=>{
+   if(def.level!==level)return;
+   const sn=def.sheet.toLowerCase(),lb=(def.label||'').toLowerCase();
+   let sc=0;
+   if(sn.includes(t)||lb.includes(t)||t.includes(lb))sc=20+t.length;
+   else{const words=t.split(/\s+/).filter(w=>w.length>1);if(words.length&&words.every(w=>sn.includes(w)||lb.includes(w)))sc=15;}
+   if(sc&&!seen.has(def.sheet)){seen.add(def.sheet);hits.push({def,sc});}
+  });
+ });
+ hits.sort((a,b)=>b.sc-a.sc);
+ return hits.map(h=>h.def);
+}
 function aiDetectFromQuestion(q){
- const s=(q||'').toLowerCase();let best=null,score=0;
+ const quoted=aiExtractQuotedTerms(q);
+ for(const term of quoted){const ds=aiTermToDataset(term);if(ds)return ds;}
+ const s=(q||'').toLowerCase()+(quoted.length?' '+quoted.map(t=>t.toLowerCase()).join(' '):'');
+ let best=null,score=0;
  Object.entries(AI_DATA_REGISTRY).forEach(([id,meta])=>{
   let sc=0;if(s.includes(meta.tag.toLowerCase()))sc+=3;
   meta.aliases.forEach(a=>{if(s.includes(a))sc+=2;});
@@ -3069,8 +3105,13 @@ function aiDetectLevelFromQuestion(q){
 }
 // Tìm sheet nguồn liên quan câu hỏi — lọc đúng cấp AM hoặc Bưu Cục theo tên sheet
 function aiSearchSheets(q,subject){
- const s=(q||'').toLowerCase();
+ const quoted=aiExtractQuotedTerms(q);
  const level=aiDetectLevelFromQuestion(q)||(subject==='bc'?'bc':'am');
+ if(quoted.length){
+  const fromQ=aiSheetsFromQuoted(quoted,level);
+  if(fromQ.length)return fromQ.slice(0,6);
+ }
+ const s=(q||'').toLowerCase()+(quoted.length?' '+quoted.map(t=>t.toLowerCase()).join(' '):'');
  const hits=[];
  SHEET_REGISTRY.forEach(def=>{
   if(def.level!==level)return; // chỉ sheet đúng cấp: AM hoặc Bưu Cục
@@ -3138,6 +3179,12 @@ async function aiAutoSourceContext(userQ,subject,days,forceDataset){
  const level=aiDetectLevelFromQuestion(userQ)||(subject==='bc'?'bc':'am');
  let defs=aiSearchSheets(userQ,level);
  if(!defs.length&&forceDataset)defs=aiDefsForDataset(forceDataset,level);
+ if(!defs.length){
+  for(const term of aiExtractQuotedTerms(userQ)){
+   const ds=aiTermToDataset(term);
+   if(ds){defs=aiDefsForDataset(ds,level);if(defs.length)break;}
+  }
+ }
  if(!defs.length)return null;
  const parts=[];const used=[];
  for(const def of defs){
@@ -3167,7 +3214,7 @@ function aiCustSuggest(ds,subject){
  const S=aiSubjLabel(subject);
  const m={
   gtcTotal:[`Xếp hạng ${S} theo %GTC; chỉ ra ${S} thấp nhất và phân tích nguyên nhân có thể (Vol, %Gán).`,`${S} nào có %Gán cao nhưng %GTC vẫn thấp? Đề xuất hành động cải thiện.`,`Phân tích tương quan giữa sản lượng (Vol) và %GTC theo ${S}.`],
-  gtcTTS:[`Xếp hạng ${S} theo %GTC của TTS; ${S} nào cần ưu tiên cải thiện?`,`So sánh chênh lệch %GTC TTS giữa nhóm ${S} tốt nhất và kém nhất.`,`${S} nào %Gán cao mà %GTC TTS thấp? Vì sao?`],
+  gtcTTS:[`Xếp hạng ${S} theo %GTC của "GTC TTS"; ${S} nào cần ưu tiên cải thiện?`,`So sánh chênh lệch %GTC "GTC TTS" giữa nhóm ${S} tốt nhất và kém nhất.`,`${S} nào %Gán cao mà %GTC "GTC TTS" thấp? Vì sao?`],
   canNang:[`Phân tích %GTC theo nhóm khối lượng cho từng ${S}; nhóm cân nặng nào kéo tụt %GTC?`,`${S} nào tồn đọng (Số đơn tồn) cao nhất và tỉ trọng hàng cồng kềnh ra sao?`,`Hàng cồng kềnh (>=5kg) ảnh hưởng thế nào đến %GTC của ${S}? Đề xuất xử lý.`],
   fd:[`${S} nào có %FD (tỉ lệ trả) cao nhất? Phân tích mức độ nghiêm trọng và rủi ro.`,`Xu hướng %FD theo ${S} có đáng báo động không? Top cần can thiệp ngay.`,`Đề xuất giải pháp giảm %FD cho nhóm ${S} có tỉ lệ trả cao.`],
   odr:[`${S} nào có %Ontime ODR thấp nhất? Phân tích nguyên nhân và rủi ro vận hành.`,`Xếp hạng ${S} theo %Ontime ODR, chỉ ra nhóm dưới chuẩn.`,`${S} sản lượng lớn nhưng Ontime thấp: ưu tiên xử lý ai trước?`],
@@ -3197,7 +3244,7 @@ function aiCustDatasetChange(){
  if(loaiOpt){const ok=ds==='canNang';loaiOpt.disabled=!ok;if(!ok&&subj.value==='loai')subj.value='am';}
  if(subj){const bcOnly=ds==='aging'||ds==='rotLC'||ds==='baton'||ds==='ltkct';subj.querySelectorAll('option').forEach(o=>{if(o.value==='loai')o.disabled=ds!=='canNang';if(o.value==='am'||o.value==='bc')o.disabled=(ds==='baton'&&o.value==='am')||(ds==='ltkct'&&o.value==='am');});if(ds==='baton'&&subj.value==='am')subj.value='bc';if(ds==='ltkct'&&subj.value==='am')subj.value='bc';}
  const hint=document.getElementById('aiCustHint');
- if(hint){const map={gtcTotal:'GTC Total (Vol, %GTC, %Gán)',gtcTTS:'GTC TTS (Vol, %GTC, %Gán)',canNang:'GTC chi tiết theo cân nặng (Vol, %GTC, Tồn, %Cồng kềnh)',fd:'Tỉ lệ trả %FD — header: %Vol, %FD, Trả Total',odr:'ODR Ontime',opr:'OPR Ontime',aging:'Số đơn Aging >5 ngày',rotLC:'Rớt LC — số đơn lấy không thành công',hron:'Định biên nhân sự — Data_HRON (số nhân sự theo ngày/AM/BC)',nangSuat:'Năng suất — Data_Năng_Suất (NS Gán Giao TB, NS GTC, Thu nhập TB)',baton:'BC Bất Ổn (Baton) + Năng suất/Thu nhập/HRON theo từng BC',ltkct:'Leadtime KCT — Volume & Leadtime theo kho chuyển tiếp & mốc giờ (Total_LT/Volume)'};hint.textContent='Sẽ gửi: '+(map[ds]||'')+' · so sánh N-1 vs N-7.';}
+ if(hint){const map={gtcTotal:'GTC Total (Vol, %GTC, %Gán)',gtcTTS:'GTC TTS (Vol, %GTC, %Gán)',canNang:'GTC chi tiết theo cân nặng (Vol, %GTC, Tồn, %Cồng kềnh)',fd:'Tỉ lệ trả %FD — header: %Vol, %FD, Trả Total',odr:'ODR Ontime',opr:'OPR Ontime',aging:'Số đơn Aging >5 ngày',rotLC:'Rớt LC — số đơn lấy không thành công',hron:'Định biên nhân sự — Data_HRON (số nhân sự theo ngày/AM/BC)',nangSuat:'Năng suất — Data_Năng_Suất (NS Gán Giao TB, NS GTC, Thu nhập TB)',baton:'BC Bất Ổn (Baton) + Năng suất/Thu nhập/HRON theo từng BC',ltkct:'Leadtime KCT — Volume & Leadtime theo kho chuyển tiếp & mốc giờ (Total_LT/Volume)'};hint.textContent='Sẽ gửi: '+(map[ds]||'')+' · so sánh N-1 vs N-7. Tip: ghi chỉ số trong nháy kép (vd "GTC TTS") để AI tự tìm đúng sheet nguồn.';}
  const sug=document.getElementById('aiCustSuggest');if(sug)sug.innerHTML=aiChips(aiCustSuggest(ds,subj?subj.value:'am'));
 }
 function aiLastDateSet(rows,dateIdx,days){const s=[...new Set(rows.map(r=>isoD(r[dateIdx])).filter(Boolean))].sort();return new Set(s.slice(-days));}
@@ -3234,16 +3281,21 @@ function getAIAnchor(){
    datesRaw: mảng ngày (chuỗi) của nhóm dữ liệu đó; days: số ngày cửa sổ phân tích. */
 function aiDatasetDates(datesRaw,days){
  days=days||7;const A=getAIAnchor();const n1=A.n1;
- // 1 ngày: mốc so sánh là ngày trước đó (N-2); còn lại canh theo N-7 chung
- const n7=days<=1?(n1?aiShiftISO(n1,-1):''):A.n7;
  const uniq=[...new Set((datesRaw||[]).map(d=>isoD(d)).filter(Boolean))].sort();
- const winStart=n1?aiShiftISO(n1,-(days-1)):'';
  const leN1=uniq.filter(d=>!n1||d<=n1);const dN1=leN1.length?leN1[leN1.length-1]:'';
- const leN7=uniq.filter(d=>!n7||d<=n7);const dN7=leN7.length?leN7[leN7.length-1]:'';
  const before=uniq.filter(d=>dN1&&d<dN1);const dPrev=before.length?before[before.length-1]:'';
- const win=uniq.filter(d=>(!winStart||d>=winStart)&&(!n1||d<=n1));
+ // 1 ngày: so N-1 (ngày mới nhất trong nhóm) vs ngày trước đó trong cùng sheet
+ const n7Cmp=days<=1?(dPrev||aiShiftISO(dN1||n1,-1)):A.n7;
+ const winStart=n1?aiShiftISO(n1,-(days-1)):'';
+ let winArr=uniq.filter(d=>(!winStart||d>=winStart)&&(!n1||d<=n1));
+ // Sheet cập nhật chậm hơn mốc chung — dùng ngày mới nhất có trong nhóm này
+ if(!winArr.length&&dN1){
+  const effStart=days<=1?dN1:aiShiftISO(dN1,-(days-1));
+  winArr=uniq.filter(d=>d>=effStart&&d<=dN1);
+ }
+ const leN7=uniq.filter(d=>!n7Cmp||d<=n7Cmp);const dN7=leN7.length?leN7[leN7.length-1]:'';
  const lag=!!(dN1&&n1&&dN1!==n1);
- return{n1,n7,dN1,dN7,dPrev,win:new Set(win),winArr:win,lag,
+ return{n1,n7:n7Cmp,dN1,dN7,dPrev,win:new Set(winArr),winArr:winArr,lag,
   lagNote:lag?` [⚠ LỆCH MỐC: nhóm này chỉ có dữ liệu đến ${shortD(dN1)}, không tới mốc chung N-1=${shortD(n1)}]`:''};
 }
 function aiN1N7(sheet,dateIdx){
@@ -3491,6 +3543,32 @@ function aiCtxCustom(dataset,days,subject){
  else if(dataset==='ltkct')s=ltkctGatherAICtx(days);
  return s||'(Dữ liệu chưa được tải hoặc không có)';
 }
+async function aiEnsureCoreSheets(){
+ window._D=window._D||{};
+ const missing=AI_SHEET_NAMES.filter(n=>{
+  const dk=SHEET_DMAP[n];
+  if(window._SHEETCACHE[n]?.length>1)return false;
+  if(dk&&window._D[dk]?.length>1)return false;
+  return true;
+ });
+ if(!missing.length)return;
+ await Promise.all(missing.map(async n=>{
+  try{
+   const r=await fetchSheet(n);
+   window._SHEETCACHE[n]=r;
+   const dk=SHEET_DMAP[n];
+   if(dk)window._D[dk]=r;
+  }catch(e){console.warn('AI ensure sheet',n,e.message);}
+ }));
+ window._FD={
+  totalAM:window._D.fdTotalAM,smeAM:window._D.fdSMEAM,ttsAM:window._D.fdTTSAM,shopeeAM:window._D.fdShopeeAM,
+  totalBC:window._D.fdTotalBC,smeBC:window._D.fdSMEBC,ttsBC:window._D.fdTTSBC,shopeeBC:window._D.fdShopeeBC
+ };
+}
+function aiCtxIsEmpty(ctx){
+ const c=(ctx||'').trim();
+ return!c||/^\(Dữ liệu chưa được tải/i.test(c);
+}
 async function aiEnsureData(needCanNang,needAging,needRotLC,needBaton,needHron,needNS,needLTKCT){
  const jobs=[];
  if(needHron&&!((window._HRON&&window._HRON.rows&&window._HRON.rows.length))){
@@ -3570,7 +3648,7 @@ function gatherDashboardData(){
  return lines.join('\n')||'(Dữ liệu chưa được tải)';
 }
 const AI_SYSTEM_PROMPT=`Bạn đóng vai trò là CHUYÊN GIA CỐ VẤN VẬN HÀNH LOGISTICS Vùng TNT (GHN). Nhiệm vụ: đọc dữ liệu, đưa ra nhận định chuyên sâu, cảnh báo rủi ro và khuyến nghị hành động cụ thể. CHỈ phân tích dựa trên đúng phần DỮ LIỆU được cung cấp; nếu thiếu số liệu, nói rõ KHÔNG bịa. Trả lời tiếng Việt.
-LƯU Ý: Phần "NGUỒN DỮ LIỆU AI TỰ TÌM/ĐỌC" được TÍNH TRỰC TIẾP từ sheet thô — ưu tiên dùng các con số này, đọc kỹ để hiểu ngữ cảnh từng AM/Bưu Cục trước khi nhận định, không suy diễn ngoài dữ liệu.
+LƯU Ý: Phần "NGUỒN DỮ LIỆU AI TỰ TÌM/ĐỌC" được TÍNH TRỰC TIẾP từ sheet thô — ưu tiên dùng các con số này, đọc kỹ để hiểu ngữ cảnh từng AM/Bưu Cục trước khi nhận định, không suy diễn ngoài dữ liệu. Khi câu hỏi có chỉ số trong nháy kép (vd "GTC TTS", "FD Total"), đó là tên nguồn/sheet cần phân tích — chỉ dùng đúng phần dữ liệu khớp tên đó.
 MỐC THỜI GIAN (RẤT QUAN TRỌNG): TẤT CẢ các nhóm dữ liệu đều được canh theo CÙNG MỘT MỐC THỜI GIAN CHUNG — N-1 là ngày mới nhất chung, N-7 = N-1 trừ đúng 6 ngày lịch. Khi so sánh chéo giữa các chỉ số (GTC, FD, Ontime, Aging, Rớt LC, Nhân sự, Năng suất, Baton) PHẢI hiểu chúng cùng một mốc ngày. Nếu một nhóm dữ liệu có ghi chú "[⚠ LỆCH MỐC...]" nghĩa là sheet đó cập nhật chậm, chỉ có dữ liệu đến ngày sớm hơn mốc chung — phải nêu rõ điều này khi nhận định, KHÔNG so sánh nhầm như thể cùng ngày.
 ĐỊNH NGHĨA THUẬT NGỮ: "Tồn LM" (= cột BL LM / blLmTong trong Baton) = TỒN ĐƠN TRÊN HỆ THỐNG — tức số đơn còn tồn đọng chưa được xử lý/đẩy đi trên hệ thống Last Mile. CÀNG CAO CÀNG TỆ. KHÔNG hiểu nhầm đây là sản lượng (Vol) hay đơn đã giao. "%Tồn LM >5N" = tỉ trọng tồn đơn quá 5 ngày — càng cao càng tệ.
 ĐẶC BIỆT về NHÂN SỰ (Định biên/HRON): số nhân sự GIẢM là TÍN HIỆU XẤU (rủi ro thiếu người, ảnh hưởng năng suất/giao hàng) — đánh dấu cảnh báo; số nhân sự TĂNG là tín hiệu tốt. Khi BC bất ổn đi kèm nhân sự giảm, mức rủi ro càng cao.
@@ -3631,6 +3709,7 @@ async function runAIAnalysis(){
  const isLTKCT=aiIsLTKCTPrompt(userQ);
  window._AI_ANCHOR=null; // tính lại mốc thời gian chung sau khi nạp dữ liệu cho lần phân tích này
  try{
+  await aiEnsureCoreSheets();
   if(isBatonHR){
    document.getElementById('aiStatus').textContent='⏳ Đang nạp Baton + Nhân sự + Năng suất...';
    await aiEnsureData(true,false,false,true,true,true);
@@ -3656,8 +3735,9 @@ async function runAIAnalysis(){
    let dataset=document.getElementById('aiCustDataset')?.value||'gtcTotal';
    const days=+(document.getElementById('aiCustDays')?.value)||7;
    let subject=document.getElementById('aiCustSubject')?.value||'am';
-   const detected=aiDetectFromQuestion(userQ);
-   if(detected){dataset=detected;const sel=document.getElementById('aiCustDataset');if(sel)sel.value=detected;scopeNote=`[Tự nhận diện nguồn: ${AI_DATA_REGISTRY[detected]?.tag||detected}] `;}
+   const quotedDS=aiExtractQuotedTerms(userQ).map(aiTermToDataset).find(Boolean);
+   const detected=quotedDS||aiDetectFromQuestion(userQ);
+   if(detected){dataset=detected;const sel=document.getElementById('aiCustDataset');if(sel)sel.value=detected;scopeNote=`[Tự nhận diện nguồn: ${AI_DATA_REGISTRY[detected]?.tag||detected}${quotedDS?' (từ nháy kép)':''}] `;}
    forceDS=dataset;
    document.getElementById('aiStatus').textContent='⏳ Đang đọc sheet nguồn để tính toán...';
    const f=aiEnsureFlags(dataset);
@@ -3667,10 +3747,12 @@ async function runAIAnalysis(){
    if(needHR&&dataset!=='hron'&&dataset!=='nangSuat'&&dataset!=='baton')ctx+=aiHron(days,'am')+aiNangSuat(days,'am');
    const dmap={gtcTotal:'GTC Total',gtcTTS:'GTC TTS',canNang:'GTC chi tiết cân nặng',fd:'Tỉ lệ trả FD',odr:'ODR Ontime',opr:'OPR Ontime',aging:'Aging >5 ngày',rotLC:'Rớt LC',hron:'Định biên nhân sự (HRON)',nangSuat:'Năng suất nhân viên',baton:'BC Bất Ổn + Năng suất/Thu nhập',ltkct:'Leadtime KCT (Kho chuyển tiếp)'};
    const smap={am:'AM',bc:'Bưu cục',loai:'Loại hàng'};
-   scopeNote=(scopeNote||'')+(dataset==='baton'?`[CHUYÊN GIA NHÂN SỰ] `:'')+(dataset==='ltkct'?`[NETWORK LOGISTICS TNT] `:'')+`Phạm vi: ${dmap[dataset]} · ${days} ngày · theo ${smap[subject]||'BC'} · ĐỌC SHEET NGUỒN tính trực tiếp. So sánh N-1 vs N-7.`;
+   const cmpNote=days<=1?'So sánh N-1 vs ngày trước đó (N-2).':'So sánh N-1 vs N-7.';
+   scopeNote=(scopeNote||'')+(dataset==='baton'?`[CHUYÊN GIA NHÂN SỰ] `:'')+(dataset==='ltkct'?`[NETWORK LOGISTICS TNT] `:'')+`Phạm vi: ${dmap[dataset]} · ${days<=1?'ngày mới nhất':days+' ngày'} · theo ${smap[subject]||'BC'} · ĐỌC SHEET NGUỒN tính trực tiếp. ${cmpNote}`;
    if(dataset==='ltkct')systemPrompt=LTKCT_AI_SYSTEM;
    }else{
-    const detected=aiDetectFromQuestion(userQ);
+    const quotedDS=aiExtractQuotedTerms(userQ).map(aiTermToDataset).find(Boolean);
+    const detected=quotedDS||aiDetectFromQuestion(userQ);
     if(detected){
      document.getElementById('aiStatus').textContent='⏳ Tự nhận diện nguồn: '+AI_DATA_REGISTRY[detected].tag+'...';
      const f=aiEnsureFlags(detected);
@@ -3699,6 +3781,16 @@ async function runAIAnalysis(){
    const auto=await aiAutoSourceContext(userQ,subjForSearch,daysSearch,mode==='custom'?forceDS:'');
    if(auto){ctx=auto.ctx+'\n\n'+ctx;scopeNote=(scopeNote||'')+` · Sheet đã đọc (${auto.level==='bc'?'Bưu Cục':'AM'}): ${auto.used.join(', ')}.`;}
   }catch(_){}
+  }
+  if(aiCtxIsEmpty(ctx)&&mode==='custom'){
+   const dataset=document.getElementById('aiCustDataset')?.value||forceDS||'gtcTotal';
+   const days=+(document.getElementById('aiCustDays')?.value)||7;
+   const subject=document.getElementById('aiCustSubject')?.value||'am';
+   await aiEnsureCoreSheets();
+   window._AI_ANCHOR=null;
+   ctx=aiCtxCustom(dataset,days,subject);
+   const auto=await aiAutoSourceContext(userQ,subject,days,dataset).catch(()=>null);
+   if(auto)ctx=auto.ctx+'\n\n'+ctx;
   }
   document.getElementById('aiStatus').textContent='';
  }catch(_){ctx=gatherDashboardData();}
