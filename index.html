@@ -2929,74 +2929,84 @@ p12.innerHTML=`<div class="page-header"><div class="page-title">✨ AI - Phân T
 aiRenderSavedQuestions();
 }
 const AI_Q_KEY='tnt_ai_saved_questions';
-const AI_PROMPT_BAO_CAO_VH=`Viết BÁO CÁO VẬN HÀNH VÙNG TNT — ngày N-1 theo ĐÚNG cấu trúc 2 phần dưới đây. Mốc: N-1 = ngày mới nhất trong dữ liệu; biến động so N-2 (ngày liền trước). CHỈ dùng số trong DỮ LIỆU — không bịa. Mỗi dòng kết thúc => tốt/tệ (hoặc tốt lên/tệ đi).
+const AI_PROMPT_BAO_CAO_VH=`Viết BÁO CÁO VẬN HÀNH VÙNG TNT theo ĐÚNG mẫu 2 phần dưới.
 
-# BÁO CÁO VẬN HÀNH VÙNG TNT — [ghi ngày N-1]
+CÁCH LÀM:
+1. Đọc block "SO SÁNH NHANH" và "THỐNG KÊ ĐÃ TÍNH" — số liệu đã tính sẵn, KHÔNG tự tính lại, KHÔNG đổi số.
+2. Copy nguyên văn số liệu + biến động + tốt/tệ vào báo cáo.
+3. Tự viết nguyên nhân + giải pháp ngay ngày N (tham khảo block "GỢI Ý PHÂN TÍCH", không copy nguyên văn gợi ý).
+
+ĐỊNH NGHĨA MỐC:
+- Mỗi chỉ số lấy ngày mới nhất của sheet riêng, so với ngày kề trước trong cùng sheet.
+- "so N-1" trong mẫu = biến động so ngày liền trước (đã tính sẵn trong THỐNG KÊ).
+
+# BÁO CÁO VẬN HÀNH VÙNG TNT — [ngày N-1]
 
 ## 1. Tổng quan:
 
-• GTC [X]% , tăng/giảm [Y]pp so N-2 => tốt/tệ
-=> Các BC có GTC tệ bất thường (N-1 xấu hơn N-2 hoặc <%50, liệt kê top 5-8):
-+ BC [Tên] [X]%, giảm/tăng [Y]pp so N-2, nguyên nhân [1 câu từ dữ liệu: tồn cao/thiếu NS/năng suất thấp/...], giải pháp ngay ngày N [1-2 việc cụ thể]
-+ ...
+• GTC ...% , tăng/giảm...% so với N-1 => tốt/tệ
+=> Các BC có GTC tệ bất thường
++ BC [Tên] [X]%, giảm/tăng [Y]% so N-1, nguyên nhân...., giải pháp ngay ngày N
++....
 
-• FD total [X]% , tăng/giảm [Y]pp so N-2 => tốt/tệ
-+ FD TTS [X]% , tăng/giảm [Y]pp so N-2 => tốt/tệ
-+ FD SME [X]% , tăng/giảm [Y]pp so N-2 => tốt/tệ
-+ FD Shopee [X]% , tăng/giảm [Y]pp so N-2 => tốt/tệ
-=> Các BC có FD tệ bất thường (FD tăng so N-2 hoặc vượt ngưỡng: Total≥15%, TTS≥10%, SME≥15%, Shopee≥10%):
-+ BC [Tên] [X]%, tăng [Y]pp so N-2, nguyên nhân..., giải pháp ngay ngày N
-+ ...
+• FD total...% , tăng/giảm...% so với N-1 => tốt/tệ
++ FD TTS...% , tăng/giảm...% so với N-1 => tốt/tệ
++ FD SME...% , tăng/giảm...% so với N-1 => tốt/tệ
++ FD Shopee...% , tăng/giảm...% so với N-1 => tốt/tệ
+=> Các BC có FD tệ bất thường:
++ BC [Tên] [X]%, tăng [Y]% so N-1, nguyên nhân...., giải pháp ngay ngày N
++....
 
-• Aging >5 ngày [X] đơn, tăng/giảm [Y] đơn so N-2 => tốt/tệ
-=> Các BC có Aging cao cần kiểm soát (top 5-8 theo số đơn N-1 hoặc tăng mạnh so N-2):
-+ BC [Tên] [X] đơn, tăng/giảm [Y] đơn so N-2
-+ ...
+• Aging >5 ngày ...đơn, tăng/giảm ...đơn so N-1 => tốt/tệ
+=> Các BC có Aging cao cần kiểm soát:
++ BC [Tên] ...đơn, tăng/giảm ...đơn so N-1
++....
 
-- Rớt LC [X] đơn, tăng/giảm [Y] đơn so N-2 => tốt/tệ
-=> Các BC rớt LC bất thường (tăng so N-2 hoặc top cao nhất):
-+ BC [Tên] [X] đơn, tăng/giảm [Y] đơn so N-2
-+ ...
+- Rớt LC ...đơn, tăng/giảm...đơn so N-1 => tốt/tệ
+=> Các BC rớt LC bất thường:
++ BC [Tên] ...đơn, tăng/giảm ...đơn so N-1
++...
 
-• ODR TTS [X]%, tăng/giảm [Y]pp so N-2 => tốt/tệ
-=> Các BC có ODR giảm bất thường (N-1 thấp hơn N-2):
-+ BC [Tên] [X]%, tăng/giảm [Y]pp so N-2
-+ ...
+• ODR TTS ...%, tăng/giảm...% so N-1 => tốt/tệ
+=> Các BC có ODR giảm bất thường:
++ BC [Tên] ...%, tăng/giảm ...% so N-1
++...
 
-• OPR TTS [X]%, tăng/giảm [Y]pp so N-2 => tốt/tệ
+• OPR TTS ...%, tăng/giảm...% so N-1 => tốt/tệ
 => Các BC có OPR giảm bất thường:
-+ BC [Tên] [X]%, tăng/giảm [Y]pp so N-2
-+ ...
++ BC [Tên] ...%, tăng/giảm ...% so N-1
++...
 
-- Leadtime KCT [X]h, tăng/giảm [Y]h so N-2 => tốt/tệ
-=> bất thường cần chú ý: [kho/mốc giờ xấu nhất + 1 câu nhận định]
+- Leadtime KCT ...h, tăng/giảm ...h so N-1 => tốt/tệ
+=> bất thường cần chú ý....
 
 ## 2. Bưu cục bất ổn:
-(Liệt kê ĐỦ TẤT CẢ BC trong danh sách Baton — không bỏ sót)
+(Liệt kê ĐỦ mọi BC trong block PHẦN 2 — Baton)
 
-• Bưu cục [Tên BC 1]:
-+ GTC N-1 [X]%, tăng/giảm [Y]pp so N-2 => tốt lên/tệ đi
-+ FD total [X]%, tăng/giảm [Y]pp so N-2 => tốt lên/tệ đi
-+ Aging [X] đơn, tăng/giảm [Y] đơn so N-2 => tốt lên/tệ đi
-=> Các hành động để cải thiện: [2-4 việc cụ thể gắn BC/AM, ưu tiên trong ngày]
-
-• Bưu cục [Tên BC 2]:
-+ ...
+• Bưu cục [Tên]:
++ GTC N-1...%, tăng/giảm ...% so N-1 => tốt lên/tệ đi
++ FD total...%, tăng/giảm...% so N-1 => tốt lên/tệ đi
++ Aging...đơn, tăng/giảm ...đơn so N-1 => tốt lên/tệ đi
+=> Các hành động để cải thiện....
 
 QUY TẮC:
-- %GTC/ODR/OPR: cao = tốt, thấp = tệ; %FD/Aging/Rớt LC/Leadtime: cao = tệ.
-- Nguyên nhân: suy luận từ dữ liệu (Tồn LM, Lý do Baton, NS, HRON) — không bịa.
-- Giải pháp: hành động vận hành thực tế (rà tồn, tăng ca, coaching NV, liên hệ AM...).
-- PHẢI hoàn thành đủ Phần 1 và Phần 2 (mọi BC bất ổn). Không viết mở đầu dài.`;
+- Chỉ đọc THỐNG KÊ + viết nguyên nhân/giải pháp/hành động. Không tự tính số.
+- %GTC/ODR/OPR: cao=tốt; %FD/Aging/Rớt LC/Leadtime: cao=tệ.
+- Phần 2: "tốt lên/tệ đi" (không dùng tốt/tệ).
+- Hoàn thành đủ 2 phần, không mở đầu dài, không bảng pipe.`;
 
-const AI_SYSTEM_PROMPT_BAO_CAO_VH_APPEND=`\n\n[FORMAT BÁO CÁO VẬN HÀNH VÙNG TNT — GHI ĐÈ CÁCH TRÌNH BÀY MẶC ĐỊNH]
-Khi yêu cầu là "BÁO CÁO VẬN HÀNH VÙNG TNT" theo mẫu 2 phần: tuân thủ ĐÚNG cấu trúc bullet • / + / => như prompt. So sánh N-1 vs N-2. Mỗi chỉ số vùng 1 dòng bullet kèm => tốt/tệ. Liệt kê BC bất thường dưới mỗi chỉ số với nguyên nhân + giải pháp ngay ngày N (GTC, FD). Phần 2: mỗi BC Baton một block • với GTC/FD/Aging và hành động cải thiện. KHÔNG dùng bảng markdown pipe. KHÔNG bỏ sót BC bất ổn. PHẢI kết thúc đủ 2 phần.`;
+const AI_SYSTEM_PROMPT_BAO_CAO_VH_APPEND=`\n\n[FORMAT BÁO CÁO VẬN HÀNH VÙNG TNT]
+Số liệu đã tính sẵn trong "SO SÁNH NHANH" và "THỐNG KÊ ĐÃ TÍNH" — mỗi chỉ số dùng ngày mới nhất sheet riêng.
+Nhiệm vụ AI: (1) copy số nguyên văn, (2) viết nguyên nhân + giải pháp dựa block GỢI Ý. KHÔNG tự tính lại.
+KHÔNG bỏ Phần 1. Phần 2: đủ mọi BC Baton + hành động cải thiện.`;
 
 function aiIsBaoCaoVanHanhPrompt(q){
 if(!q)return false;
 if(q===AI_PROMPT_BAO_CAO_VH)return true;
 const s=(q||'').toLowerCase();
-return/báo cáo vận hành vùng tnt|bao cao van hanh vung tnt|mẫu báo cáo vận hành|format báo cáo vận hành/.test(s)&&!/ngắn gọn|~80 dòng|hl\/ll|highlight.*lowlight/.test(s);
+if(/ngắn gọn|~80 dòng|hl\/ll|highlight.*lowlight/.test(s))return false;
+if(/báo cáo vận hành vùng tnt|bao cao van hanh vung tnt|mẫu báo cáo vận hành|format báo cáo vận hành/.test(s))return true;
+return/## 1\.\s*tổng quan/.test(s)&&/## 2\.\s*bưu cục bất ổn/.test(s)&&/leadtime kct|odr tts|fd total|aging >5/.test(s);
 }
 
 const AI_PROMPT_TONG_QUAN=`Viết BÁO CÁO VẬN HÀNH VÙNG TNT — [ngày N-1] theo format NGẮN GỌN (tối đa ~80 dòng), so sánh N-1 vs N-7. KHÔNG viết lời văn dài, KHÔNG mở đầu "Bức tranh tổng thể", KHÔNG liệt kê quá 3 highlight và 3 lowlight dạng đoạn văn.
@@ -3391,6 +3401,7 @@ Object.entries(AI_DATA_REGISTRY).forEach(([id,meta])=>{
 return score>=2?best:null;
 }
 function aiIsBatonHRPrompt(q){
+if(aiIsBaoCaoVanHanhPrompt(q))return false;
 const s=(q||'').toLowerCase();
 return/(bưu cục bất ổn|bc bất ổn|baton)/.test(s)&&/(nhân sự|năng suất|thu nhập|chuyên gia nhân sự|baton cột)/.test(s);
 }
@@ -3635,25 +3646,33 @@ if(!iso)return'';const p=iso.split('-');if(p.length!==3)return'';
 const dt=new Date(Date.UTC(+p[0],+p[1]-1,+p[2]));dt.setUTCDate(dt.getUTCDate()+delta);
 return`${dt.getUTCFullYear()}-${String(dt.getUTCMonth()+1).padStart(2,'0')}-${String(dt.getUTCDate()).padStart(2,'0')}`;
 }
-function aiCollectAllDates(){
+function aiCollectOpsAnchorDates(){
 const set=new Set();const add=d=>{const x=isoD(d);if(x)set.add(x);};
 const D=window._D||{};
 [D.gtcTotalAM,D.gtcTTSAM,D.odrAM,D.oprAM,D.fdTotalAM].forEach(sh=>{if(sh&&sh.length>1)sh.slice(1).forEach(r=>add(r[1]));});
 [D.gtcTotalBC,D.gtcTTSBC,D.odrBC,D.oprBC].forEach(sh=>{if(sh&&sh.length>1)sh.slice(1).forEach(r=>add(r[2]));});
 const F=window._FD||{};[F.totalAM,F.smeAM,F.ttsAM,F.shopeeAM].forEach(sh=>{if(sh&&sh.length>1)sh.slice(1).forEach(r=>add(r[1]));});
 (window._GTCD?.rows||[]).forEach(r=>add(r.date));
-(window._AGING?.rows||[]).forEach(r=>add(r.date));
 (window._ROTLC||[]).forEach(r=>add(r.date));
+(window._LTKCT?.rows||[]).forEach(r=>add(r.date));
+return[...set].filter(Boolean).sort();
+}
+function aiCollectAllDates(){
+const ops=aiCollectOpsAnchorDates();
+const extra=new Set(ops);
+const add=d=>{const x=isoD(d);if(x)extra.add(x);};
+(window._AGING?.rows||[]).forEach(r=>add(r.date));
 (window._HRON?.rows||[]).forEach(r=>add(r.date));
 (window._NS?.rows||[]).forEach(r=>add(r.date));
-return[...set].filter(Boolean).sort();
+return[...extra].filter(Boolean).sort();
 }
 function getAIAnchor(){
 if(window._AI_ANCHOR)return window._AI_ANCHOR;
+const ops=aiCollectOpsAnchorDates();
 const all=aiCollectAllDates();
-const n1=all.length?all[all.length-1]:'';
+const n1=ops.length?ops[ops.length-1]:'';
 const n7=n1?aiShiftISO(n1,-6):'';
-window._AI_ANCHOR={n1,n7,all};
+window._AI_ANCHOR={n1,n7,all,opsN1:n1};
 return window._AI_ANCHOR;
 }
 /* Trả về mốc cho 1 nhóm dữ liệu cụ thể, canh theo anchor chung.
@@ -3675,7 +3694,7 @@ if(!winArr.length&&dN1){
 const leN7=uniq.filter(d=>!n7Cmp||d<=n7Cmp);const dN7=leN7.length?leN7[leN7.length-1]:'';
 const lag=!!(dN1&&n1&&dN1!==n1);
 return{n1,n7:n7Cmp,dN1,dN7,dPrev,win:new Set(winArr),winArr:winArr,lag,
-  lagNote:lag?` [⚠ LỆCH MỐC: nhóm này chỉ có dữ liệu đến ${shortD(dN1)}, không tới mốc chung N-1=${shortD(n1)}]`:''};
+  lagNote:lag?` [⚠ LỆCH MỐC: nhóm này chỉ có dữ liệu đến ${shortD(dN1)}, không tới mốc vận hành N-1=${shortD(n1)}]`:''};
 }
 function aiN1N7(sheet,dateIdx){
 if(!sheet||sheet.length<2)return'';
@@ -3974,90 +3993,233 @@ if(ch.odrTTS?.n1!=null&&ch.odrTTS?.n2!=null&&!lines.some(l=>l.includes('ODR')))l
 if(ch.oprTTS?.n1!=null&&ch.oprTTS?.n2!=null&&!lines.some(l=>l.includes('OPR')))lines.push(`OPR TTS: N-2=${ch.oprTTS.n2.toFixed(1)}% → N-1=${ch.oprTTS.n1.toFixed(1)}%`);
 return lines;
 }
+function aiVhDelta(cur,prev,type,hb){
+if(cur==null||prev==null||!isFinite(cur)||!isFinite(prev))return{delta:'—',verdict:'—',trend:'—'};
+const d=cur-prev,eps=type==='h'?0.05:type==='cnt'?0.5:0.05;
+if(Math.abs(d)<eps)return{delta:'không đổi',verdict:'—',trend:'—'};
+const up=d>0,worse=hb?!up:up;
+const unit=type==='h'?'h':type==='cnt'?' đơn':'%';
+const dec=type==='h'?2:type==='cnt'?0:1;
+const delta=`${up?'tăng':'giảm'} ${type==='cnt'?Math.abs(Math.round(d)):Math.abs(d).toFixed(dec)}${unit} so N-1`;
+const verdict=worse?'tệ':'tốt';
+const trend=worse?'tệ đi':'tốt lên';
+return{delta,verdict,trend,d,worse};
+}
+function aiVhFmtVal(v,type){if(v==null||!isFinite(v))return'—';if(type==='h')return v.toFixed(2)+'h';if(type==='cnt')return Math.round(v)+' đơn';return v.toFixed(type==='pct2'?2:1)+'%';}
+function aiVhBcGtc(gBC,bc,dt){
+const r=(gBC||[]).slice(1).find(x=>(x[1]||'').trim()===bc&&isoD(x[2])===dt);
+if(!r)return null;
+const v=Math.round(parseFloat(r[3])||0),n=Math.round(parseFloat(r[6])||0);
+return v?{gtc:n/v*100,vol:v,am:(r[0]||'').trim()}:null;
+}
+function aiVhBcFd(sh,bc,dt){const r=(sh||[]).slice(1).find(x=>(x[0]||'').trim()===bc&&isoD(x[1])===dt);return r?parsePct(r[3]):null;}
+function aiVhBcAging(agRows,bc,dt){return(agRows||[]).filter(r=>r.bc===bc&&r.date===dt).length;}
+function aiVhNguyenNhan(bc,batonByBC){
+const hints=[];
+const b=batonByBC[bc];
+if(b?.lyDo)hints.push(b.lyDo);
+if(b?.blLmTong>0)hints.push(`Tồn LM ${fmt(b.blLmTong)} đơn (${(b.pctBlLmOver5||0).toFixed(1)}%>5N)`);
+const ns=aiBatonNSMetrics(bc,7);
+if(ns.hasNS&&ns.nsT<15)hints.push('NS GTC thấp');
+if(ns.hasNS&&ns.thu<300000)hints.push('Thu nhập TB thấp');
+if(ns.hasHron&&ns.staffD<0)hints.push('Nhân sự giảm');
+return hints.length?hints.join('; '):'cần rà soát vận hành';
+}
+function aiVhGiaiPhap(bc,batonByBC){
+const b=batonByBC[bc];
+if(b?.lyDo)return`Rà soát: ${b.lyDo} — liên hệ AM xử lý trong ngày`;
+return'Rà tồn, tăng ca giao, coaching NV — liên hệ AM trong ngày';
+}
+function aiVhLatestPair(datesRaw){
+const uniq=[...new Set((datesRaw||[]).map(d=>isoD(d)).filter(Boolean))].sort();
+const n1=uniq.at(-1)||'',n2=uniq.filter(d=>d<n1).at(-1)||'';
+return{n1,n2,ok:!!(n1&&n2)};
+}
+function aiVhSheetDates(sheet,colIdx){return(sheet||[]).slice(1).map(r=>r[colIdx]);}
+function aiVhFdReg(sh,n1,n2){
+const g=dt=>{if(!dt)return null;const rows=(sh||[]).slice(1).filter(r=>(r[0]||'').trim()&&isoD(r[1])===dt);let tra=0,vol=0;rows.forEach(r=>{tra+=ovPf(r[4]);vol+=ovPf(r[2]);});return vol>0?tra/vol*100:null;};
+return{n1:g(n1),n2:g(n2)};
+}
+function aiVhAgingCnt(agRows,dt){return(agRows||[]).filter(r=>r.date===dt).length;}
+function aiVhRotCnt(rotData,dt){return(rotData||[]).filter(r=>r.date===dt).length;}
+function aiVhQuickCmp(lb,n1,n2,v1,v2,type,hb){
+if(v1==null||v2==null||!n1||!n2)return`• ${lb}: (chưa đủ dữ liệu)`;
+const d=aiVhDelta(v1,v2,type,hb);
+return`• ${lb} [${shortD(n1)}]: ${aiVhFmtVal(v1,type)} vs [${shortD(n2)}]: ${aiVhFmtVal(v2,type)} → ${d.delta} => ${d.verdict}`;
+}
+function aiVhBcBad(gBC,odrBC,oprBC,fdSheet,rotData,agRows,n1,n2,key){
+if(!n1||!n2)return[];
+const sects=ovCollectBCBadPoints(gBC,odrBC,oprBC,fdSheet,rotData,agRows,n1,n2);
+return(sects.find(s=>s.k===key)?.items)||[];
+}
+function aiVhGtcBadBC(gBC,n1,n2,gtcSectItems){
+const bad=new Map();
+(gtcSectItems||[]).forEach(it=>bad.set(it.bc,it));
+(gBC||[]).slice(1).filter(r=>isoD(r[2])===n1).forEach(r=>{
+  const bc=(r[1]||'').trim(),v=Math.round(parseFloat(r[3])||0),n=Math.round(parseFloat(r[6])||0);
+  if(!bc||!v)return;
+  const gtc=n/v*100,r2=(gBC||[]).slice(1).find(x=>(x[1]||'').trim()===bc&&isoD(x[2])===n2);
+  const gtc2=r2&&parseFloat(r2[3])?Math.round(parseFloat(r2[6])||0)/Math.round(parseFloat(r2[3]))*100:0;
+  if(gtc<50||gtc<gtc2-1)bad.set(bc,{bc,am:(r[0]||'').trim(),v1:gtc,v2:gtc2});
+});
+return[...bad.values()].sort((a,b)=>a.v1-b.v1);
+}
 function aiCtxBaoCaoVanHanh(){
 const D=window._D||{},F=window._FD||{};
 const gBC=D.gtcTotalBC,odrBC=D.odrBC,oprBC=D.oprBC;
 const fdBC=D.fdTotalBC,fdTTSBC=D.fdTTSBC,fdSMEBC=D.fdSMEBC,fdShopeeBC=D.fdShopeeBC;
 const rotData=window._ROTLC||[],agRows=window._AGING?.rows||[];
-const ds=ovDatesDesc(gBC,2);
-const n1=ds[0],n2=ds[1];
-if(!n1||!n2)return'(Chưa đủ dữ liệu N-1 và N-2)';
 const{bc2tinh,bc2am}=ovBuildBcMaps(gBC);
-const m1=ovRegionTotals(gBC,odrBC,oprBC,fdBC,rotData,agRows,bc2tinh,n1);
-const m2=ovRegionTotals(gBC,odrBC,oprBC,fdBC,rotData,agRows,bc2tinh,n2);
-const fdN1=(sh)=>{if(!sh)return null;const rows=(sh||[]).slice(1).filter(r=>(r[0]||'').trim()&&isoD(r[1])===n1);let tra=0,vol=0;rows.forEach(r=>{tra+=ovPf(r[4]);vol+=ovPf(r[2]);});return vol>0?tra/vol*100:null;};
-const fdCh=[
-  {lb:'FD Total',n1:null,n2:null},
-  {lb:'FD TTS',n1:null,n2:null},
-  {lb:'FD SME',n1:null,n2:null},
-  {lb:'FD Shopee',n1:null,n2:null}
-];
-const fdN2=(sh)=>{if(!sh)return null;const rows=(sh||[]).slice(1).filter(r=>(r[0]||'').trim()&&isoD(r[1])===n2);let tra=0,vol=0;rows.forEach(r=>{tra+=ovPf(r[4]);vol+=ovPf(r[2]);});return vol>0?tra/vol*100:null;};
-fdCh[0].n1=fdN1(F.totalAM);fdCh[0].n2=fdN2(F.totalAM);
-fdCh[1].n1=fdN1(F.ttsAM);fdCh[1].n2=fdN2(F.ttsAM);
-fdCh[2].n1=fdN1(F.smeAM);fdCh[2].n2=fdN2(F.smeAM);
-fdCh[3].n1=fdN1(F.shopeeAM);fdCh[3].n2=fdN2(F.shopeeAM);
-const dpp=(a,b)=>a!=null&&b!=null&&isFinite(a)&&isFinite(b)?`${(a-b)>=0?'+':''}${(a-b).toFixed(2)}pp`:'—';
-const dCnt=(a,b)=>a!=null&&b!=null?`${(a-b)>=0?'+':''}${Math.round(a-b)} đơn`:'—';
-let s=`=== DỮ LIỆU BÁO CÁO VẬN HÀNH VÙNG TNT ===\nN-1: ${shortD(n1)} | N-2: ${shortD(n2)}\n`;
-s+=`\n### PHẦN 1 — CHỈ SỐ TOÀN VÙNG\n`;
-s+=`- GTC: N-1=${m1.gtc?.toFixed(1)||'—'}%, N-2=${m2.gtc?.toFixed(1)||'—'}%, Δ=${dpp(m1.gtc,m2.gtc)}\n`;
-fdCh.forEach(ch=>{s+=`- ${ch.lb}: N-1=${ch.n1?.toFixed(2)||'—'}%, N-2=${ch.n2?.toFixed(2)||'—'}%, Δ=${dpp(ch.n1,ch.n2)}\n`;});
-s+=`- Aging >5N: N-1=${m1.aging||0} đơn, N-2=${m2.aging||0} đơn, Δ=${dCnt(m1.aging,m2.aging)}\n`;
-s+=`- Rớt LC: N-1=${m1.rot||0} đơn, N-2=${m2.rot||0} đơn, Δ=${dCnt(m1.rot,m2.rot)}\n`;
-s+=`- ODR TTS: N-1=${m1.odr?.toFixed(1)||'—'}%, N-2=${m2.odr?.toFixed(1)||'—'}%, Δ=${dpp(m1.odr,m2.odr)}\n`;
-s+=`- OPR TTS: N-1=${m1.opr?.toFixed(1)||'—'}%, N-2=${m2.opr?.toFixed(1)||'—'}%, Δ=${dpp(m1.opr,m2.opr)}\n`;
-if(m1.ltk!=null)s+=`- Leadtime KCT TB: N-1=${m1.ltk.toFixed(2)}h, N-2=${m2.ltk?.toFixed(2)||'—'}h, Δ=${m1.ltk!=null&&m2.ltk!=null?`${(m1.ltk-m2.ltk)>=0?'+':''}${(m1.ltk-m2.ltk).toFixed(2)}h`:'—'}\n`;
-const sects=aiAllBadSects(gBC,odrBC,oprBC,fdBC,fdTTSBC,fdSMEBC,rotData,agRows,n1,n2);
-const fdShop=ovCollectBCBadPoints(gBC,odrBC,oprBC,D.fdShopeeBC,rotData,agRows,n1,n2).find(x=>x.k==='fd');
-if(fdShop)sects.push({...fdShop,label:'FD Shopee tăng',k:'fdShopee'});
-const sectMap={
-  gtc:'BC GTC giảm bất thường',fd:'BC FD Total tăng bất thường',fdTTS:'BC FD TTS tăng bất thường',
-  fdSME:'BC FD SME tăng bất thường',fdShopee:'BC FD Shopee tăng bất thường',aging:'BC Aging cao/tăng',
-  rot:'BC Rớt LC tăng bất thường',odr:'BC ODR giảm bất thường',opr:'BC OPR giảm bất thường'
-};
-sects.forEach(sec=>{
-  if(!sec.items.length)return;
-  s+=`\n### ${sectMap[sec.k]||sec.label} (top ${Math.min(8,sec.items.length)}):\n`;
-  sec.items.slice(0,8).forEach((it,i)=>{
-  s+=`  ${i+1}. ${it.bc} (AM: ${it.am}): N-2=${sec.fmt(it.v2)} → N-1=${sec.fmt(it.v1)}\n`;
+const gtcP=aiVhLatestPair(aiVhSheetDates(gBC,2));
+const odrP=aiVhLatestPair(aiVhSheetDates(odrBC,2));
+const oprP=aiVhLatestPair(aiVhSheetDates(oprBC,2));
+const fdTP=aiVhLatestPair(aiVhSheetDates(F.totalAM,1));
+const fdTtsP=aiVhLatestPair(aiVhSheetDates(F.ttsAM,1));
+const fdSmeP=aiVhLatestPair(aiVhSheetDates(F.smeAM,1));
+const fdShopP=aiVhLatestPair(aiVhSheetDates(F.shopeeAM,1));
+const agP=aiVhLatestPair((agRows||[]).map(r=>r.date));
+const rotP=aiVhLatestPair((rotData||[]).map(r=>r.date));
+const ltkS=ltkctOvSummary();
+const n1=gtcP.n1||'';
+if(!n1)return'(Chưa đủ dữ liệu GTC)';
+window._AI_ANCHOR={n1,n7:aiShiftISO(n1,-6),all:[n1,gtcP.n2].filter(Boolean),opsN1:n1};
+const batonByBC={};(window._BATON?.rows||[]).forEach(r=>{batonByBC[r.bc]=r;});
+const regGtc=(dt)=>dt?ovRegionTotals(gBC,odrBC,oprBC,fdBC,rotData,agRows,bc2tinh,dt).gtc:null;
+const regOdr=(dt)=>dt?ovRegionTotals(gBC,odrBC,oprBC,fdBC,rotData,agRows,bc2tinh,dt).odr:null;
+const regOpr=(dt)=>dt?ovRegionTotals(gBC,odrBC,oprBC,fdBC,rotData,agRows,bc2tinh,dt).opr:null;
+const gtcV={n1:regGtc(gtcP.n1),n2:regGtc(gtcP.n2)};
+const odrV={n1:regOdr(odrP.n1),n2:regOdr(odrP.n2)};
+const oprV={n1:regOpr(oprP.n1),n2:regOpr(oprP.n2)};
+const fdTotal=aiVhFdReg(F.totalAM,fdTP.n1,fdTP.n2);
+const fdTTS=aiVhFdReg(F.ttsAM,fdTtsP.n1,fdTtsP.n2);
+const fdSME=aiVhFdReg(F.smeAM,fdSmeP.n1,fdSmeP.n2);
+const fdShop=aiVhFdReg(F.shopeeAM,fdShopP.n1,fdShopP.n2);
+const agCnt1=aiVhAgingCnt(agRows,agP.n1),agCnt2=aiVhAgingCnt(agRows,agP.n2);
+const rotN1=aiVhRotCnt(rotData,rotP.n1),rotN2=aiVhRotCnt(rotData,rotP.n2);
+let s=`=== DỮ LIỆU BÁO CÁO VẬN HÀNH VÙNG TNT ===\n`;
+s+=`[Ngày báo cáo chính] ${shortD(n1)} (GTC) · Mỗi chỉ số so N-1 = ngày mới nhất sheet đó vs ngày kề trước\n`;
+s+=`[Nguồn] GTC→GTC Total BC · FD→FD AM sheets · Aging→Backupall · Rớt LC→Rot_LC_Raw · ODR/OPR→BC sheets · LTK→gid ${LTKCT_GID} · Baton→sheet Baton\n\n`;
+s+=`### SO SÁNH NHANH N-1 vs N-2 (tất cả chỉ số có data)\n\n`;
+if(gtcP.ok)s+=aiVhQuickCmp('GTC',gtcP.n1,gtcP.n2,gtcV.n1,gtcV.n2,'pct',true)+'\n';
+if(fdTP.ok)s+=aiVhQuickCmp('FD Total',fdTP.n1,fdTP.n2,fdTotal.n1,fdTotal.n2,'pct2',false)+'\n';
+if(fdTtsP.ok)s+=aiVhQuickCmp('FD TTS',fdTtsP.n1,fdTtsP.n2,fdTTS.n1,fdTTS.n2,'pct2',false)+'\n';
+if(fdSmeP.ok)s+=aiVhQuickCmp('FD SME',fdSmeP.n1,fdSmeP.n2,fdSME.n1,fdSME.n2,'pct2',false)+'\n';
+if(fdShopP.ok)s+=aiVhQuickCmp('FD Shopee',fdShopP.n1,fdShopP.n2,fdShop.n1,fdShop.n2,'pct2',false)+'\n';
+if(agP.ok)s+=aiVhQuickCmp('Aging >5N',agP.n1,agP.n2,agCnt1,agCnt2,'cnt',false)+'\n';
+if(rotP.ok)s+=aiVhQuickCmp('Rớt LC',rotP.n1,rotP.n2,rotN1,rotN2,'cnt',false)+'\n';
+if(odrP.ok)s+=aiVhQuickCmp('ODR TTS',odrP.n1,odrP.n2,odrV.n1,odrV.n2,'pct',true)+'\n';
+if(oprP.ok)s+=aiVhQuickCmp('OPR TTS',oprP.n1,oprP.n2,oprV.n1,oprV.n2,'pct',true)+'\n';
+if(ltkS?.n1&&ltkS?.n2)s+=aiVhQuickCmp('Leadtime KCT',ltkS.n1,ltkS.n2,ltkS.total.lt,ltkS.total.lt-ltkS.total.dLt,'h',false)+'\n';
+s+=`\n### THỐNG KÊ ĐÃ TÍNH — PHẦN 1 TỔNG QUAN\n`;
+s+=`(AI: copy nguyên số liệu dưới đây, tự viết nguyên nhân + giải pháp — tham khảo block GỢI Ý cuối file)\n\n`;
+if(gtcP.ok){
+  const gtcD=aiVhDelta(gtcV.n1,gtcV.n2,'pct',true);
+  s+=`• GTC ${aiVhFmtVal(gtcV.n1,'pct')} [${shortD(gtcP.n1)}] , ${gtcD.delta} => ${gtcD.verdict}\n`;
+  s+=`=> Các BC có GTC tệ bất thường\n`;
+  const gtcBad=aiVhGtcBadBC(gBC,gtcP.n1,gtcP.n2,aiVhBcBad(gBC,odrBC,oprBC,fdBC,rotData,agRows,gtcP.n1,gtcP.n2,'gtc'));
+  gtcBad.slice(0,8).forEach(it=>{
+    const d=aiVhDelta(it.v1,it.v2,'pct',true);
+    s+=`+ BC ${it.bc} ${it.v1.toFixed(1)}%, ${d.delta}\n`;
   });
-});
-const gtcLow=(gBC||[]).slice(1).filter(r=>isoD(r[2])===n1).map(r=>{
-  const bc=(r[1]||'').trim(),v=Math.round(parseFloat(r[3])||0),n=Math.round(parseFloat(r[6])||0);
-  if(!bc||!v)return null;
-  const r2=(gBC||[]).slice(1).find(x=>(x[1]||'').trim()===bc&&isoD(x[2])===n2);
-  const v2=r2?Math.round(parseFloat(r2[3])||0):0,n2v=r2?Math.round(parseFloat(r2[6])||0):0;
-  const gtc=v?n/v*100:0,gtc2=v2?n2v/v2*100:0;
-  return{bc,am:(r[0]||'').trim(),gtc,gtc2,d:gtc-gtc2};
-}).filter(Boolean).filter(x=>x.gtc<50||x.d<-1).sort((a,b)=>a.gtc-b.gtc).slice(0,8);
-if(gtcLow.length){
-  s+=`\n### BC GTC thấp bất thường (<%50 hoặc giảm mạnh):\n`;
-  gtcLow.forEach((x,i)=>s+=`  ${i+1}. ${x.bc} (AM: ${x.am}): N-1=${x.gtc.toFixed(1)}%, N-2=${x.gtc2.toFixed(1)}%, Δ=${dpp(x.gtc,x.gtc2)}\n`);
 }
-const agTop={};
-(agRows||[]).filter(r=>r.date===n1||r.date===n2).forEach(r=>{
-  if(!agTop[r.bc])agTop[r.bc]={bc:r.bc,am:r.am||bc2am[r.bc]||'—',n1:0,n2:0};
-  agTop[r.bc][r.date===n1?'n1':'n2']++;
-});
-const agList=Object.values(agTop).sort((a,b)=>b.n1-a.n1).slice(0,8);
-if(agList.length){
-  s+=`\n### BC Aging cao nhất N-1:\n`;
-  agList.forEach((x,i)=>s+=`  ${i+1}. ${x.bc} (AM: ${x.am}): N-1=${x.n1} đơn, N-2=${x.n2} đơn, Δ=${dCnt(x.n1,x.n2)}\n`);
+if(fdTP.ok){
+  const fdTD=aiVhDelta(fdTotal.n1,fdTotal.n2,'pct2',false);
+  s+=`\n• FD total ${aiVhFmtVal(fdTotal.n1,'pct2')} [${shortD(fdTP.n1)}] , ${fdTD.delta} => ${fdTD.verdict}\n`;
+  [{lb:'FD TTS',v:fdTTS,p:fdTtsP},{lb:'FD SME',v:fdSME,p:fdSmeP},{lb:'FD Shopee',v:fdShop,p:fdShopP}].forEach(ch=>{
+    if(!ch.p.ok)return;
+    const d=aiVhDelta(ch.v.n1,ch.v.n2,'pct2',false);
+    s+=`+ ${ch.lb} ${aiVhFmtVal(ch.v.n1,'pct2')} [${shortD(ch.p.n1)}] , ${d.delta} => ${d.verdict}\n`;
+  });
+  s+=`=> Các BC có FD tệ bất thường:\n`;
+  const fdBcSet=new Map();
+  [{k:'fd',sh:fdBC,p:fdTP},{k:'fd',sh:fdTTSBC,p:fdTtsP,tag:'TTS'},{k:'fd',sh:fdSMEBC,p:fdSmeP,tag:'SME'},{k:'fd',sh:fdShopeeBC,p:fdShopP,tag:'Shopee'}].forEach(x=>{
+    if(!x.p.ok)return;
+    aiVhBcBad(gBC,odrBC,oprBC,x.sh,rotData,agRows,x.p.n1,x.p.n2,'fd').forEach(it=>{
+      if(!fdBcSet.has(it.bc))fdBcSet.set(it.bc,{...it,channels:[]});
+      if(x.tag)fdBcSet.get(it.bc).channels.push(x.tag);
+    });
+  });
+  [...fdBcSet.values()].slice(0,8).forEach(it=>{
+    const d=aiVhDelta(it.v1,it.v2,'pct2',false);
+    s+=`+ BC ${it.bc} ${it.v1.toFixed(2)}%, ${d.delta}${it.channels?.length?' ('+it.channels.join('/')+')':''}\n`;
+  });
 }
-const ltk=ovLtkCopyDataN1N2();
-if(ltk){s+=`\n### Leadtime KCT chi tiết:\n`;ltk.rows.slice(0,-1).forEach(r=>s+=`  ${r[1]}: Vol N-1=${r[2]}, LT N-1=${r[5]}, ΔLT=${r[7]}\n`);}
-if(window._BATON?.rows?.length){
-  s+=`\n### PHẦN 2 — BƯU CỤC BẤT ỔN (Baton: ${window._BATON.rows.length} BC)\n`;
-  window._BATON.rows.forEach((r,i)=>{
+if(agP.ok){
+  const agD=aiVhDelta(agCnt1,agCnt2,'cnt',false);
+  s+=`\n• Aging >5 ngày ${agCnt1} đơn [${shortD(agP.n1)}], ${agD.delta} => ${agD.verdict}\n`;
+  s+=`=> Các BC có Aging cao cần kiểm soát:\n`;
+  const agBc={};
+  (agRows||[]).filter(r=>r.date===agP.n1||r.date===agP.n2).forEach(r=>{
+    if(!agBc[r.bc])agBc[r.bc]={bc:r.bc,am:r.am||bc2am[r.bc]||'—',n1:0,n2:0};
+    agBc[r.bc][r.date===agP.n1?'n1':'n2']++;
+  });
+  Object.values(agBc).sort((a,b)=>b.n1-a.n1).slice(0,8).forEach(it=>{
+    const d=aiVhDelta(it.n1,it.n2,'cnt',false);
+    s+=`+ BC ${it.bc} ${it.n1} đơn, ${d.delta}\n`;
+  });
+}
+if(rotP.ok){
+  const rotD=aiVhDelta(rotN1,rotN2,'cnt',false);
+  s+=`\n- Rớt LC ${rotN1} đơn [${shortD(rotP.n1)}], ${rotD.delta} => ${rotD.verdict}\n`;
+  s+=`=> Các BC rớt LC bất thường:\n`;
+  aiVhBcBad(gBC,odrBC,oprBC,fdBC,rotData,agRows,rotP.n1,rotP.n2,'rot').slice(0,8).forEach(it=>{
+    const d=aiVhDelta(it.v1,it.v2,'cnt',false);
+    s+=`+ BC ${it.bc} ${Math.round(it.v1)} đơn, ${d.delta}\n`;
+  });
+}
+if(odrP.ok){
+  const odrD=aiVhDelta(odrV.n1,odrV.n2,'pct',true);
+  s+=`\n• ODR TTS ${aiVhFmtVal(odrV.n1,'pct')} [${shortD(odrP.n1)}] , ${odrD.delta} => ${odrD.verdict}\n`;
+  s+=`=> Các BC có ODR giảm bất thường:\n`;
+  aiVhBcBad(gBC,odrBC,oprBC,fdBC,rotData,agRows,odrP.n1,odrP.n2,'odr').slice(0,8).forEach(it=>{
+    const d=aiVhDelta(it.v1,it.v2,'pct',true);
+    s+=`+ BC ${it.bc} ${it.v1.toFixed(1)}%, ${d.delta}\n`;
+  });
+}
+if(oprP.ok){
+  const oprD=aiVhDelta(oprV.n1,oprV.n2,'pct',true);
+  s+=`\n• OPR TTS ${aiVhFmtVal(oprV.n1,'pct')} [${shortD(oprP.n1)}] , ${oprD.delta} => ${oprD.verdict}\n`;
+  s+=`=> Các BC có OPR giảm bất thường:\n`;
+  aiVhBcBad(gBC,odrBC,oprBC,fdBC,rotData,agRows,oprP.n1,oprP.n2,'opr').slice(0,8).forEach(it=>{
+    const d=aiVhDelta(it.v1,it.v2,'pct',true);
+    s+=`+ BC ${it.bc} ${it.v1.toFixed(1)}%, ${d.delta}\n`;
+  });
+}
+if(ltkS?.n1){
+  const ltPrev=ltkS.total.lt-ltkS.total.dLt;
+  const ltD=aiVhDelta(ltkS.total.lt,ltPrev,'h',false);
+  s+=`\n- Leadtime KCT ${ltkS.total.lt.toFixed(2)}h [${shortD(ltkS.n1)}], ${ltD.delta} => ${ltD.verdict}\n`;
+  const worst=ltkS.warehouses.slice().sort((a,b)=>b.lt-a.lt)[0];
+  s+=`=> bất thường cần chú ý: ${worst?`${worst.short} LT=${worst.lt.toFixed(2)}h (${worst.dLt>=0?'+':''}${worst.dLt.toFixed(2)}h so N-1)`:'—'}\n`;
+}
+s+=`\n### THỐNG KÊ ĐÃ TÍNH — PHẦN 2 BƯU CỤC BẤT ỔN\n`;
+if(!window._BATON?.rows?.length)s+=`(Chưa có BC Baton)\n`;
+(window._BATON?.rows||[]).forEach(r=>{
   const bc=r.bc,am=bc2am[bc]||'—';
-  s+=`\nBC ${i+1} — ${bc} (AM: ${am}, Tỉnh: ${r.tinh||'—'})\n`;
-  s+=`- Tồn LM: ${fmt(r.blLmTong)}, %Tồn>5N: ${r.pctBlLmOver5.toFixed(1)}%, Lý do: ${r.lyDo||'—'}\n`;
-  aiBcProfileLines(bc,am,sects,n1,n2,null).forEach(l=>s+=`- ${l}\n`);
-  const agN1=agRows.filter(x=>x.bc===bc&&x.date===n1).length,agN2=agRows.filter(x=>x.bc===bc&&x.date===n2).length;
-  s+=`- Aging N-1: ${agN1} đơn · N-2: ${agN2} đơn · Δ: ${dCnt(agN1,agN2)}\n`;
-  });
-}
+  const g1=gtcP.ok?aiVhBcGtc(gBC,bc,gtcP.n1):null,g2=gtcP.ok?aiVhBcGtc(gBC,bc,gtcP.n2):null;
+  const f1=fdTP.ok?aiVhBcFd(fdBC,bc,fdTP.n1):null,f2=fdTP.ok?aiVhBcFd(fdBC,bc,fdTP.n2):null;
+  const a1=agP.ok?aiVhBcAging(agRows,bc,agP.n1):0,a2=agP.ok?aiVhBcAging(agRows,bc,agP.n2):0;
+  const gD=aiVhDelta(g1?.gtc,g2?.gtc,'pct',true);
+  const fD=aiVhDelta(f1,f2,'pct2',false);
+  const aD=aiVhDelta(a1,a2,'cnt',false);
+  s+=`\n• Bưu cục ${bc} (AM: ${am}, Tỉnh: ${r.tinh||'—'}):\n`;
+  s+=`+ GTC N-1 ${g1?g1.gtc.toFixed(1)+'% ['+shortD(gtcP.n1)+']':'—'}, ${gD.delta} => ${gD.trend}\n`;
+  s+=`+ FD total ${f1!=null?f1.toFixed(2)+'% ['+shortD(fdTP.n1)+']':'—'}, ${fD.delta} => ${fD.trend}\n`;
+  s+=`+ Aging ${a1} đơn [${agP.ok?shortD(agP.n1):'—'}], ${aD.delta} => ${aD.trend}\n`;
+  s+=`+ Tồn LM: ${fmt(r.blLmTong)}, Lý do Baton: ${r.lyDo||'—'}\n`;
+});
+s+=`\n### GỢI Ý PHÂN TÍCH (tham khảo khi viết nguyên nhân/giải pháp — KHÔNG copy vào báo cáo)\n`;
+const hintBCs=new Set();
+if(gtcP.ok)aiVhGtcBadBC(gBC,gtcP.n1,gtcP.n2,aiVhBcBad(gBC,odrBC,oprBC,fdBC,rotData,agRows,gtcP.n1,gtcP.n2,'gtc')).slice(0,12).forEach(it=>hintBCs.add(it.bc));
+if(fdTP.ok)aiVhBcBad(gBC,odrBC,oprBC,fdBC,rotData,agRows,fdTP.n1,fdTP.n2,'fd').slice(0,8).forEach(it=>hintBCs.add(it.bc));
+(window._BATON?.rows||[]).forEach(r=>hintBCs.add(r.bc));
+[...hintBCs].slice(0,20).forEach(bc=>{
+  const hints=aiVhNguyenNhan(bc,batonByBC);
+  if(hints&&hints!=='cần rà soát vận hành')s+=`- BC ${bc}: ${hints}\n`;
+});
+(window._BATON?.rows||[]).forEach(r=>{
+  s+=`- BC ${r.bc} (Baton): Tồn LM ${fmt(r.blLmTong)}, Lý do: ${r.lyDo||'—'} → gợi ý: ${aiVhGiaiPhap(r.bc,batonByBC)}\n`;
+});
 return s;
 }
 function aiCtxN1N2ManhYeu(){
@@ -4242,7 +4404,7 @@ return lines.join('\n')||'(Dữ liệu chưa được tải)';
 }
 const AI_SYSTEM_PROMPT=`Bạn đóng vai trò là CHUYÊN GIA CỐ VẤN VẬN HÀNH LOGISTICS Vùng TNT (GHN). Nhiệm vụ: đọc dữ liệu, đưa ra nhận định chuyên sâu, cảnh báo rủi ro và khuyến nghị hành động cụ thể. CHỈ phân tích dựa trên đúng phần DỮ LIỆU được cung cấp; nếu thiếu số liệu, nói rõ KHÔNG bịa. Trả lời tiếng Việt.
 LƯU Ý: Phần "NGUỒN DỮ LIỆU AI TỰ TÌM/ĐỌC" được TÍNH TRỰC TIẾP từ sheet thô — ưu tiên dùng các con số này, đọc kỹ để hiểu ngữ cảnh từng AM/Bưu Cục trước khi nhận định, không suy diễn ngoài dữ liệu. Khi câu hỏi có chỉ số trong nháy kép (vd "GTC TTS", "FD Total"), đó là tên nguồn/sheet cần phân tích — chỉ dùng đúng phần dữ liệu khớp tên đó.
-MỐC THỜI GIAN (RẤT QUAN TRỌNG): TẤT CẢ các nhóm dữ liệu đều được canh theo CÙNG MỘT MỐC THỜI GIAN CHUNG — N-1 là ngày mới nhất chung, N-7 = N-1 trừ đúng 6 ngày lịch. Khi so sánh chéo giữa các chỉ số (GTC, FD, Ontime, Aging, Rớt LC, Nhân sự, Năng suất, Baton) PHẢI hiểu chúng cùng một mốc ngày. Nếu một nhóm dữ liệu có ghi chú "[⚠ LỆCH MỐC...]" nghĩa là sheet đó cập nhật chậm, chỉ có dữ liệu đến ngày sớm hơn mốc chung — phải nêu rõ điều này khi nhận định, KHÔNG so sánh nhầm như thể cùng ngày.
+MỐC THỜI GIAN (RẤT QUAN TRỌNG): Mốc vận hành N-1/N-7 lấy từ sheet GTC/FD/ODR/OPR (ngày mới nhất trong nhóm vận hành). Aging, HRON, Năng suất có thể cập nhật khác ngày — khi so sánh chéo PHẢI dùng đúng ngày ghi trong từng block dữ liệu; nếu có ghi chú "[⚠ LỆCH MỐC...]" nghĩa là nhóm đó chưa có dữ liệu tới mốc vận hành N-1.
 ĐỊNH NGHĨA THUẬT NGỮ: "Tồn LM" (= cột BL LM / blLmTong trong Baton) = TỒN ĐƠN TRÊN HỆ THỐNG — tức số đơn còn tồn đọng chưa được xử lý/đẩy đi trên hệ thống Last Mile. CÀNG CAO CÀNG TỆ. KHÔNG hiểu nhầm đây là sản lượng (Vol) hay đơn đã giao. "%Tồn LM >5N" = tỉ trọng tồn đơn quá 5 ngày — càng cao càng tệ.
 ĐẶC BIỆT về NHÂN SỰ (Định biên/HRON): số nhân sự GIẢM là TÍN HIỆU XẤU (rủi ro thiếu người, ảnh hưởng năng suất/giao hàng) — đánh dấu cảnh báo; số nhân sự TĂNG là tín hiệu tốt. Khi BC bất ổn đi kèm nhân sự giảm, mức rủi ro càng cao.
 
@@ -4298,6 +4460,7 @@ const card=document.getElementById('aiResultCard');card.style.display='block';
 document.getElementById('aiResultArea').innerHTML='<div class="ai-thinking"><div class="ai-thinking-dot"></div><div class="ai-thinking-dot"></div><div class="ai-thinking-dot"></div><span style="margin-left:8px">AI đang phân tích...</span></div>';
 const mode=window._aiMode||'preset';
 let ctx,scopeNote='',forceDS='',maxTokens=4096,systemPrompt=AI_SYSTEM_PROMPT;
+const isBaoCaoVH=aiIsBaoCaoVanHanhPrompt(userQ);
 const isBatonHR=aiIsBatonHRPrompt(userQ);
 const isLTKCT=aiIsLTKCTPrompt(userQ);
 const isAmAnalysis=aiIsAmTongQuanPrompt(userQ);
@@ -4305,7 +4468,15 @@ const amTarget=aiDetectAmFromQuestion(userQ);
 window._AI_ANCHOR=null; // tính lại mốc thời gian chung sau khi nạp dữ liệu cho lần phân tích này
 try{
   await aiEnsureCoreSheets();
-  if(isBatonHR){
+  if(isBaoCaoVH){
+  document.getElementById('aiStatus').textContent='⏳ Đang nạp dữ liệu báo cáo vận hành (mẫu đầy đủ)...';
+  await aiEnsureData(true,true,true,true,true,true,true);
+  window._AI_ANCHOR=null;
+  ctx=aiCtxBaoCaoVanHanh();
+  scopeNote=`Phạm vi: BÁO CÁO VẬN HÀNH VÙNG TNT · thống kê N-1 vs N-2 đã tính sẵn (mỗi chỉ số ngày mới nhất sheet riêng) · AI chỉ copy số + viết giải pháp.`;
+  systemPrompt=AI_SYSTEM_PROMPT+AI_SYSTEM_PROMPT_BAO_CAO_VH_APPEND;
+  maxTokens=8192;
+  }else if(isBatonHR){
   document.getElementById('aiStatus').textContent='⏳ Đang nạp Baton + Nhân sự + Năng suất...';
   await aiEnsureData(true,false,false,true,true,true);
   const days=7;
@@ -4326,13 +4497,6 @@ try{
   ctx=aiCtxN1N2ManhYeu();
   scopeNote=`[TỔNG QUAN YẾU/TỐT N-1] So sánh N-1 vs N-2 · chỉ số tệ nhất vùng + top 5 BC kém nhất · chỉ text, không bảng.`;
   systemPrompt=AI_SYSTEM_PROMPT+AI_SYSTEM_PROMPT_MANH_YEU_APPEND;
-  maxTokens=8192;
-  }else if(aiIsBaoCaoVanHanhPrompt(userQ)){
-  document.getElementById('aiStatus').textContent='⏳ Đang nạp dữ liệu báo cáo vận hành (mẫu đầy đủ)...';
-  await aiEnsureData(true,true,true,true,true,true,true);
-  ctx=aiCtxBaoCaoVanHanh();
-  scopeNote=`Phạm vi: BÁO CÁO VẬN HÀNH VÙNG TNT (mẫu 2 phần) · N-1 vs N-2 · đủ GTC/FD/Aging/Rớt LC/ODR/OPR/LTK + BC Baton.`;
-  systemPrompt=AI_SYSTEM_PROMPT+AI_SYSTEM_PROMPT_BAO_CAO_VH_APPEND;
   maxTokens=8192;
   }else if(isAmAnalysis){
   const am=amTarget;
@@ -4401,7 +4565,7 @@ try{
   }
   }
   // ===== AI tự tìm/đọc sheet nguồn (bỏ qua Baton+HR, LTKCT, và phân tích AM để tránh nhiễu dữ liệu toàn vùng) =====
-  if(!isBatonHR&&!isLTKCT&&!isAmAnalysis&&!aiIsBaoCaoVanHanhPrompt(userQ)){
+  if(!isBatonHR&&!isLTKCT&&!isAmAnalysis&&!isBaoCaoVH){
   try{
   const subjForSearch=aiDetectLevelFromQuestion(userQ)||(document.getElementById('aiCustSubject')?.value==='bc'?'bc':'am');
   const daysSearch=+(document.getElementById('aiCustDays')?.value||document.getElementById('aiAllDays')?.value)||7;
