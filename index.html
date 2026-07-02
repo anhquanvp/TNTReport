@@ -2460,7 +2460,9 @@ const recSections=[
 const hasRec=recSections.length>0;
 const recHTML=hasRec?recSections.map(s=>`<div style="margin-bottom:12px"><div style="font-size:12px;font-weight:800;color:${s.c};margin-bottom:5px">${s.ic} ${s.t} <span style="color:var(--text-sub);font-weight:600">(${s.items.length} AM)</span></div>${s.items.map(it=>`<div style="font-size:12px;line-height:1.55;padding:5px 10px;background:#fff;border:1px solid var(--border);border-radius:8px;margin-bottom:5px">• ${it}</div>`).join('')}</div>`).join(''):'✅ Không có AM nào dưới ngưỡng cảnh báo trong ngày.';
 // ===== Render =====
-let h=`<div class="kpi-grid">${kAttr.map(k=>`<div class="kpi-card" style="border-top:none"><div class="kpi-ico" style="background:${k.bg}">${k.ic}</div><div class="kpi-label">${k.label}</div><div class="kpi-val" style="color:${k.c}">${k.val}</div><div style="font-size:10.5px;color:var(--text-sub);margin-top:4px">${k.tgt}</div>${k.d?`<div style="font-size:11px;font-weight:700;color:${k.d.col};margin-top:3px">${k.d.txt}</div>`:''}${k.sub?`<div style="display:flex;gap:6px;margin-top:8px">${k.sub.map(s=>`<div style="flex:1;background:#F8FAFC;border-radius:7px;padding:5px 4px;text-align:center"><div style="font-size:9px;font-weight:700;color:var(--text-sub)">${s.l}</div><div style="font-size:12px;font-weight:800;color:${s.c}">${s.v}</div></div>`).join('')}</div>`:''}</div>`).join('')}</div>`;
+const vhStats=ovVhQuickStats();
+let h=ovVhQuickStatsHTML(vhStats);
+h+=`<div class="kpi-grid">${kAttr.map(k=>`<div class="kpi-card" style="border-top:none"><div class="kpi-ico" style="background:${k.bg}">${k.ic}</div><div class="kpi-label">${k.label}</div><div class="kpi-val" style="color:${k.c}">${k.val}</div><div style="font-size:10.5px;color:var(--text-sub);margin-top:4px">${k.tgt}</div>${k.d?`<div style="font-size:11px;font-weight:700;color:${k.d.col};margin-top:3px">${k.d.txt}</div>`:''}${k.sub?`<div style="display:flex;gap:6px;margin-top:8px">${k.sub.map(s=>`<div style="flex:1;background:#F8FAFC;border-radius:7px;padding:5px 4px;text-align:center"><div style="font-size:9px;font-weight:700;color:var(--text-sub)">${s.l}</div><div style="font-size:12px;font-weight:800;color:${s.c}">${s.v}</div></div>`).join('')}</div>`:''}</div>`).join('')}</div>`;
 window._OV_SUMMARY={n1:latest,n2:prev};
 h+=`<div style="display:flex;align-items:center;justify-content:space-between;margin:18px 0 12px"><div style="font-size:15px;font-weight:800">📍 6 tỉnh Vùng TNT${am||bc?` <span style="font-size:12px;color:var(--text-sub);font-weight:600">· ${bc||am}</span>`:''}</div><div style="font-size:11.5px;color:var(--text-sub)">Bấm tab phía trên để xem phân tích chi tiết từng chỉ số</div></div>`;
 h+=`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px">${tinhCards}</div>`;
@@ -4064,12 +4066,16 @@ const bad=new Map();
 });
 return[...bad.values()].sort((a,b)=>a.v1-b.v1);
 }
-function aiCtxBaoCaoVanHanh(){
-const D=window._D||{},F=window._FD||{};
-const gBC=D.gtcTotalBC,odrBC=D.odrBC,oprBC=D.oprBC;
-const fdBC=D.fdTotalBC,fdTTSBC=D.fdTTSBC,fdSMEBC=D.fdSMEBC,fdShopeeBC=D.fdShopeeBC;
-const rotData=window._ROTLC||[],agRows=window._AGING?.rows||[];
-const{bc2tinh,bc2am}=ovBuildBcMaps(gBC);
+function aiVhQuickRow(lb,n1,n2,v1,v2,type,hb){
+if(v1==null||v2==null||!n1||!n2||!isFinite(v1)||!isFinite(v2))return null;
+const d=aiVhDelta(v1,v2,type,hb);
+return{lb,n1,n2,v1,v2,v1Fmt:aiVhFmtVal(v1,type),v2Fmt:aiVhFmtVal(v2,type),delta:d.delta,verdict:d.verdict,trend:d.trend,worse:d.worse,type};
+}
+function ovVhQuickStats(src){
+const D=src?.D||window._D||{},F=src?.F||window._FD||{};
+const gBC=D.gtcTotalBC,odrBC=D.odrBC,oprBC=D.oprBC,fdBC=D.fdTotalBC;
+const rotData=src?.rotData||window._ROTLC||[],agRows=src?.agRows||window._AGING?.rows||[];
+const{bc2tinh}=ovBuildBcMaps(gBC);
 const gtcP=aiVhLatestPair(aiVhSheetDates(gBC,2));
 const odrP=aiVhLatestPair(aiVhSheetDates(odrBC,2));
 const oprP=aiVhLatestPair(aiVhSheetDates(oprBC,2));
@@ -4080,36 +4086,62 @@ const fdShopP=aiVhLatestPair(aiVhSheetDates(F.shopeeAM,1));
 const agP=aiVhLatestPair((agRows||[]).map(r=>r.date));
 const rotP=aiVhLatestPair((rotData||[]).map(r=>r.date));
 const ltkS=ltkctOvSummary();
-const n1=gtcP.n1||'';
-if(!n1)return'(Chưa đủ dữ liệu GTC)';
-window._AI_ANCHOR={n1,n7:aiShiftISO(n1,-6),all:[n1,gtcP.n2].filter(Boolean),opsN1:n1};
-const batonByBC={};(window._BATON?.rows||[]).forEach(r=>{batonByBC[r.bc]=r;});
-const regGtc=(dt)=>dt?ovRegionTotals(gBC,odrBC,oprBC,fdBC,rotData,agRows,bc2tinh,dt).gtc:null;
-const regOdr=(dt)=>dt?ovRegionTotals(gBC,odrBC,oprBC,fdBC,rotData,agRows,bc2tinh,dt).odr:null;
-const regOpr=(dt)=>dt?ovRegionTotals(gBC,odrBC,oprBC,fdBC,rotData,agRows,bc2tinh,dt).opr:null;
-const gtcV={n1:regGtc(gtcP.n1),n2:regGtc(gtcP.n2)};
-const odrV={n1:regOdr(odrP.n1),n2:regOdr(odrP.n2)};
-const oprV={n1:regOpr(oprP.n1),n2:regOpr(oprP.n2)};
+const reg=(dt,k)=>dt?ovRegionTotals(gBC,odrBC,oprBC,fdBC,rotData,agRows,bc2tinh,dt)[k]:null;
 const fdTotal=aiVhFdReg(F.totalAM,fdTP.n1,fdTP.n2);
 const fdTTS=aiVhFdReg(F.ttsAM,fdTtsP.n1,fdTtsP.n2);
 const fdSME=aiVhFdReg(F.smeAM,fdSmeP.n1,fdSmeP.n2);
 const fdShop=aiVhFdReg(F.shopeeAM,fdShopP.n1,fdShopP.n2);
 const agCnt1=aiVhAgingCnt(agRows,agP.n1),agCnt2=aiVhAgingCnt(agRows,agP.n2);
 const rotN1=aiVhRotCnt(rotData,rotP.n1),rotN2=aiVhRotCnt(rotData,rotP.n2);
+const rows=[];
+const push=(lb,p,v1,v2,type,hb)=>{const r=aiVhQuickRow(lb,p.n1,p.n2,v1,v2,type,hb);if(r)rows.push(r);};
+if(gtcP.ok)push('GTC',gtcP,reg(gtcP.n1,'gtc'),reg(gtcP.n2,'gtc'),'pct',true);
+if(fdTP.ok)push('FD Total',fdTP,fdTotal.n1,fdTotal.n2,'pct2',false);
+if(fdTtsP.ok)push('FD TTS',fdTtsP,fdTTS.n1,fdTTS.n2,'pct2',false);
+if(fdSmeP.ok)push('FD SME',fdSmeP,fdSME.n1,fdSME.n2,'pct2',false);
+if(fdShopP.ok)push('FD Shopee',fdShopP,fdShop.n1,fdShop.n2,'pct2',false);
+if(agP.ok)push('Aging >5N',agP,agCnt1,agCnt2,'cnt',false);
+if(rotP.ok)push('Rớt LC',rotP,rotN1,rotN2,'cnt',false);
+if(odrP.ok)push('ODR TTS',odrP,reg(odrP.n1,'odr'),reg(odrP.n2,'odr'),'pct',true);
+if(oprP.ok)push('OPR TTS',oprP,reg(oprP.n1,'opr'),reg(oprP.n2,'opr'),'pct',true);
+if(ltkS?.n1&&ltkS?.n2)push('Leadtime KCT',{n1:ltkS.n1,n2:ltkS.n2},ltkS.total.lt,ltkS.total.lt-ltkS.total.dLt,'h',false);
+const textLines=rows.map(r=>`• ${r.lb} [${shortD(r.n1)}]: ${r.v1Fmt} vs [${shortD(r.n2)}]: ${r.v2Fmt} → ${r.delta} => ${r.verdict}`);
+return{rows,textLines,gtcN1:gtcP.n1||'',pairs:{gtcP,odrP,oprP,fdTP,fdTtsP,fdSmeP,fdShopP,agP,rotP},values:{gtcV:{n1:reg(gtcP.n1,'gtc'),n2:reg(gtcP.n2,'gtc')},odrV:{n1:reg(odrP.n1,'odr'),n2:reg(odrP.n2,'odr')},oprV:{n1:reg(oprP.n1,'opr'),n2:reg(oprP.n2,'opr')},fdTotal,fdTTS,fdSME,fdShop,agCnt1,agCnt2,rotN1,rotN2},ltkS,bc2tinh};
+}
+function ovVhQuickStatsHTML(stats){
+if(!stats?.rows?.length)return'';
+const headers=['Chỉ số','N-1','Giá trị N-1','N-2','Giá trị N-2','Biến động','Đánh giá'];
+const tableRows=stats.rows.map(r=>[
+  r.lb,shortD(r.n1),r.v1Fmt,shortD(r.n2),r.v2Fmt,r.delta,
+  r.verdict==='tốt'?'🟢 tốt':r.verdict==='tệ'?'🔴 tệ':r.verdict
+]);
+let h=`<div class="card" style="margin-bottom:18px;border-color:#BFDBFE;background:linear-gradient(180deg,#EFF6FF 0%,#fff 55%)">`;
+h+=`<div class="card-header" style="border-bottom:1px solid #BFDBFE"><div class="card-title"><div class="card-icon" style="background:#2563EB">📊</div>So sánh nhanh N-1 vs N-2 — Toàn vùng TNT</div>`;
+h+=`<div class="card-info">Mỗi chỉ số lấy <strong>ngày mới nhất</strong> sheet riêng, so với ngày kề trước · Ngày báo cáo chính (GTC): <strong>${shortD(stats.gtcN1)}</strong></div></div>`;
+h+=`<div style="padding:0 0 4px">`;
+h+=monoCopyBox('SO SÁNH NHANH N-1 vs N-2',headers,tableRows,'Copy để dán báo cáo · Hoặc dùng tab AI → Báo cáo Vận hành');
+h+=`</div></div>`;
+return h;
+}
+function aiCtxBaoCaoVanHanh(){
+const D=window._D||{},F=window._FD||{};
+const gBC=D.gtcTotalBC,odrBC=D.odrBC,oprBC=D.oprBC;
+const fdBC=D.fdTotalBC,fdTTSBC=D.fdTTSBC,fdSMEBC=D.fdSMEBC,fdShopeeBC=D.fdShopeeBC;
+const rotData=window._ROTLC||[],agRows=window._AGING?.rows||[];
+const stats=ovVhQuickStats();
+const n1=stats.gtcN1;
+if(!n1)return'(Chưa đủ dữ liệu GTC)';
+const{gtcP,odrP,oprP,fdTP,fdTtsP,fdSmeP,fdShopP,agP,rotP}=stats.pairs;
+const{gtcV,odrV,oprV,fdTotal,fdTTS,fdSME,fdShop,agCnt1,agCnt2,rotN1,rotN2}=stats.values;
+const ltkS=stats.ltkS;
+const{bc2tinh,bc2am}=ovBuildBcMaps(gBC);
+window._AI_ANCHOR={n1,n7:aiShiftISO(n1,-6),all:[n1,gtcP.n2].filter(Boolean),opsN1:n1};
+const batonByBC={};(window._BATON?.rows||[]).forEach(r=>{batonByBC[r.bc]=r;});
 let s=`=== DỮ LIỆU BÁO CÁO VẬN HÀNH VÙNG TNT ===\n`;
 s+=`[Ngày báo cáo chính] ${shortD(n1)} (GTC) · Mỗi chỉ số so N-1 = ngày mới nhất sheet đó vs ngày kề trước\n`;
 s+=`[Nguồn] GTC→GTC Total BC · FD→FD AM sheets · Aging→Backupall · Rớt LC→Rot_LC_Raw · ODR/OPR→BC sheets · LTK→gid ${LTKCT_GID} · Baton→sheet Baton\n\n`;
 s+=`### SO SÁNH NHANH N-1 vs N-2 (tất cả chỉ số có data)\n\n`;
-if(gtcP.ok)s+=aiVhQuickCmp('GTC',gtcP.n1,gtcP.n2,gtcV.n1,gtcV.n2,'pct',true)+'\n';
-if(fdTP.ok)s+=aiVhQuickCmp('FD Total',fdTP.n1,fdTP.n2,fdTotal.n1,fdTotal.n2,'pct2',false)+'\n';
-if(fdTtsP.ok)s+=aiVhQuickCmp('FD TTS',fdTtsP.n1,fdTtsP.n2,fdTTS.n1,fdTTS.n2,'pct2',false)+'\n';
-if(fdSmeP.ok)s+=aiVhQuickCmp('FD SME',fdSmeP.n1,fdSmeP.n2,fdSME.n1,fdSME.n2,'pct2',false)+'\n';
-if(fdShopP.ok)s+=aiVhQuickCmp('FD Shopee',fdShopP.n1,fdShopP.n2,fdShop.n1,fdShop.n2,'pct2',false)+'\n';
-if(agP.ok)s+=aiVhQuickCmp('Aging >5N',agP.n1,agP.n2,agCnt1,agCnt2,'cnt',false)+'\n';
-if(rotP.ok)s+=aiVhQuickCmp('Rớt LC',rotP.n1,rotP.n2,rotN1,rotN2,'cnt',false)+'\n';
-if(odrP.ok)s+=aiVhQuickCmp('ODR TTS',odrP.n1,odrP.n2,odrV.n1,odrV.n2,'pct',true)+'\n';
-if(oprP.ok)s+=aiVhQuickCmp('OPR TTS',oprP.n1,oprP.n2,oprV.n1,oprV.n2,'pct',true)+'\n';
-if(ltkS?.n1&&ltkS?.n2)s+=aiVhQuickCmp('Leadtime KCT',ltkS.n1,ltkS.n2,ltkS.total.lt,ltkS.total.lt-ltkS.total.dLt,'h',false)+'\n';
+stats.textLines.forEach(l=>s+=l+'\n');
 s+=`\n### THỐNG KÊ ĐÃ TÍNH — PHẦN 1 TỔNG QUAN\n`;
 s+=`(AI: copy nguyên số liệu dưới đây, tự viết nguyên nhân + giải pháp — tham khảo block GỢI Ý cuối file)\n\n`;
 if(gtcP.ok){
